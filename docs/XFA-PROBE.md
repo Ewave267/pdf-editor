@@ -102,7 +102,20 @@ save as successful. It retains dynamic XFA rather than flattening the document.
 
 The build recipe uses pinned shared-library/V8 initialization tooling plus a
 small V8 TLS patch adjusted for this revision. It produces an explicit
-`PDF_EDITOR_PDFIUM_PATCHSET=1` package with source/patch/library hashes and
+`PDF_EDITOR_PDFIUM_PATCHSET=2` package with source/patch/library hashes and
 upstream/dependency license notices. CMake rejects the old unpatched package.
 See [the integration decision](adr/0001-isolated-xfa-probe.md) and
 [third-party build notes](../third_party/pdfium/README.md).
+
+## XFA radio and caption compatibility (patchset 2)
+
+Patch 0003 permits editing when a calculate node has no script or an empty
+expression; genuine calculation override rules still apply. Designer-generated
+empty placeholders previously made an entire radio group reject selections.
+Linux Arial substitution now prefers Liberation Sans, preserving the metrics
+of narrow rich-text captions rather than wrapping and clipping their last word.
+Install Liberation Sans on the runtime host (`liberation-sans-fonts` on Fedora,
+`fonts-liberation` on Ubuntu). The native package manifest includes this patch
+hash, and CMake rejects older dependency packages. Rebuild with
+`python3 tools/build_pdfium.py --skip-sync --jobs 4` when the pinned source is
+already present, then rebuild the viewer. For a fresh checkout omit `--skip-sync`.

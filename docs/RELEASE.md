@@ -16,8 +16,9 @@ installs the same files. The desktop entry requires `bin` on PATH. A GUI process
 stays running until its window closes; that is expected, not compilation.
 
 The local artifact targets Fedora 42 x86-64 with Qt 6.10.2 and glibc 2.41.
-Install runtime packages `bubblewrap qt6-qtbase qt6-qtdeclarative` and a font
-package such as `dejavu-sans-fonts`. A desktop session, Qt platform plugin and
+Install runtime packages `bubblewrap qt6-qtbase qt6-qtdeclarative` and
+`liberation-sans-fonts` for metric-compatible Arial substitution. A desktop
+session, Qt platform plugin and
 Qt Quick/QML runtime modules are required; no compiler, SDK, Python, Node.js or
 PDF.js is used by the application. Fedora 42 is the local build environment,
 not a promise of support for other distributions. Build separately against the

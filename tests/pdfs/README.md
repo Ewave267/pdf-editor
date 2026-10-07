@@ -49,3 +49,13 @@ by `safety_fixtures()` in `tools/generate_probe_fixtures.py`:
 Only open the loop fixtures through the isolated viewer/test harness. They are
 intended to reach real deadlines. See [SAFETY](../../docs/SAFETY.md) for the tests,
 measured budgets, scope and remaining release work.
+
+## XFA compatibility regressions
+
+`xfa-dynamic/empty-calculation.xdp` and its generated PDF extend the original
+controls fixture with empty/scriptless calculate nodes on checkboxes and radio
+groups. Both native and mouse/keyboard tests verify edits and save/reopen values.
+`xfa-dynamic/arial-caption.xdp` and its PDF compare a narrow rich Arial caption
+with the same caption requesting Liberation Sans explicitly, including visibility
+of its final word. These are original GPL-3.0-only synthetic documents; the
+reported maternity form remains outside the repository.

@@ -19,6 +19,31 @@ see [FORMS](docs/FORMS.md) and [SAVING](docs/SAVING.md). Step 7 adds kernel
 restrictions, allocation limits, hostile-document tests and controlled worker
 failure; see [SAFETY](docs/SAFETY.md).
 
+## Compatibility fix — XFA radios and clipped captions
+
+The reported nine-page maternity/parental leave form reproduced two PDFium
+compatibility bugs. Empty calculate placeholders prevented radio selections in
+section 6; missing Arial was substituted with fonts whose wider metrics wrapped
+and clipped the waiting-period caption. Native patchset 2 permits empty
+calculations to be edited and prefers Liberation Sans for Linux Arial fallback.
+Actual calculations and form-authored read-only conditions remain enforced.
+
+The original local form was validated without changing its bytes: all three
+section 3 squares work after opting into benefits; both section 6 province
+choices, waiting-period choices, every Quebec rate group and the dependent
+squares work. Saved datasets contain the expected values, and reopening retains
+selections. The entire waiting-period sentence now fits on one line. The form
+and derived local artifacts were not added to the repository.
+
+Added original empty-calculation and Arial-caption fixtures, automated native
+and mouse/keyboard persistence cases, and a pixel comparison with an explicit
+Liberation Sans caption. The pinned native rebuild passed all 69 upstream XML
+unit tests. The complete 6/6 CTest suite passed in 110 seconds, including all
+20 viewer results, native security checks and independent-reader round trips.
+The rebuilt Release archive also passed all 20 relocated-package viewer results.
+Rebuild instructions and runtime font dependencies are documented
+in [XFA-PROBE](docs/XFA-PROBE.md). Existing step 6 release gaps remain.
+
 ## Step 1 — Repository Foundation
 
 - [x] Add README with scope, build instructions, and project layout.

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- Copyright (c) 2026 PDF Form Editor contributors. Original synthetic fixture. -->
+<xdp:xdp xmlns:xdp="http://ns.adobe.com/xdp/">
+  <config xmlns="http://www.xfa.org/schema/xci/3.0/">
+    <present>
+      <pdf><version>1.7</version><renderPolicy>client</renderPolicy><interactive>1</interactive></pdf>
+      <script><runScripts>client</runScripts></script>
+    </present>
+    <acrobat><acrobat7><dynamicRender>required</dynamicRender></acrobat7></acrobat>
+  </config>
+  <template xmlns="http://www.xfa.org/schema/xfa-template/3.3/">
+    <subform name="form1" layout="tb" locale="en_US" restoreState="auto">
+      <pageSet>
+        <pageArea name="page1">
+          <contentArea x="0pt" y="0pt" w="612pt" h="792pt"/>
+          <medium stock="default" short="612pt" long="792pt"/>
+        </pageArea>
+      </pageSet>
+      <subform name="body" w="612pt" h="792pt" layout="position">
+        <field name="requested" x="20pt" y="20pt" w="88.9mm" h="5.65mm">
+          <ui><checkButton shape="round"/></ui><margin leftInset="1mm" rightInset="1mm"/>
+          <para vAlign="middle"/><font typeface="Courier New" weight="bold"/>
+          <caption placement="right" reserve="82.9mm"><para vAlign="middle"/>
+            <font typeface="Arial" size="9pt"/>
+            <value><exData contentType="text/html"><body xmlns="http://www.w3.org/1999/xhtml"><p style="font-weight:bold">Je n’observerai pas<span style="font-weight:normal"> le délai de carence d’une semaine.</span></p></body></exData></value>
+          </caption>
+          <items><integer>1</integer><integer>0</integer></items>
+        </field>
+        <field name="reference" x="20pt" y="60pt" w="88.9mm" h="5.65mm">
+          <ui><checkButton shape="round"/></ui><margin leftInset="1mm" rightInset="1mm"/>
+          <para vAlign="middle"/><font typeface="Courier New" weight="bold"/>
+          <caption placement="right" reserve="82.9mm"><para vAlign="middle"/>
+            <font typeface="Liberation Sans" size="9pt"/>
+            <value><exData contentType="text/html"><body xmlns="http://www.w3.org/1999/xhtml"><p style="font-weight:bold">Je n’observerai pas<span style="font-weight:normal"> le délai de carence d’une semaine.</span></p></body></exData></value>
+          </caption>
+          <items><integer>1</integer><integer>0</integer></items>
+        </field>
+      </subform>
+    </subform>
+  </template>
+</xdp:xdp>

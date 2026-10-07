@@ -72,3 +72,13 @@ on full XFA still returns a controlled error and retains the edits/additions.
 There is no autosave or recovery of in-memory form edits after a renderer crash.
 Step 7 retains application-owned additions, clears pending operations, and
 explicitly reports native form loss; see [SAFETY](SAFETY.md).
+
+### Form-authored conditional controls
+
+The locally reported maternity/parental leave XFA form enables section 6's
+Quebec “De base 55 %” checkbox only when “De base 70 %” is selected in the same
+Parentales or Adoption row. Selecting “Résidents du Québec seulement” alone
+leaves these checkboxes read-only; choosing “Spéciales 75 %” clears and locks
+them. These are document script rules, not overrides supplied by the editor.
+Both dependent checkboxes were verified with 70 % selected, including saved
+values and reopening. The reported document is not stored in the repository.

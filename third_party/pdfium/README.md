@@ -1,4 +1,4 @@
-# PDFium persistence patch
+# PDFium persistence and compatibility patches
 
 `patches/0001-xfa-persistence.patch` applies to PDFium revision
 `2fd6cff57d9412cc42ef1a7e4e0a59b13a1e7cec` (the pinned `chromium/8086` source).
@@ -25,3 +25,10 @@ The patched package includes a build manifest with revisions and SHA-256 hashes
 and retains upstream/dependency notices together with the project and
 distributor licenses. Project modifications use the repository's GPL-3.0-only
 license. This repository does not vendor the complete PDFium or V8 source tree.
+
+`patches/0003-xfa-radio-and-font-fallback.patch` makes empty calculation
+placeholders editable while retaining real calculation override checks. It also
+prefers Liberation Sans when substituting unavailable Arial on Linux. Patchset 2
+includes all three patches; install Liberation Sans in the runtime environment.
+Synthetic regression fixtures cover radio/checkbox edits and repeated saves with
+empty calculations, plus exact rendering of a fixed-height rich-text caption.

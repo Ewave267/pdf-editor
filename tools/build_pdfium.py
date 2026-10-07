@@ -106,6 +106,8 @@ def main():
     apply_patch(ROOT / "third_party/pdfium/patches/0002-v8-shared-library-tls.patch",
                 source / "v8", environment)
     apply_patch(PATCH, source, environment)
+    apply_patch(ROOT / "third_party/pdfium/patches/0003-xfa-radio-and-font-fallback.patch",
+                source, environment)
     build = source / "out/persistence"
     build.mkdir(parents=True, exist_ok=True)
     (build / "args.gn").write_text("""is_debug = false
@@ -141,12 +143,12 @@ target_os = "linux"
     shutil.copyfile(distributor / "LICENSE", package / "DISTRIBUTOR-LICENSE")
     (package / "NOTICE").write_text(
         "PDFium source revision: " + PDFIUM_REVISION + "\n"
-        "Modified by PDF Form Editor contributors for XFA persistence.\n"
+        "Modified by PDF Form Editor contributors for XFA persistence, radio editing and Linux font fallback.\n"
         "Project modifications are distributed under GPL-3.0-only; see PROJECT-LICENSE.\n"
         "Original PDFium and third-party notices: LICENSE and licenses/.\n"
         "Shared-library/V8 initialization recipe: DISTRIBUTOR-LICENSE.\n")
     (package / "PDFiumConfig.cmake").write_text(f'''set(PDFium_VERSION "{VERSION}")
-set(PDF_EDITOR_PDFIUM_PATCHSET "1")
+set(PDF_EDITOR_PDFIUM_PATCHSET "2")
 add_library(pdfium SHARED IMPORTED)
 set_target_properties(pdfium PROPERTIES
   IMPORTED_LOCATION "${{CMAKE_CURRENT_LIST_DIR}}/lib/libpdfium.so"
@@ -158,6 +160,7 @@ set_target_properties(pdfium PROPERTIES
             ["git", "rev-parse", "HEAD"], cwd=source / "v8", text=True).strip(),
         "depot_tools_revision": DEPOT_REVISION, "distributor_revision": DISTRIBUTOR_REVISION,
         "patch_sha256": hashlib.sha256(PATCH.read_bytes()).hexdigest(),
+        "radio_font_patch_sha256": hashlib.sha256((ROOT / "third_party/pdfium/patches/0003-xfa-radio-and-font-fallback.patch").read_bytes()).hexdigest(),
         "v8_tls_patch_sha256": hashlib.sha256((ROOT / "third_party/pdfium/patches/0002-v8-shared-library-tls.patch").read_bytes()).hexdigest(),
         "library_sha256": hashlib.sha256((package / "lib/libpdfium.so").read_bytes()).hexdigest(),
     }, indent=2) + "\n")
@@ -170,7 +173,7 @@ set_target_properties(pdfium PROPERTIES
     for library in ("libc++", "libc++abi"):
         shutil.copyfile(source / "third_party" / library / "src/LICENSE.TXT",
                         package / "licenses" / f"{library}.txt")
-    print(f"Built and XML-tested PDFium persistence patchset 1: {package}", flush=True)
+    print(f"Built and XML-tested PDFium persistence/compatibility patchset 2: {package}", flush=True)
 
 
 if __name__ == "__main__":

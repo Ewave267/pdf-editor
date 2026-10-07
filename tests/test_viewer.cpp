@@ -82,11 +82,34 @@ class ViewerTests : public QObject
 #endif
     }
   private slots:
+    void arialCaptionUsesMetricCompatibleFont()
+    {
+        PdfDocument document;
+        document.open(fixture("xfa-dynamic/arial-caption.pdf"));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        QSignalSpy images(&document, &PdfDocument::rendered);
+        document.requestRender(0, 1224);
+        QTRY_VERIFY_WITH_TIMEOUT(!images.isEmpty(), 10000);
+        const QImage image = qvariant_cast<QImage>(images.first()[1]);
+        // Same rich caption at y=20 and y=60 pt: Arial fallback must match
+        // explicit Liberation Sans, including the final word within the box.
+        const QImage requested = image.copy(64, 40, 470, 32);
+        const QImage reference = image.copy(64, 120, 470, 32);
+        QVERIFY(!requested.isNull());
+        QCOMPARE(requested, reference);
+        bool finalWordVisible = false;
+        for (int y = 0; y < requested.height(); ++y)
+            for (int x = 420; x < requested.width(); ++x)
+                finalWordVisible |= qGray(requested.pixel(x, y)) < 100;
+        QVERIFY(finalWordVisible);
+    }
+
     void formEventsAndPersistence_data()
     {
         QTest::addColumn<QString>("path");
         QTest::newRow("acroform") << QString("acroform/controls.pdf");
         QTest::newRow("xfa") << QString("xfa-dynamic/controls.pdf");
+        QTest::newRow("xfa-empty-calculation") << QString("xfa-dynamic/empty-calculation.pdf");
     }
     void formEventsAndPersistence()
     {

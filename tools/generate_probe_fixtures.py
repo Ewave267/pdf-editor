@@ -188,6 +188,10 @@ def generate(output_root: Path = ROOT) -> None:
         b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << >> >>",
     ]))
     (output_root / "tests/pdfs/acroform/controls.pdf").write_bytes(acroform_controls())
+    compatibility = ROOT / "tests/pdfs/xfa-dynamic/empty-calculation.xdp"
+    (output_root / "tests/pdfs/xfa-dynamic/empty-calculation.pdf").write_bytes(xfa_pdf(compatibility.read_bytes()))
+    font_layout = ROOT / "tests/pdfs/xfa-dynamic/arial-caption.xdp"
+    (output_root / "tests/pdfs/xfa-dynamic/arial-caption.pdf").write_bytes(xfa_pdf(font_layout.read_bytes()))
     controls = ROOT / "tests/pdfs/xfa-dynamic/controls.xdp"
     (output_root / "tests/pdfs/xfa-dynamic/controls.pdf").write_bytes(pdf([
         b"<< /Type /Catalog /Pages 2 0 R /AcroForm 4 0 R /NeedsRendering true /Extensions << /ADBE << /BaseVersion /1.7 /ExtensionLevel 8 >> >> >>",
