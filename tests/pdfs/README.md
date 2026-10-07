@@ -13,6 +13,8 @@ uncompressed PDFs with byte-accurate cross-reference tables.
 | --- | --- | --- |
 | `xfa-javascript/calculation.pdf` | Dynamic XFA packet array; editable input, initial calculation, exit-event JavaScript, denied URL action | Renders, executes JavaScript, edits, and preserves exact values across repeated saves |
 | `xfa-javascript/single-stream.pdf` | Same form as one XDP stream | Same exact round trip as packet arrays; independent PDF.js layout retains values |
+| `normal/single-page.pdf` | Original labeled/color-coded one-page viewer fixture | Opens and renders at 600 × 780 points |
+| `normal/multi-page.pdf` | Three labeled/color-coded pages with portrait, landscape and tall layouts | Every page and thumbnail preserves its own dimensions and color |
 | `normal/blank.pdf` | Valid one-page PDF without forms | Probe rejects it as non-XFA |
 | `malformed/not-a-pdf.pdf` | Invalid PDF bytes | Probe rejects it with a PDFium open error |
 

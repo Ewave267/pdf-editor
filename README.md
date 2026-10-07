@@ -3,15 +3,15 @@
 An open-source desktop application for completing PDF forms and adding text,
 signatures, and annotations, entirely offline.
 
-The project is in early development. The main executable is a repository
-foundation smoke check. A separate isolated PDFium probe now opens, renders,
-and interacts with a synthetic dynamic XFA form and executes its JavaScript.
-Step 2 verifies exact values through repeated saves and reopening in PDFium
-and an independent PDF.js reader. The editor UI has not been started.
+The project is in early development. The Linux Qt/QML viewer now opens PDFs,
+renders and scrolls pages, zooms, navigates by page number, and shows thumbnails.
+PDFium runs in an isolated worker behind a C++ document interface. Step 2 also
+verifies exact XFA values through repeated saves and independent PDF.js reopening.
+Form editing and saving in the viewer are later milestones.
 
-The planned stack is C++20, Qt Quick / QML, PDFium, and CMake. Qt and PDFium are
-not dependencies of the default foundation build. PDFium is an explicit,
-source-pinned, locally patched opt-in dependency for the Linux x64 XFA probe.
+The stack is C++20, Qt Quick / QML, PDFium, and CMake. The default build remains
+a dependency-free foundation check. Enable the viewer explicitly with
+`PDF_EDITOR_BUILD_VIEWER=ON` and the source-pinned, patched PDFium package.
 
 ## Build and verify
 
@@ -27,6 +27,21 @@ ctest --test-dir build --output-on-failure
 
 For a multi-configuration generator, add `--config Debug` to the build command
 and `-C Debug` to the test command. The executable will be under `build/Debug/`.
+
+## Minimal viewer
+
+Reuse the patched PDFium library from step 2. With Qt 6 development packages
+and Bubblewrap available:
+
+```sh
+cmake -S . -B build-viewer -DCMAKE_BUILD_TYPE=Debug \
+  -DPDF_EDITOR_BUILD_VIEWER=ON -DPDFium_DIR="$PWD/.deps/pdfium-patched"
+cmake --build build-viewer --parallel 4
+./build-viewer/pdf-form-editor
+```
+
+See [VIEWER](docs/VIEWER.md) for complete setup, controls, limits and test
+instructions, including this workspace's local Qt SDK configuration.
 
 ## Development
 
@@ -51,9 +66,9 @@ XFA; broader form compatibility belongs to the later MVP steps.
 ## Project layout
 
 - `src/app/`: application entry point and lifecycle.
-- `src/pdf/`: future PDFium abstraction.
+- `src/pdf/`: document interface, isolated renderer and XFA probe.
 - `src/document/`: future document and added-content models.
-- `src/ui/` and `qml/`: future desktop interface.
+- `src/ui/` and `qml/`: page painting and the Qt Quick viewer shell.
 - `tests/pdfs/`: compatibility corpus, organized by document type.
 - `docs/adr/`: architecture decision records.
 

@@ -27,6 +27,13 @@ See [XFA-PROBE](../docs/XFA-PROBE.md) for complete setup. Sandbox startup failur
 fails the suite; there is no unsandboxed fallback. The XML serializer's upstream
 unit tests are also run by the PDFium build recipe.
 
+With `PDF_EDITOR_BUILD_VIEWER=ON`, `viewer-integration` also runs four Qt/QML
+integration cases for rendering/thumbnail identity, document replacement and
+close, malformed/XFA input, sandbox failure, close during rendering, file dialog,
+zoom/fit, typed page navigation, thumbnail clicks and scrolling. QtTest uses
+`QT_QPA_PLATFORM=offscreen` and `QT_QUICK_BACKEND=software` automatically under
+CTest. See [VIEWER](../docs/VIEWER.md) for setup and limits.
+
 For each future fixture, record its source, redistribution license, expected
 behavior, and any privacy review. Add documents that expose bugs as regression
 fixtures when licensing and privacy permit.

@@ -1,0 +1,64 @@
+%PDF-1.7
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [4 0 R 6 0 R 8 0 R] /Count 3 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 600 780] /Resources << /Font << /F1 3 0 R >> >> /Contents 5 0 R >>
+endobj
+5 0 obj
+<< /Length 170 >>
+stream
+0.2 0.45 0.8 rg 32 96 536 588 re f
+0.12 0.18 0.25 rg BT /F1 30 Tf 48 716 Td (PAGE 1) Tj ET
+BT /F1 14 Tf 48 52 Td (Original synthetic viewer fixture - 600 x 780 pt) Tj ET
+
+endstream
+endobj
+6 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 780 600] /Resources << /Font << /F1 3 0 R >> >> /Contents 7 0 R >>
+endobj
+7 0 obj
+<< /Length 170 >>
+stream
+0.2 0.65 0.4 rg 32 96 716 408 re f
+0.12 0.18 0.25 rg BT /F1 30 Tf 48 536 Td (PAGE 2) Tj ET
+BT /F1 14 Tf 48 52 Td (Original synthetic viewer fixture - 780 x 600 pt) Tj ET
+
+endstream
+endobj
+8 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 420 840] /Resources << /Font << /F1 3 0 R >> >> /Contents 9 0 R >>
+endobj
+9 0 obj
+<< /Length 170 >>
+stream
+0.9 0.5 0.16 rg 32 96 356 648 re f
+0.12 0.18 0.25 rg BT /F1 30 Tf 48 776 Td (PAGE 3) Tj ET
+BT /F1 14 Tf 48 52 Td (Original synthetic viewer fixture - 420 x 840 pt) Tj ET
+
+endstream
+endobj
+xref
+0 10
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000133 00000 n 
+0000000203 00000 n 
+0000000329 00000 n 
+0000000550 00000 n 
+0000000676 00000 n 
+0000000897 00000 n 
+0000001023 00000 n 
+trailer
+<< /Size 10 /Root 1 0 R >>
+startxref
+1244
+%%EOF

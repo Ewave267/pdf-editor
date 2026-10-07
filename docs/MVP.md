@@ -125,17 +125,17 @@ QML should not call PDFium directly.
 
 Using representative single-page and multi-page PDFs:
 
-- [ ] A PDF can be selected and opened from the UI.
-- [ ] Every page renders.
-- [ ] Pages can be scrolled without visual corruption.
-- [ ] Zoom in works.
-- [ ] Zoom out works.
-- [ ] Fit-to-page or equivalent initial sizing is usable.
-- [ ] The user can navigate directly between pages.
-- [ ] Thumbnails correspond to the correct pages.
-- [ ] Opening a second document correctly closes or replaces the first document.
-- [ ] QML contains no direct PDFium API calls.
-- [ ] Closing a document releases its resources without crashing.
+- [x] A PDF can be selected and opened from the UI.
+- [x] Every page renders.
+- [x] Pages can be scrolled without visual corruption.
+- [x] Zoom in works.
+- [x] Zoom out works.
+- [x] Fit-to-page or equivalent initial sizing is usable.
+- [x] The user can navigate directly between pages.
+- [x] Thumbnails correspond to the correct pages.
+- [x] Opening a second document correctly closes or replaces the first document.
+- [x] QML contains no direct PDFium API calls.
+- [x] Closing a document releases its resources without crashing.
 
 ## Step 4 — Forms
 

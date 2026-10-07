@@ -4,11 +4,13 @@ Last updated: 2026-10-06
 
 ## Current state
 
-Steps 1 and 2 are implemented and verified locally. Step 2's isolated PDFium
+Steps 1, 2 and 3 are implemented and verified locally. Step 2's isolated PDFium
 probe preserves exact XFA input and calculated values across two save/reopen
 cycles for both packet-array and single-stream forms. Pinned PDF.js independently
 opens and lays out both saved generations and verifies the values.
-The editor UI has not been started. Step 3 can now begin.
+The Linux Qt/QML viewer opens and scrolls PDFs, zooms, fits pages, navigates by
+page number, and shows thumbnails. Rendering runs in an isolated asynchronous
+worker behind a C++ interface. Form editing and saving in the viewer are next.
 
 ## Step 1 — Repository Foundation
 
@@ -50,6 +52,48 @@ relayout need later form compatibility work. Independent PDF.js validation
 parses/layouts XFA and reads persisted values; it does not execute JavaScript.
 Adobe Acrobat compatibility has not been tested.
 
+## Step 3 — Minimal Viewer
+
+- [x] Add an opt-in Qt/QML application shell and local PDF file dialog.
+- [x] Keep PDFium calls and handles inside an isolated C++ rendering worker.
+- [x] Render single-page and mixed-size multi-page documents asynchronously.
+- [x] Scroll pages vertically and horizontally with bounded image caching.
+- [x] Add zoom in/out and fit-to-page sizing.
+- [x] Navigate with Previous/Next, typed page number and thumbnail clicks.
+- [x] Render thumbnails with the same page renderer and verify page identity.
+- [x] Replace a document and release its old worker, page model and cache.
+- [x] Close idle and actively rendering documents without crashing.
+- [x] Show controlled invalid-input and sandbox-startup errors; fail closed.
+- [x] Verify the actual QML controls and inspect a rendered screenshot.
+- [x] Add integration tests, CI coverage and [viewer instructions](docs/VIEWER.md).
+- [x] Record [ADR 0002](docs/adr/0002-viewer-render-worker.md).
+
+Step 3 local validation used Qt 6.10.2 and the existing patched PDFium library:
+
+```sh
+cmake -S . -B build-viewer -DCMAKE_CXX_COMPILER=/usr/bin/c++ -DCMAKE_BUILD_TYPE=Debug \
+  -DPDF_EDITOR_BUILD_VIEWER=ON -DPDF_EDITOR_BUILD_XFA_PROBE=ON \
+  -DPDFium_DIR="$PWD/.deps/pdfium-patched" -DCMAKE_PREFIX_PATH="$PWD/.deps/qt-sdk/usr"
+cmake --build build-viewer --parallel 4
+ctest --test-dir build-viewer --output-on-failure
+./build-viewer/pdf-form-editor
+```
+
+All 4 CTest entries pass: application identity, four viewer integration cases,
+eleven XFA regression/isolation tests, and the strict independent-reader XFA
+gate. Viewer tests use Qt's offscreen/software platform. Pixel checks verify
+all three differently sized pages and their thumbnails; UI checks exercise
+file-dialog acceptance, keyboard page entry, zoom/fit, thumbnails, navigation
+and scroll tracking. Replacement and close tests verify the old PID is gone,
+including close during active rendering. The default foundation build still
+passes independently. Qt development files were extracted locally; no system
+Qt packages were installed and PDFium was not rebuilt.
+
+Viewer limits and remaining compatibility work are in [VIEWER](docs/VIEWER.md).
+The viewer currently opens local, unencrypted PDFs; it has no form-editing or
+save controls yet. CI is configured for the combined suite but has not been run
+remotely. GPL-3.0-only licensing remains in place.
+
 ## Validation
 
 Passed locally:
@@ -75,8 +119,7 @@ formatting, workflow YAML, and the default foundation build/smoke test pass.
 The explicit compiler path bypasses the workspace's read-only ccache directory.
 Sandbox tests used approved tool escalation because the nested tool sandbox
 blocks Bubblewrap namespaces; the worker retained Bubblewrap isolation. CI is
-configured but has not been run remotely. This workspace lacks usable repository
-Git metadata; no commit or push was performed.
+configured but has not been run remotely. No commit or push was performed.
 
 The original unpatched binary failed both persistence encodings. Those failures
 are documented with their source fixes in [XFA-PROBE](docs/XFA-PROBE.md). CMake
@@ -87,7 +130,7 @@ now requires the patched package and rejects the original binary.
 | Step | Status | Next milestone |
 | --- | --- | --- |
 | 2 — Prove XFA First | Complete for committed fixtures | Expand compatibility during forms work |
-| 3 — Minimal Viewer | Not started; ready to begin | Qt/QML shell behind a C++ PDF abstraction |
+| 3 — Minimal Viewer | Complete for committed fixtures | Extend form interaction in step 4 |
 | 4 — Forms | Not started | AcroForm and representative XFA field interaction |
 | 5 — Added Content | Not started | Text, signature, and image object model |
 | 6 — Save | Not started | Preserve form changes and added content on reopen |

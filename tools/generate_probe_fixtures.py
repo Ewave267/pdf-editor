@@ -27,6 +27,23 @@ def stream(data: bytes) -> bytes:
     return f"<< /Length {len(data)} >>\nstream\n".encode() + data + b"\nendstream"
 
 
+def viewer_pdf(page_count: int) -> bytes:
+    sizes = [(600, 780), (780, 600), (420, 840)]
+    colors = [(0.2, 0.45, 0.8), (0.2, 0.65, 0.4), (0.9, 0.5, 0.16)]
+    kids = " ".join(f"{4 + 2 * i} 0 R" for i in range(page_count))
+    objects = [b"<< /Type /Catalog /Pages 2 0 R >>",
+               f"<< /Type /Pages /Kids [{kids}] /Count {page_count} >>".encode(),
+               b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"]
+    for index in range(page_count):
+        width, height = sizes[index]
+        red, green, blue = colors[index]
+        content = (f"{red} {green} {blue} rg 32 96 {width - 64} {height - 192} re f\n"
+                   f"0.12 0.18 0.25 rg BT /F1 30 Tf 48 {height - 64} Td (PAGE {index + 1}) Tj ET\n"
+                   f"BT /F1 14 Tf 48 52 Td (Original synthetic viewer fixture - {width} x {height} pt) Tj ET\n").encode()
+        objects.extend([f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {width} {height}] /Resources << /Font << /F1 3 0 R >> >> /Contents {5 + 2 * index} 0 R >>".encode(), stream(content)])
+    return pdf(objects)
+
+
 def generate(output_root: Path = ROOT) -> None:
     fixture = ROOT / "tests/pdfs/xfa-javascript/calculation.xdp"
     output_fixture = output_root / fixture.relative_to(ROOT)
@@ -63,6 +80,8 @@ def generate(output_root: Path = ROOT) -> None:
         b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
         b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << >> >>",
     ]))
+    (output_root / "tests/pdfs/normal/single-page.pdf").write_bytes(viewer_pdf(1))
+    (output_root / "tests/pdfs/normal/multi-page.pdf").write_bytes(viewer_pdf(3))
     (output_root / "tests/pdfs/malformed/not-a-pdf.pdf").write_bytes(b"This is not a PDF.\n")
 
 

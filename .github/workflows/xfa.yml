@@ -1,4 +1,4 @@
-name: XFA Probe
+name: PDF Integration
 
 on:
   push:
@@ -16,8 +16,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Install build and sandbox tools
-        run: sudo apt-get update && sudo apt-get install --yes bubblewrap ninja-build
+      - name: Install build, Qt, and sandbox tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes bubblewrap ninja-build qt6-base-dev qt6-declarative-dev \
+            qml6-module-qtquick qml6-module-qtquick-controls qml6-module-qtquick-dialogs \
+            qml6-module-qtquick-layouts qml6-module-qtquick-templates \
+            qml6-module-qtquick-window qml6-module-qtqml-workerscript qml6-module-qt-labs-folderlistmodel
       - uses: actions/cache@v4
         id: pdfium
         with:
@@ -31,7 +36,7 @@ jobs:
       - name: Configure
         run: >-
           cmake -S . -B build-xfa -DCMAKE_BUILD_TYPE=Release
-          -DPDF_EDITOR_BUILD_XFA_PROBE=ON -DPDFium_DIR="$PWD/.deps/pdfium-patched"
+          -DPDF_EDITOR_BUILD_XFA_PROBE=ON -DPDF_EDITOR_BUILD_VIEWER=ON -DPDFium_DIR="$PWD/.deps/pdfium-patched"
       - name: Build
         run: cmake --build build-xfa --parallel
       - name: Validate regressions, isolation, and independent-reader round trips
