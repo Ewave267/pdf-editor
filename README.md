@@ -20,6 +20,42 @@ The stack is C++20, Qt Quick / QML, PDFium, and CMake. The default build remains
 a dependency-free foundation check. Enable the viewer explicitly with
 `PDF_EDITOR_BUILD_VIEWER=ON` and the source-pinned, patched PDFium package.
 
+## Docker browser deployment
+
+```sh
+./docker.sh start
+./docker.sh stop
+./docker.sh rebuild
+```
+
+The helper prints the browser link, works from any directory, and reuses matching
+local PDFium files during rebuilds. `./docker.sh build` builds without replacing
+the desktop session; `status`, `logs`, and `url` are also available. Save edits
+before `rebuild`, which replaces the running session.
+
+The app opens fullscreen automatically. See
+[Docker deployment](docs/DOCKER-DEPLOYMENT.md). Compose exposes the host root
+at `~/host_fs` inside the container; file pickers start in the configured host
+user's home automatically. The GUI has access wherever that user has permissions.
+
+## Build the desktop app on Fedora / Red Hat
+
+```sh
+./compile.sh
+./build-release/pdf-form-editor
+```
+
+The script checks dependencies, asks before installing missing packages with
+`sudo dnf`, checks Qt/C++20 and Bubblewrap, and builds the Release viewer. It
+reuses a matching patched PDFium package; a fresh checkout performs the long
+PDFium/V8 source build once. RHEL needs repositories providing Qt 6.4+ and a
+C++20 compiler; unavailable packages are reported without changing repositories.
+
+Use `./compile.sh --yes` to approve dependency installation, `--no-install` to
+require existing dependencies, or `--package` to also create a portable archive
+in `dist/`. Run as your normal user. See `./compile.sh --help` and
+[release instructions](docs/RELEASE.md) for package/runtime limitations.
+
 ## Build and verify
 
 Requirements: CMake 3.20 or newer, a C++20 compiler, and a native build tool

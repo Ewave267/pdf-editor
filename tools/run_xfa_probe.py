@@ -21,8 +21,10 @@ def sandbox_command(worker: Path, library: Path, input_pdf: Path, output: Path) 
         "--clearenv", "--setenv", "LD_LIBRARY_PATH", "/pdfium", "--setenv", "HOME", "/tmp",
         "--setenv", "LANG", "C.UTF-8", "--ro-bind", "/usr", "/usr",
         "--symlink", "usr/lib", "/lib", "--symlink", "usr/lib64", "/lib64",
-        "--proc", "/proc", "--dev", "/dev", "--size", "67108864", "--tmpfs", "/tmp",
+        "--dir", "/proc", "--dir", "/dev", "--size", "67108864", "--tmpfs", "/tmp",
     ]
+    for device in ("/dev/null", "/dev/zero", "/dev/urandom", "/dev/random"):
+        command.extend(["--ro-bind", device, device])
     # Fonts and their configuration are runtime inputs, never writable host paths.
     for path in ("/etc/fonts", "/var/cache/fontconfig"):
         if Path(path).exists():

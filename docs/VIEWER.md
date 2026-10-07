@@ -10,6 +10,14 @@ validation gaps.
 
 ## Build and run
 
+On Fedora/RHEL-family Linux x86-64, run `./compile.sh` from the checkout (or
+`./compile.sh --package` to also produce a portable archive). The script handles
+dependency checks, optional DNF installation, Qt/toolchain and namespace checks,
+patched PDFium reuse/build, and Release compilation. `--yes` permits installation
+without prompting; `--no-install` never installs packages. RHEL repositories must
+provide Qt 6.4+ and a C++20 compiler; the script does not change repositories or
+security policy. For manual configuration, follow the instructions below.
+
 Requirements: CMake 3.20+, a C++20 compiler, Qt 6.4+ development packages for
 Core, Gui, Qml, Quick, QuickControls2 and Test, the corresponding Qt Quick QML
 runtime modules (including Dialogs and Layouts), Bubblewrap, and the patched

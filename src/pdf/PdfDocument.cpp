@@ -202,10 +202,13 @@ void PdfDocument::open(const QUrl& url)
                      "--symlink",     "usr/lib",
                      "/lib",          "--symlink",
                      "usr/lib64",     "/lib64",
-                     "--proc",        "/proc",
-                     "--dev",         "/dev",
+                     "--dir",         "/proc",
+                     "--dir",         "/dev",
                      "--size",        "67108864",
                      "--tmpfs",       "/tmp"};
+    for (const QString& device : {QString("/dev/null"), QString("/dev/zero"),
+                                  QString("/dev/urandom"), QString("/dev/random")})
+        args << "--ro-bind" << device << device;
     for (const QString& path : {QString("/etc/fonts"), QString("/var/cache/fontconfig")})
         if (QFileInfo::exists(path))
             args << "--ro-bind" << path << path;

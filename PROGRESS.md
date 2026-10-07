@@ -284,6 +284,103 @@ The original unpatched binary failed both persistence encodings. Those failures
 are documented with their source fixes in [XFA-PROBE](docs/XFA-PROBE.md). CMake
 now requires the patched package and rejects the original binary.
 
+## Native build helper — compile.sh
+
+Added an executable Fedora/RHEL-family Linux x86-64 build helper. It detects
+missing dependencies, confirms DNF installation (or accepts `--yes`), honors
+`--no-install`, and checks Qt 6.4+, CMake/C++20 and Bubblewrap before native work.
+It validates the cached PDFium manifest, patch/library hashes and runtime library
+compatibility; matching builds reuse PDFium. `--rebuild-pdfium` forces a rebuild.
+The script builds the Release desktop viewer and optionally creates the existing
+portable archive with `--package`. Repositories and security settings are not
+modified. RHEL package availability and modern toolchain requirements are reported
+as errors rather than assumed; no clean RHEL-machine test has been performed.
+
+Validation: Bash syntax and invalid-argument checks passed. Mocked dependency
+checks verified refusal in noninteractive mode, `--no-install`, and the explicit
+`--yes` DNF command/failure path without installing system packages. Local Fedora
+`--no-install --package` built the application and produced the approximately
+14 MiB archive. A subsequent `--no-install` run completed successfully and
+reported PDFium reuse. Fresh PDFium rebuilding was not repeated for this helper.
+
+## Docker host filesystem and initial file-picker folder
+
+Prepared a writable bind mount of the local host root at
+`/home/pdfeditor/host_fs`. Startup identifies the configured UID's host home from
+host `/etc/passwd` (with a unique owned `/home` directory fallback), without a
+`HOST_HOME` setting, and initializes Open, Save As and image pickers there.
+Native desktop startup defaults to the user's ordinary home. Host UID/GID still
+need to match the existing Compose configuration.
+
+The prepared Compose configuration disables SELinux labeling for this container
+instead of relabeling the host root. This gives the trusted GUI broad host-file
+access under its UID; PDF workers retain their own isolated filesystems and
+syscall restrictions. The Docker-compatible empty `/proc` and essential-device
+configuration is applied consistently to workers and the development probe.
+
+Host-home detection checks passed (spaces, invalid paths, directory-service
+fallback and ambiguous accounts); the file-picker regression passed. Native and
+Ubuntu Docker application builds succeeded; the full host CTest suite passed
+6/6 in 109.73 seconds. Automatic approval review rejected
+starting the writable host-root/SELinux-disabled deployment due to broad host
+exposure; explicit approval has been requested. At that point the existing container had not
+been replaced. A later user-launched deployment now has the requested root mount
+and was verified by read-only Docker inspection; browser scaling checks passed.
+
+## Docker container name
+
+Compose now names the container `pdf-editor`, allowing `docker start pdf-editor`
+and `docker stop pdf-editor`. The existing running container was renamed without
+recreation, preserving its mounts and security configuration. A later user-launched
+recreation applied the host-root mount.
+
+## Docker browser scaling
+
+Changed the noVNC landing-page default from remote resizing to local scaling.
+The fixed Xvfb desktop now fits the browser viewport while preserving its aspect
+ratio. Existing deployments can use
+`http://localhost:8080/vnc.html?autoconnect=true&resize=scale` immediately without
+recreation. Double-clicking the app title bar maximizes the Qt window, and the
+noVNC fullscreen button / Firefox F11 removes browser chrome.
+
+Headless browser checks passed against the running container at 1280x720 and
+1920x1080: the rendered desktop fits without overflow and adjusts when the
+browser viewport changes. The updated image uses this setting by default on
+future creation; the running container was not replaced for this change.
+
+## Docker lifecycle helper — docker.sh
+
+Added executable start/stop/rebuild commands, plus build/status/logs/url and help.
+The helper works from any directory, prints the scaling-enabled URL with the
+published port, preserves existing configuration on start, and waits for health.
+Rebuild validates cached native package hashes/version, builds the configured
+image, then recreates the desktop session. A source-build option is available.
+Build alone keeps the running session intact. Host files persist, but unsaved
+edits must be saved before rebuilding.
+
+Validation: Bash syntax and mocked lifecycle/error checks passed, including
+first creation, stop, cached/source rebuild selection, cache integrity mismatch,
+paths with spaces, custom ports, unhealthy startup and missing Docker access.
+Live status and already-running start passed without disrupting the user session.
+The real `build` path also passed, reused the native package, built the image and
+printed the expected browser URL. No live stop/recreation was performed for this
+helper validation, preserving the user's active document session.
+
+## Fullscreen application startup
+
+The desktop viewer now calls `showFullScreen()` on startup, filling the virtual
+Docker desktop automatically. noVNC continues scaling the desktop to the browser;
+Firefox F11 or the noVNC fullscreen button can also fill the physical screen.
+The browser walkthrough now maps clicks through the fullscreen canvas and fitted
+PDF page instead of the old window's fixed position.
+
+Validation: the Ubuntu image compiled successfully and an isolated test container
+showed a 1600x1000 application at desktop origin (0,0). The complete browser
+walkthrough passed for AcroForm and XFA editing, checkbox/radio/dropdown selection,
+clipboard paste, Save As and reopening; four outputs passed independent PDF.js
+checks. Syntax/formatting checks passed. The user's live PDF session was not
+recreated; save edits and use `./docker.sh rebuild` to apply the updated image.
+
 ## Remaining MVP steps
 
 | Step | Status | Next milestone |

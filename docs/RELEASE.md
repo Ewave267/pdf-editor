@@ -6,7 +6,10 @@ PDFium dependency notices. Qt and operating-system libraries come from the host.
 
 ## Build and install
 
-Use the viewer configuration in VIEWER.md, with `CMAKE_BUILD_TYPE=Release`.
+On Fedora/RHEL-family systems, `./compile.sh --package` builds the Release
+viewer and generates the archive in `dist/`. Dependency installation is confirmed
+interactively, or permitted explicitly with `--yes`. To configure manually,
+use the viewer configuration in VIEWER.md, with `CMAKE_BUILD_TYPE=Release`.
 After building, run `cpack --config build-viewer/CPackConfig.cmake -B dist`.
 The resulting `.tar.gz` has a single top-level directory. Extract it into a
 user-owned location and run `bin/pdf-form-editor`, optionally followed by a PDF

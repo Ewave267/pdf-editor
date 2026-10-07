@@ -1,0 +1,7 @@
+{
+  "name": "pdf-editor-docker-browser-check",
+  "private": true,
+  "type": "module",
+  "scripts": { "check": "node check.mjs" },
+  "devDependencies": { "playwright": "1.63.0" }
+}

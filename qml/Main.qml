@@ -24,6 +24,7 @@ ApplicationWindow {
         pdfDocument.currentPage = page
         pageView.positionViewAtIndex(pdfDocument.currentPage - 1, ListView.Beginning)
     }
+    property url initialFolder: typeof startupFolder !== "undefined" ? startupFolder : ""
     property string placement: ""
     property string pendingText: ""
     property url pendingImage
@@ -84,6 +85,7 @@ ApplicationWindow {
     FileDialog {
         id: imageDialog
         objectName: "imageDialog"
+        currentFolder: root.initialFolder
         property bool signature: false
         title: signature ? "Choose a signature image" : "Choose an image"
         nameFilters: ["Images (*.png *.jpg *.jpeg *.webp *.bmp)"]
@@ -99,6 +101,7 @@ ApplicationWindow {
     FileDialog {
         id: fileDialog
         objectName: "openDialog"
+        currentFolder: root.initialFolder
         title: "Open a PDF"
         nameFilters: ["PDF documents (*.pdf)", "All files (*)"]
         onAccepted: root.openFile(selectedFile)
@@ -106,6 +109,7 @@ ApplicationWindow {
     FileDialog {
         id: saveDialog
         objectName: "saveDialog"
+        currentFolder: root.initialFolder
         title: "Save a new PDF"
         fileMode: FileDialog.SaveFile
         nameFilters: ["PDF documents (*.pdf)"]

@@ -3,10 +3,12 @@
 #include "ui/AddedOverlay.h"
 #include "ui/FormInput.h"
 #include "ui/PdfPageItem.h"
+#include <QDir>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
+#include <QQuickWindow>
 #include <iostream>
 
 int main(int argc, char** argv)
@@ -30,9 +32,14 @@ int main(int argc, char** argv)
     PdfDocument document;
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("pdfDocument", &document);
+    const QString initialFolder =
+        qEnvironmentVariable("PDF_EDITOR_INITIAL_FOLDER", QDir::homePath());
+    engine.rootContext()->setContextProperty("startupFolder", QUrl::fromLocalFile(initialFolder));
     engine.load(QUrl("qrc:/qml/Main.qml"));
     if (engine.rootObjects().isEmpty())
         return 1;
+    if (auto* window = qobject_cast<QQuickWindow*>(engine.rootObjects().first()))
+        window->showFullScreen();
     if (argc == 2)
         document.open(QUrl::fromLocalFile(QString::fromLocal8Bit(argv[1])));
     return app.exec();

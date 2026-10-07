@@ -864,6 +864,26 @@ class ViewerTests : public QObject
             QVERIFY(!document.ready());
         }
     }
+    void fileDialogsStartInConfiguredFolder()
+    {
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+        PdfDocument document;
+        QQmlApplicationEngine engine;
+        const QUrl folder = QUrl::fromLocalFile(directory.path());
+        engine.rootContext()->setContextProperty("pdfDocument", &document);
+        engine.rootContext()->setContextProperty("startupFolder", folder);
+        engine.load(QUrl("qrc:/qml/Main.qml"));
+        QVERIFY(!engine.rootObjects().isEmpty());
+        auto* window = engine.rootObjects().first();
+        for (const QString& name :
+             {QString("openDialog"), QString("saveDialog"), QString("imageDialog")})
+        {
+            auto* dialog = window->findChild<QObject*>(name);
+            QVERIFY(dialog);
+            QCOMPARE(dialog->property("currentFolder").toUrl(), folder);
+        }
+    }
     void qmlControlsAndScrolling()
     {
         PdfDocument document;
