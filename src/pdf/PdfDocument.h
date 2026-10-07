@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
 
+#include "content/AddedContent.h"
 #include <QCache>
 #include <QImage>
 #include <QObject>
@@ -13,6 +14,7 @@
 class PdfDocument : public QObject
 {
     Q_OBJECT
+    Q_PROPERTY(AddedContent* additions READ additions CONSTANT)
     Q_PROPERTY(bool ready READ ready NOTIFY stateChanged)
     Q_PROPERTY(bool loading READ loading NOTIFY stateChanged)
     Q_PROPERTY(QString error READ error NOTIFY stateChanged)
@@ -27,6 +29,7 @@ class PdfDocument : public QObject
   public:
     explicit PdfDocument(QObject* parent = nullptr);
     ~PdfDocument() override;
+    AddedContent* additions() const { return additions_; }
     bool ready() const { return ready_; }
     bool loading() const { return loading_; }
     QString error() const { return error_; }
@@ -67,6 +70,7 @@ class PdfDocument : public QObject
     void receive();
     void nextRequest();
     void updateFit();
+    AddedContent* additions_;
     QProcess* worker_ = nullptr;
     QTimer deadline_;
     QByteArray incoming_, diagnostics_;

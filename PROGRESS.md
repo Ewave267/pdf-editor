@@ -4,13 +4,15 @@ Last updated: 2026-10-06
 
 ## Current state
 
-Steps 1, 2 and 3 are implemented and verified locally. Step 2's isolated PDFium
+Steps 1, 2, 3 and 5 are implemented and verified locally. Step 2's isolated PDFium
 probe preserves exact XFA input and calculated values across two save/reopen
 cycles for both packet-array and single-stream forms. Pinned PDF.js independently
 opens and lays out both saved generations and verifies the values.
 The Linux Qt/QML viewer opens and scrolls PDFs, zooms, fits pages, navigates by
 page number, and shows thumbnails. Rendering runs in an isolated asynchronous
-worker behind a C++ interface. Form editing and saving in the viewer are next.
+worker behind a C++ interface. Added text, images, and image-based signatures
+can be placed, selected, moved, resized, edited, and deleted. Step 4 form editing
+and step 6 saving remain pending. Additions are held in memory only.
 
 ## Step 1 — Repository Foundation
 
@@ -94,6 +96,25 @@ The viewer currently opens local, unencrypted PDFs; it has no form-editing or
 save controls yet. CI is configured for the combined suite but has not been run
 remotely. GPL-3.0-only licensing remains in place.
 
+## Step 5 — Added Content
+
+- [x] Add document-owned objects with stable IDs, page, geometry, type and content.
+- [x] Create text, local images, and image-based signatures with click placement.
+- [x] Select, drag, resize, delete, and edit added text through the QML interface.
+- [x] Render additions on pages and thumbnails independently of source PDF content.
+- [x] Keep coordinates stable across zoom and constrain edits to their original page.
+- [x] Snapshot image content and preserve exact text content in memory.
+- [x] Ask before discarding additions on open, close, or application exit.
+- [x] Validate all three types through model, rendering, and QML interaction tests.
+
+See [ADDED-CONTENT](docs/ADDED-CONTENT.md) for controls and limitations. Step 5
+was implemented independently of pending step 4. It supports image-based
+signatures; drawing signatures, saving, and recovery are not implemented.
+The two new viewer cases pass alongside the existing four viewer cases.
+The combined CTest suite passes 4/4 entries, including eleven XFA regressions
+and four independent-reader opens. Formatting and whitespace checks pass.
+No PDFium rebuild was needed. GPL-3.0-only licensing remains unchanged.
+
 ## Validation
 
 Passed locally:
@@ -132,7 +153,7 @@ now requires the patched package and rejects the original binary.
 | 2 — Prove XFA First | Complete for committed fixtures | Expand compatibility during forms work |
 | 3 — Minimal Viewer | Complete for committed fixtures | Extend form interaction in step 4 |
 | 4 — Forms | Not started | AcroForm and representative XFA field interaction |
-| 5 — Added Content | Not started | Text, signature, and image object model |
+| 5 — Added Content | Complete for synthetic fixtures | Save additions in step 6 |
 | 6 — Save | Not started | Preserve form changes and added content on reopen |
 | 7 — Safety | Not started | Broader untrusted PDF and JavaScript isolation testing |
 | 8 — MVP Release | Not started | Package the verified workflow for one desktop platform |

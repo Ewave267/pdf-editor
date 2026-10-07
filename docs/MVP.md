@@ -200,17 +200,17 @@ Objects must support:
 
 For each supported added-object type:
 
-- [ ] The object can be created on a selected page.
-- [ ] The object appears at the expected position.
-- [ ] The object can be selected.
-- [ ] The object can be moved.
-- [ ] The object can be resized where applicable.
-- [ ] The object can be deleted.
-- [ ] Added text preserves its content.
-- [ ] An image can be added from a local file.
-- [ ] A handwritten or image-based signature can be added.
-- [ ] Added objects remain associated with the correct page.
-- [ ] Added objects do not modify unrelated existing PDF content.
+- [x] The object can be created on a selected page.
+- [x] The object appears at the expected position.
+- [x] The object can be selected.
+- [x] The object can be moved.
+- [x] The object can be resized where applicable.
+- [x] The object can be deleted.
+- [x] Added text preserves its content.
+- [x] An image can be added from a local file.
+- [x] A handwritten or image-based signature can be added.
+- [x] Added objects remain associated with the correct page.
+- [x] Added objects do not modify unrelated existing PDF content.
 
 ## Step 6 — Save
 

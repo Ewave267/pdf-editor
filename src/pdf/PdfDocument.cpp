@@ -12,7 +12,7 @@
 #include <algorithm>
 #include <cmath>
 
-PdfDocument::PdfDocument(QObject* parent) : QObject(parent)
+PdfDocument::PdfDocument(QObject* parent) : QObject(parent), additions_(new AddedContent(this))
 {
     deadline_.setSingleShot(true);
     connect(&deadline_, &QTimer::timeout, this, [this]
@@ -55,6 +55,7 @@ void PdfDocument::stopWorker()
 
 void PdfDocument::close()
 {
+    additions_->clear();
     stopWorker();
     ready_ = loading_ = false;
     pages_.clear();

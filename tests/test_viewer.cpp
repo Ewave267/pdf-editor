@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "pdf/PdfDocument.h"
+#include "ui/AddedOverlay.h"
 #include "ui/PdfPageItem.h"
 #include <QFile>
 #include <QGuiApplication>
 #include <QJsonDocument>
+#include <QPainter>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
 #include <QQuickWindow>
 #include <QSignalSpy>
+#include <QTemporaryDir>
 #include <QtTest>
 #include <cmath>
 #include <csignal>
@@ -34,6 +37,203 @@ class ViewerTests : public QObject
 {
     Q_OBJECT
   private slots:
+    void addedContentLifecycleAndRendering()
+    {
+        PdfDocument document;
+        QFile source(fixture("normal/multi-page.pdf").toLocalFile());
+        QVERIFY(source.open(QIODevice::ReadOnly));
+        const QByteArray original = source.readAll();
+        document.open(fixture("normal/multi-page.pdf"));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        auto* content = document.additions();
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+        const QString imagePath = directory.filePath("signature.png");
+        QImage image(80, 40, QImage::Format_ARGB32);
+        image.fill(Qt::magenta);
+        QVERIFY(image.save(imagePath));
+        const QString text = QString::fromUtf8("Hello <b>world</b>\nRésumé — 日本語");
+        const int textId = content->addText(0, 30, 40, text);
+        const int imageId = content->addImage(1, 30, 40, QUrl::fromLocalFile(imagePath));
+        const int signatureId = content->addImage(2, 30, 40, QUrl::fromLocalFile(imagePath), true);
+        QVERIFY(textId > 0 && imageId > textId && signatureId > imageId);
+        QVERIFY(QFile::remove(imagePath)); // Imported image is owned, independent of the file.
+        QCOMPARE(content->count(), 3);
+        QCOMPARE(content->object(textId)["text"].toString(), text);
+        QCOMPARE(content->object(signatureId)["type"].toString(), "signature");
+        QCOMPARE(content->addImage(0, 0, 0, QUrl("https://example.invalid/image.png")), -1);
+        QCOMPARE(content->addText(3, 0, 0, "invalid page"), -1);
+        QCOMPARE(content->count(), 3);
+        const QList<int> ids{textId, imageId, signatureId};
+        for (int page = 0; page < 3; ++page)
+        {
+            const int id = ids[page];
+            QCOMPARE(content->hit(page, 35, 45), id);
+            content->select(id);
+            QVERIFY(content->geometry(id, 60, 80, 100, 50));
+            QCOMPARE(content->object(id)["page"].toInt(), page);
+            QCOMPARE(content->object(id)["width"].toDouble(), 100.0);
+            QCOMPARE(content->hit(page, 65, 85), id);
+            QVERIFY(content->hit((page + 1) % 3, 65, 85) != id);
+            AddedOverlay overlay;
+            overlay.setContent(content);
+            overlay.setProperty("page", page);
+            overlay.setProperty("selection", false);
+            const auto dimensions = document.pages()[page].toMap();
+            for (double zoom : {0.5, 2.0})
+            {
+                overlay.setWidth(dimensions["width"].toDouble() * zoom);
+                overlay.setHeight(dimensions["height"].toDouble() * zoom);
+                QImage canvas(QSize(qRound(overlay.width()), qRound(overlay.height())),
+                              QImage::Format_ARGB32);
+                canvas.fill(Qt::transparent);
+                QPainter painter(&canvas);
+                overlay.paint(&painter);
+                painter.end();
+                QCOMPARE(canvas.pixelColor(qRound(20 * zoom), qRound(20 * zoom)).alpha(), 0);
+                if (page > 0)
+                    QCOMPARE(canvas.pixelColor(qRound(65 * zoom), qRound(85 * zoom)),
+                             QColor(Qt::magenta));
+                else
+                {
+                    bool ink = false;
+                    for (int y = 80 * zoom; y < 110 * zoom; ++y)
+                        for (int x = 60 * zoom; x < 150 * zoom; ++x)
+                            ink |= canvas.pixelColor(x, y).alpha() > 0;
+                    QVERIFY(ink);
+                }
+            }
+        }
+        QVERIFY(!content->geometry(textId, NAN, 0, 10, 10));
+        QVERIFY(content->geometry(textId, -20, 900, 900, 900));
+        QCOMPARE(content->object(textId)["x"].toDouble(), 0.0);
+        QCOMPARE(content->object(textId)["page"].toInt(), 0);
+        QCOMPARE(content->object(textId)["text"].toString(), text);
+        QVERIFY(content->setText(textId, "Edited text"));
+        QCOMPARE(content->object(textId)["text"].toString(), "Edited text");
+        for (int id : ids)
+        {
+            content->select(id);
+            content->removeSelected();
+            QVERIFY(content->object(id).isEmpty());
+        }
+        QCOMPARE(content->count(), 0);
+        QVERIFY(content->addText(0, 10, 10, "Temporary") > 0);
+        document.open(fixture("normal/single-page.pdf"));
+        QCOMPARE(content->count(), 0);
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        document.close();
+        source.seek(0);
+        QCOMPARE(source.readAll(), original);
+    }
+    void addedContentMouseInteraction()
+    {
+        PdfDocument document;
+        QQmlApplicationEngine engine;
+        engine.rootContext()->setContextProperty("pdfDocument", &document);
+        engine.load(QUrl("qrc:/qml/Main.qml"));
+        QVERIFY(!engine.rootObjects().isEmpty());
+        auto* window = qobject_cast<QQuickWindow*>(engine.rootObjects().first());
+        QVERIFY(QTest::qWaitForWindowExposed(window));
+        document.open(fixture("normal/multi-page.pdf"));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        auto* content = document.additions();
+        auto click = [&](QString name)
+        {
+            auto* target = item(window->contentItem(), name);
+            if (!target)
+                return false;
+            QTest::mouseClick(
+                window, Qt::LeftButton, Qt::NoModifier,
+                target->mapToScene(QPointF(target->width() / 2, target->height() / 2)).toPoint());
+            return true;
+        };
+        QVERIFY(click("addTextButton"));
+        auto* dialog = engine.rootObjects().first()->findChild<QObject*>("textDialog");
+        QVERIFY(dialog);
+        QTRY_VERIFY(dialog->property("visible").toBool());
+        auto* input = item(window->contentItem(), "addedTextInput");
+        QVERIFY(input);
+        input->setProperty("text", "User entered text");
+        QVERIFY(QMetaObject::invokeMethod(dialog, "accept"));
+        QTRY_COMPARE(window->property("placement").toString(), "text");
+        auto* mouse = item(window->contentItem(), "contentMouse0");
+        QVERIFY(mouse);
+        auto scene = [&](double x, double y)
+        { return mouse->mapToScene(QPointF(x * document.zoom(), y * document.zoom())).toPoint(); };
+        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, scene(45, 50));
+        QTRY_COMPARE(content->count(), 1);
+        const int textId = content->selected();
+        QCOMPARE(content->object(textId)["text"].toString(), "User entered text");
+        QVERIFY(std::abs(content->object(textId)["x"].toDouble() - 45) < 2);
+        QTemporaryDir dir;
+        QImage image(80, 40, QImage::Format_ARGB32);
+        image.fill(Qt::magenta);
+        const auto path = dir.filePath("image.png");
+        QVERIFY(image.save(path));
+        for (const QString type : {QString("text"), QString("image"), QString("signature")})
+        {
+            if (type != "text")
+            {
+                auto* picker = engine.rootObjects().first()->findChild<QObject*>("imageDialog");
+                QVERIFY(picker);
+                picker->setProperty("currentFolder", QUrl::fromLocalFile(dir.path()));
+                picker->setProperty("selectedFile", QUrl::fromLocalFile(path));
+                QVERIFY(click(type == "signature" ? "addSignatureButton" : "addImageButton"));
+                QTRY_VERIFY(picker->property("visible").toBool());
+                QTest::qWait(100);
+                QVERIFY(QMetaObject::invokeMethod(picker, "accept"));
+                QTRY_COMPARE(window->property("placement").toString(), type);
+                QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, scene(45, 50));
+            }
+            const int id = content->selected();
+            QCOMPARE(content->object(id)["type"].toString(), type);
+            QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, scene(60, 60));
+            QTest::mouseMove(window, scene(75, 80), 20);
+            QTest::mouseMove(window, scene(90, 100), 20);
+            QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, scene(90, 100));
+            QTRY_VERIFY(content->object(id)["x"].toDouble() > 65);
+            const auto before = content->object(id);
+            const double right =
+                before["x"].toDouble() + before["width"].toDouble() - 2 / document.zoom();
+            const double bottom =
+                before["y"].toDouble() + before["height"].toDouble() - 2 / document.zoom();
+            QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, scene(right, bottom));
+            QTest::mouseMove(window, scene(right + 25, bottom + 20), 20);
+            QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier,
+                                scene(right + 25, bottom + 20));
+            QTRY_VERIFY(content->object(id)["width"].toDouble() > before["width"].toDouble() + 15);
+            QVERIFY(click("deleteObjectButton"));
+            QTRY_COMPARE(content->count(), 0);
+        }
+        content->addText(0, 40, 115, "Do not discard silently");
+        content->addImage(0, 100, 180, QUrl::fromLocalFile(path));
+        content->addImage(0, 300, 280, QUrl::fromLocalFile(path), true);
+        if (qEnvironmentVariableIsSet("PDF_CONTENT_SCREENSHOT"))
+        {
+            QTest::qWait(150);
+            QVERIFY(window->grabWindow().save(qEnvironmentVariable("PDF_CONTENT_SCREENSHOT")));
+        }
+        auto* discard = engine.rootObjects().first()->findChild<QObject*>("discardDialog");
+        QVERIFY(discard);
+        QVERIFY(!window->close());
+        QTRY_VERIFY(discard->property("visible").toBool());
+        QVERIFY(QMetaObject::invokeMethod(discard, "reject"));
+        QVERIFY(window->isVisible());
+        QVERIFY(document.ready());
+        QVERIFY(click("closeButton"));
+        QTRY_VERIFY(discard->property("visible").toBool());
+        QVERIFY(document.ready());
+        QVERIFY(QMetaObject::invokeMethod(discard, "reject"));
+        QVERIFY(document.ready());
+        QCOMPARE(content->count(), 3);
+        QVERIFY(click("closeButton"));
+        QVERIFY(QMetaObject::invokeMethod(discard, "discarded"));
+        QTRY_VERIFY(!document.ready());
+        QCOMPARE(content->count(), 0);
+        window->close();
+    }
+
     void documentRenderingAndLifecycle()
     {
         PdfDocument document;
@@ -217,6 +417,9 @@ int main(int argc, char** argv)
 {
     QGuiApplication app(argc, argv);
     QQuickStyle::setStyle("Basic");
+    qmlRegisterType<AddedOverlay>("PdfEditor", 1, 0, "AddedOverlay");
+    qmlRegisterUncreatableType<AddedContent>("PdfEditor", 1, 0, "AddedContent",
+                                             "Owned by document");
     qmlRegisterType<PdfPageItem>("PdfEditor", 1, 0, "PdfPage");
     qmlRegisterUncreatableType<PdfDocument>("PdfEditor", 1, 0, "PdfDocument",
                                             "Provided by the application");

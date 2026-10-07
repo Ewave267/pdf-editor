@@ -4,6 +4,8 @@ The Linux Qt/QML viewer opens local PDFs, renders pages, scrolls vertically and
 horizontally, zooms, fits pages to the viewport, and navigates by page number,
 Previous/Next, or thumbnails. The sidebar uses the same renderer as the main
 pages. The default dependency-free foundation build remains available.
+Step 5 adds [text, images and image-based signatures](ADDED-CONTENT.md) in a
+separate overlay; additions are in memory until step 6 implements saving.
 
 ## Build and run
 
@@ -52,6 +54,7 @@ the viewer never runs the renderer unconfined.
 Opening a second document clears the old page model, cached images and pending
 requests before starting a new renderer. Password-protected documents currently
 produce an error; password entry, form editing and saving are later milestones.
+With additions present, open and close require confirmation before discarding.
 
 ## Architecture and limits
 
@@ -85,7 +88,7 @@ and real-world XFA compatibility remain later milestones.
 ## Validation
 
 `viewer-integration` uses QtTest and the actual QML scene on Qt's offscreen,
-software-rendered platform. Four integration cases verify:
+software-rendered platform. Six integration cases verify:
 
 - All three mixed-size fixture pages render at the correct dimensions and
   colors; full-size and thumbnail center pixels match for each page.
@@ -94,6 +97,10 @@ software-rendered platform. Four integration cases verify:
 - Closing during an active render releases the worker; missing Bubblewrap fails
   closed; file-dialog acceptance, zoom, fit, typed page navigation, thumbnail
   clicks and scrolling work through the UI.
+
+Two additional cases validate the added-content model, rendering, file pickers,
+placement, dragging, resizing, deletion, and discard protection; see
+[ADDED-CONTENT](ADDED-CONTENT.md).
 
 The screenshot was visually inspected. Source fixtures are original synthetic
 GPL-3.0-only documents, not evidence of arbitrary PDF compatibility. The complete

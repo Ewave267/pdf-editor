@@ -70,7 +70,9 @@ endif()
 if(PDF_EDITOR_BUILD_VIEWER)
     find_program(BWRAP_EXECUTABLE bwrap REQUIRED)
     add_library(pdf-viewer STATIC src/pdf/PdfDocument.cpp src/pdf/PdfDocument.h
-        src/ui/PdfPageItem.cpp src/ui/PdfPageItem.h)
+        src/ui/PdfPageItem.cpp src/ui/PdfPageItem.h
+        src/content/AddedContent.cpp src/content/AddedContent.h
+        src/ui/AddedOverlay.cpp src/ui/AddedOverlay.h)
     target_compile_features(pdf-viewer PUBLIC cxx_std_20)
     target_include_directories(pdf-viewer PUBLIC src)
     target_link_libraries(pdf-viewer PUBLIC Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick)

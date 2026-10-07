@@ -7,7 +7,9 @@ The project is in early development. The Linux Qt/QML viewer now opens PDFs,
 renders and scrolls pages, zooms, navigates by page number, and shows thumbnails.
 PDFium runs in an isolated worker behind a C++ document interface. Step 2 also
 verifies exact XFA values through repeated saves and independent PDF.js reopening.
-Form editing and saving in the viewer are later milestones.
+The viewer also supports adding, moving, resizing, and deleting text, images,
+and image-based signatures. These additions stay in memory; form editing and
+saving in the viewer are later milestones.
 
 The stack is C++20, Qt Quick / QML, PDFium, and CMake. The default build remains
 a dependency-free foundation check. Enable the viewer explicitly with
@@ -41,7 +43,8 @@ cmake --build build-viewer --parallel 4
 ```
 
 See [VIEWER](docs/VIEWER.md) for complete setup, controls, limits and test
-instructions, including this workspace's local Qt SDK configuration.
+instructions, including this workspace's local Qt SDK configuration. See
+[ADDED-CONTENT](docs/ADDED-CONTENT.md) for the step 5 tools and limitations.
 
 ## Development
 
@@ -67,7 +70,8 @@ XFA; broader form compatibility belongs to the later MVP steps.
 
 - `src/app/`: application entry point and lifecycle.
 - `src/pdf/`: document interface, isolated renderer and XFA probe.
-- `src/document/`: future document and added-content models.
+- `src/content/`: application-owned text, image, and signature objects.
+- `src/document/`: reserved for future document workflow models.
 - `src/ui/` and `qml/`: page painting and the Qt Quick viewer shell.
 - `tests/pdfs/`: compatibility corpus, organized by document type.
 - `docs/adr/`: architecture decision records.

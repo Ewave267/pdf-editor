@@ -24,7 +24,75 @@ ApplicationWindow {
         pdfDocument.currentPage = page
         pageView.positionViewAtIndex(pdfDocument.currentPage - 1, ListView.Beginning)
     }
-    function openFile(url) { pdfDocument.open(url) }
+    property string placement: ""
+    property string pendingText: ""
+    property url pendingImage
+    property var selectedObject: ({})
+    property var discardAction
+    function guarded(action) {
+        if (pdfDocument.additions.count > 0) { discardAction = action; discardDialog.open() }
+        else action()
+    }
+    function closeDocument() { guarded(function() { pdfDocument.close() }) }
+    function openFile(url) { guarded(function() { pdfDocument.open(url) }) }
+    onClosing: function(close) {
+        if (pdfDocument.additions.count > 0) {
+            close.accepted = false
+            guarded(function() { pdfDocument.close(); root.close() })
+        }
+    }
+    Dialog {
+        id: discardDialog
+        objectName: "discardDialog"
+        title: "Discard additions?"
+        anchors.centerIn: parent
+        modal: true
+        standardButtons: Dialog.Discard | Dialog.Cancel
+        Label { text: "Added content has not been saved. Discard it to continue?" }
+        onDiscarded: { const action = root.discardAction; root.discardAction = null; action() }
+    }
+    Dialog {
+        id: textDialog
+        objectName: "textDialog"
+        property bool editing: false
+        title: editing ? "Edit text" : "Add text"
+        anchors.centerIn: parent
+        width: Math.min(440, root.width - 40)
+        modal: true
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        function validateText() {
+            standardButton(Dialog.Ok).enabled = textInput.text.trim().length > 0 && textInput.text.length <= 10000
+        }
+        onOpened: { textInput.forceActiveFocus(); validateText() }
+        TextArea {
+            id: textInput
+            objectName: "addedTextInput"
+            width: parent.width
+            height: 140
+            wrapMode: TextEdit.Wrap
+            selectByMouse: true
+            placeholderText: "Enter text (up to 10,000 characters)"
+            onTextChanged: { if (textDialog.visible) textDialog.validateText() }
+        }
+        onAccepted: {
+            if (editing) pdfDocument.additions.setText(pdfDocument.additions.selected, textInput.text)
+            else if (textInput.text.trim().length > 0 && textInput.text.length <= 10000) { root.pendingText = textInput.text; root.placement = "text" }
+        }
+    }
+    FileDialog {
+        id: imageDialog
+        objectName: "imageDialog"
+        property bool signature: false
+        title: signature ? "Choose a signature image" : "Choose an image"
+        nameFilters: ["Images (*.png *.jpg *.jpeg *.webp *.bmp)"]
+        onAccepted: { root.pendingImage = selectedFile; root.placement = signature ? "signature" : "image" }
+    }
+    Shortcut { sequence: "Escape"; onActivated: { root.placement = ""; pdfDocument.additions.select(-1) } }
+    Connections {
+        target: pdfDocument.additions
+        function onChanged() { root.selectedObject = pdfDocument.additions.object(pdfDocument.additions.selected) }
+    }
+
 
     FileDialog {
         id: fileDialog
@@ -34,7 +102,7 @@ ApplicationWindow {
         onAccepted: root.openFile(selectedFile)
     }
     Shortcut { sequences: [StandardKey.Open]; onActivated: fileDialog.open() }
-    Shortcut { sequences: [StandardKey.Close]; onActivated: pdfDocument.close() }
+    Shortcut { sequences: [StandardKey.Close]; onActivated: root.closeDocument() }
     Shortcut { sequence: "Ctrl++"; onActivated: pdfDocument.zoom *= 1.2 }
     Shortcut { sequence: "Ctrl+-"; onActivated: pdfDocument.zoom /= 1.2 }
     Shortcut { sequence: "Ctrl+0"; onActivated: pdfDocument.fitToPage() }
@@ -48,7 +116,7 @@ ApplicationWindow {
             spacing: 10
             Label { text: "PDF FORM EDITOR"; font.pixelSize: 13; font.bold: true; color: "#354a60"; Layout.rightMargin: 12 }
             Button { objectName: "openButton"; text: "Open PDF"; onClicked: fileDialog.open(); Accessible.name: "Open PDF" }
-            Button { objectName: "closeButton"; text: "Close"; enabled: pdfDocument.ready || pdfDocument.loading; onClicked: pdfDocument.close() }
+            Button { objectName: "closeButton"; text: "Close"; enabled: pdfDocument.ready || pdfDocument.loading; onClicked: root.closeDocument() }
             Item { Layout.fillWidth: true }
             Button { objectName: "zoomOutButton"; text: "−"; enabled: pdfDocument.ready && pdfDocument.zoom > 0.25; onClicked: pdfDocument.zoom /= 1.2; Accessible.name: "Zoom out" }
             Label { objectName: "zoomLabel"; text: Math.round(pdfDocument.zoom * 100) + "%"; horizontalAlignment: Text.AlignHCenter; Layout.preferredWidth: 48; visible: pdfDocument.ready }
@@ -106,6 +174,7 @@ ApplicationWindow {
                             color: pdfDocument.currentPage === index + 1 ? "#dceaf8" : "#e8edf3"
                             border.color: pdfDocument.currentPage === index + 1 ? "#225a91" : "#cbd4df"
                             PdfPage {
+                                id: thumbnailPage
                                 objectName: "thumbnail" + index
                                 anchors.centerIn: parent
                                 width: Math.min(110, (parent.height - 10) * modelData.width / modelData.height)
@@ -113,6 +182,7 @@ ApplicationWindow {
                                 document: pdfDocument
                                 page: index
                             }
+                            AddedOverlay { anchors.fill: thumbnailPage; content: pdfDocument.additions; page: index; selection: false }
                         }
                         Label { anchors.bottom: parent.bottom; anchors.horizontalCenter: parent.horizontalCenter; text: index + 1; color: "#526579"; font.pixelSize: 12 }
                         MouseArea { anchors.fill: parent; onClicked: root.goToPage(index + 1); cursorShape: Qt.PointingHandCursor }
@@ -123,10 +193,26 @@ ApplicationWindow {
         Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
+            RowLayout {
+                id: contentTools
+                anchors.top: parent.top
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.margins: 8
+                height: 42
+                visible: pdfDocument.ready
+                Button { objectName: "addTextButton"; text: "Text"; onClicked: { textDialog.editing = false; textInput.text = ""; textDialog.open() } }
+                Button { objectName: "addImageButton"; text: "Image"; onClicked: { imageDialog.signature = false; imageDialog.open() } }
+                Button { objectName: "addSignatureButton"; text: "Signature"; onClicked: { imageDialog.signature = true; imageDialog.open() } }
+                Button { objectName: "editTextButton"; text: "Edit text"; visible: root.selectedObject.type === "text"; onClicked: { textDialog.editing = true; textInput.text = root.selectedObject.text; textDialog.open() } }
+                Button { objectName: "deleteObjectButton"; text: "Delete"; enabled: pdfDocument.additions.selected >= 0; onClicked: pdfDocument.additions.removeSelected() }
+                Label { Layout.fillWidth: true; elide: Text.ElideRight; text: root.placement ? "Click a page to place " + root.placement + " · Esc cancels" : pdfDocument.additions.error || (pdfDocument.additions.count ? "Unsaved additions · Drag to move; corner to resize" : "Add content to a page"); color: "#596878" }
+            }
             ListView {
                 id: pageView
                 objectName: "pageView"
                 anchors.fill: parent
+                anchors.topMargin: 58
                 visible: pdfDocument.ready
                 model: pdfDocument.pages
                 clip: true
@@ -154,7 +240,40 @@ ApplicationWindow {
                         height: modelData.height * pdfDocument.zoom + 2
                         color: "#ffffff"
                         border.color: "#c3cbd5"
-                        PdfPage { objectName: "page" + index; anchors.fill: parent; anchors.margins: 1; document: pdfDocument; page: index }
+                        PdfPage { id: fullPage; objectName: "page" + index; anchors.fill: parent; anchors.margins: 1; document: pdfDocument; page: index }
+                        AddedOverlay { anchors.fill: fullPage; content: pdfDocument.additions; page: index }
+                        MouseArea {
+                            objectName: "contentMouse" + index
+                            preventStealing: true
+                            anchors.fill: fullPage
+                            cursorShape: root.placement ? Qt.CrossCursor : Qt.ArrowCursor
+                            property var original: ({})
+                            property real startX
+                            property real startY
+                            property bool resizing: false
+                            onPressed: function(mouse) {
+                                pdfDocument.currentPage = index + 1
+                                const x = mouse.x / pdfDocument.zoom, y = mouse.y / pdfDocument.zoom
+                                if (root.placement) {
+                                    if (root.placement === "text") pdfDocument.additions.addText(index, x, y, root.pendingText)
+                                    else pdfDocument.additions.addImage(index, x, y, root.pendingImage, root.placement === "signature")
+                                    root.placement = ""
+                                    original = ({})
+                                    return
+                                }
+                                const id = pdfDocument.additions.hit(index, x, y)
+                                pdfDocument.additions.select(id)
+                                original = pdfDocument.additions.object(id)
+                                startX = x; startY = y
+                                resizing = id >= 0 && Math.abs(mouse.x - (original.x + original.width) * pdfDocument.zoom) < 12 && Math.abs(mouse.y - (original.y + original.height) * pdfDocument.zoom) < 12
+                                if (id < 0) mouse.accepted = false
+                            }
+                            onPositionChanged: function(mouse) {
+                                if (!pressed || original.id === undefined) return
+                                const dx = mouse.x / pdfDocument.zoom - startX, dy = mouse.y / pdfDocument.zoom - startY
+                                pdfDocument.additions.geometry(original.id, original.x + (resizing ? 0 : dx), original.y + (resizing ? 0 : dy), original.width + (resizing ? dx : 0), original.height + (resizing ? dy : 0))
+                            }
+                        }
                     }
                 }
             }
@@ -177,6 +296,7 @@ ApplicationWindow {
             Qt.callLater(function() { if (pdfDocument.ready) pageView.positionViewAtIndex(page, ListView.Beginning) })
         }
         function onStateChanged() {
+            root.placement = ""
             if (pdfDocument.ready) {
                 pdfDocument.updateViewport(pageView.width, pageView.height)
                 pageView.positionViewAtBeginning()
