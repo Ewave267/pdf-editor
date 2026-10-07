@@ -20,66 +20,39 @@ The stack is C++20, Qt Quick / QML, PDFium, and CMake. The default build remains
 a dependency-free foundation check. Enable the viewer explicitly with
 `PDF_EDITOR_BUILD_VIEWER=ON` and the source-pinned, patched PDFium package.
 
-## Standalone launcher
+## Native releases
 
-A compiled launcher can pull and start the editor with one command, print the
-browser link, and detect the user's shared home folder. Users need Docker and a
-browser; Go, Qt, Python and Compose are not needed. See
-[launcher setup and platform status](docs/LAUNCHER.md). Linux amd64 is the first
-validated target; Docker Desktop and ARM runtime compatibility remain experimental.
+The primary distribution direction is now native desktop packages: Windows ZIP
+with an executable and DLLs, Linux portable tarball and AppImage, and macOS app
+bundle. See [native release status and build instructions](docs/NATIVE-RELEASES.md).
+Linux bundling is implemented; native Windows/macOS workers still require porting.
+The previous Docker/Go implementation is preserved on `archive/docker-go`.
 
-## Docker browser deployment
+Linux release targets are RHEL 9, Fedora, and Ubuntu 22.04/24.04 or newer.
+The builder must bundle dependencies compiled against glibc 2.34 or older;
+the packaging tool enforces this baseline. Local Fedora previews require newer
+glibc and do not establish RHEL compatibility.
 
-On another Linux amd64 machine with Docker Engine and the Compose plugin,
-clone this repository and start the published image:
+The earlier [Docker deployment](docs/DOCKER-DEPLOYMENT.md) and
+[Go launcher](docs/LAUNCHER.md) remain available on the archive branch. Neither
+is required for the native packages.
 
-```sh
-git clone <YOUR_GITHUB_REPOSITORY_URL> pdf-editor
-cd pdf-editor
-PDF_EDITOR_UID="$(id -u)" PDF_EDITOR_GID="$(id -g)" ./docker.sh start
-```
-
-This requires `ewave267/pdf-editor:0.1.0` to be available on Docker Hub (or
-already present locally). Cloning does not copy an image or compiled launcher.
-The command prints the browser link; no application compilation is performed.
-Local `.env` settings and PDFs saved in `documents/` are excluded from Git.
-For Windows/macOS, use the separately distributed launcher; runtime support
-remains experimental. Singularity/Apptainer is not currently supported; see
-[runtime compatibility](docs/LAUNCHER.md#singularity-and-apptainer).
+## Build the native desktop app (developers)
 
 ```sh
-./docker.sh start
-./docker.sh stop
-./docker.sh rebuild
-```
-
-The helper prints the browser link, works from any directory, and reuses matching
-local PDFium files during rebuilds. `./docker.sh build` builds without replacing
-the desktop session; `status`, `logs`, and `url` are also available. Save edits
-before `rebuild`, which replaces the running session.
-
-The app opens fullscreen automatically. See
-[Docker deployment](docs/DOCKER-DEPLOYMENT.md). Compose exposes the host root
-at `~/host_fs` inside the container; file pickers start in the configured host
-user's home automatically. The GUI has access wherever that user has permissions.
-
-## Build the desktop app on Fedora / Red Hat
-
-```sh
-./compile.sh
+python3 tools/build_pdfium.py --jobs 4
+cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release \
+  -DPDF_EDITOR_BUILD_VIEWER=ON -DBUILD_TESTING=OFF \
+  -DPDFium_DIR="$PWD/.deps/pdfium-patched"
+cmake --build build-release --parallel 4
 ./build-release/pdf-form-editor
 ```
 
-The script checks dependencies, asks before installing missing packages with
-`sudo dnf`, checks Qt/C++20 and Bubblewrap, and builds the Release viewer. It
-reuses a matching patched PDFium package; a fresh checkout performs the long
-PDFium/V8 source build once. RHEL needs repositories providing Qt 6.4+ and a
-C++20 compiler; unavailable packages are reported without changing repositories.
-
-Use `./compile.sh --yes` to approve dependency installation, `--no-install` to
-require existing dependencies, or `--package` to also create a portable archive
-in `dist/`. Run as your normal user. See `./compile.sh --help` and
-[release instructions](docs/RELEASE.md) for package/runtime limitations.
+Developers need Qt 6.4+ development packages, CMake, a C++20 compiler, Ninja,
+Python, Git and Bubblewrap. Skip the PDFium source build when a matching patched
+package already exists. End users run the packaged application directly.
+See [native release instructions](docs/NATIVE-RELEASES.md) for bundling Qt and
+building against the RHEL 9 compatibility baseline.
 
 ## Build and verify
 

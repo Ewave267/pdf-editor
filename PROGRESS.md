@@ -4,6 +4,30 @@ Last updated: 2026-10-07
 
 ## Current state
 
+Native release work is on `native-releases`; `archive/docker-go` preserves the
+previous Docker/Go implementation at `06fa38e`. The active distribution goal is
+a Windows executable ZIP, Linux portable tarball/AppImage, and macOS app bundle.
+Linux targets are RHEL 9, Fedora and Ubuntu 22.04/24.04+ on x86_64, using a glibc
+2.34 build baseline. This compatibility matrix is not yet validated.
+
+Linux native bundling includes Qt libraries, QML/plugins, patched PDFium,
+Bubblewrap and Liberation fonts. Both formats build locally. Installed workers
+explicitly mount bundled dependency libraries and fonts read-only inside their
+existing sandbox, including Save As workers. No Go/Docker runtime is used.
+All six existing CTest suites passed. Both original tarball/AppImage payloads
+passed relocation under paths containing spaces and all 21 viewer integration
+checks, including form saves and independent reopening. Tests require running
+outside the agent's outer sandbox, which blocks Bubblewrap namespace sockets.
+
+The local Fedora previews in `dist/native-local/` require glibc 2.39 and cannot
+run on RHEL 9. Package generation defaults to refusing dependencies newer than
+glibc 2.34; the validation gate correctly rejected the local preview for that
+baseline. A manual workflow prepares Linux candidates on a configured
+`pdf-editor-rhel9` self-hosted builder, which is not available in this workspace.
+Windows/macOS native workers and patched PDFium build recipes remain
+unimplemented. They are not runnable candidates yet; no placeholder executables
+or unsupported cross-platform releases are emitted. See NATIVE-RELEASES.md.
+
 Steps 1, 2, 3, 4, 5 and 7 are implemented and verified locally. Step 2's isolated PDFium
 probe preserves exact XFA input and calculated values across two save/reopen
 cycles for both packet-array and single-stream forms. Pinned PDF.js independently

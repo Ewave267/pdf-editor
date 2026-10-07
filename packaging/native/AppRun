@@ -1,0 +1,12 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-only
+set -eu
+bundle=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+export PATH="$bundle/bin:$PATH"
+export LD_LIBRARY_PATH="$bundle/lib/runtime:$bundle/lib/pdf-form-editor"
+export QT_PLUGIN_PATH="$bundle/plugins"
+export QT_QPA_PLATFORM_PLUGIN_PATH="$bundle/plugins/platforms"
+export QML_IMPORT_PATH="$bundle/qml"
+export QML2_IMPORT_PATH="$bundle/qml"
+export QT_QUICK_BACKEND="${QT_QUICK_BACKEND:-software}"
+exec "$bundle/bin/pdf-form-editor" "$@"

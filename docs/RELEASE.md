@@ -1,4 +1,11 @@
-# Linux preview package
+# Releases
+
+The active release direction is native desktop distribution. See
+[NATIVE-RELEASES](NATIVE-RELEASES.md) for Windows ZIP, Linux portable tarball and
+AppImage, and macOS app bundle targets, implementation status and build commands.
+The CPack preview below relies on host Qt; the new native bundler includes Qt.
+
+## Earlier Linux preview package
 
 The package is an offline Linux desktop preview, not a completed MVP release.
 It includes the GUI, isolated renderer, patched PDFium, desktop entry, icon and
@@ -17,10 +24,7 @@ The native Qt preview package below remains a separate option.
 
 ## Build and install
 
-On Fedora/RHEL-family systems, `./compile.sh --package` builds the Release
-viewer and generates the archive in `dist/`. Dependency installation is confirmed
-interactively, or permitted explicitly with `--yes`. To configure manually,
-use the viewer configuration in VIEWER.md, with `CMAKE_BUILD_TYPE=Release`.
+Use the viewer configuration in VIEWER.md, with `CMAKE_BUILD_TYPE=Release`.
 After building, run `cpack --config build-viewer/CPackConfig.cmake -B dist`.
 The resulting `.tar.gz` has a single top-level directory. Extract it into a
 user-owned location and run `bin/pdf-form-editor`, optionally followed by a PDF

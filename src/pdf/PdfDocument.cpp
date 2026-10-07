@@ -212,6 +212,18 @@ void PdfDocument::open(const QUrl& url)
     for (const QString& path : {QString("/etc/fonts"), QString("/var/cache/fontconfig")})
         if (QFileInfo::exists(path))
             args << "--ro-bind" << path << path;
+    // Portable packages carry Qt and its dependency closure. The worker's
+    // cleared environment must explicitly select those same libraries.
+    const QDir installation(QCoreApplication::applicationDirPath() + "/..");
+    const QString runtime = installation.absoluteFilePath("lib/runtime");
+    if (QFileInfo(runtime).isDir())
+        args << "--ro-bind" << runtime << "/runtime/lib"
+             << "--setenv" << "LD_LIBRARY_PATH" << "/pdfium:/runtime/lib";
+    const QString fonts = installation.absoluteFilePath("share/fonts");
+    const QString fontConfig = installation.absoluteFilePath("share/fonts/sandbox.conf");
+    if (QFileInfo(fonts).isDir() && QFileInfo::exists(fontConfig))
+        args << "--ro-bind" << fonts << "/runtime/fonts"
+             << "--setenv" << "FONTCONFIG_FILE" << "/runtime/fonts/sandbox.conf";
     args << "--ro-bind" << binary << "/probe"
          << "--ro-bind" << library << "/pdfium/libpdfium.so"
          << "--ro-bind" << snapshot_->filePath("input.pdf") << "/input.pdf"
