@@ -1,13 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-only
+#include "NativeFile.h"
 #include "PdfDocument.h"
 #include <QBuffer>
+#include <QCoreApplication>
+#include <QDebug>
 #include <QFileInfo>
 #include <QPageSize>
 #include <QPainter>
 #include <QPdfWriter>
+#include <QProcessEnvironment>
 #include <QSaveFile>
 #include <QStandardPaths>
-#include <sys/stat.h>
+#include <algorithm>
 
 void PdfDocument::saveAs(const QUrl& url)
 {
@@ -15,11 +19,7 @@ void PdfDocument::saveAs(const QUrl& url)
         return;
     saveError_.clear();
     const QFileInfo target(url.toLocalFile());
-    struct stat sourceStat{}, targetStat{};
-    const bool sameFile =
-        ::stat(sourcePath_.toLocal8Bit().constData(), &sourceStat) == 0 &&
-        ::stat(target.absoluteFilePath().toLocal8Bit().constData(), &targetStat) == 0 &&
-        sourceStat.st_dev == targetStat.st_dev && sourceStat.st_ino == targetStat.st_ino;
+    const bool sameFile = pdf::detail::sameFile(sourcePath_, target.absoluteFilePath());
     if (!ready_ || !url.isLocalFile() || url.toLocalFile().isEmpty() || sameFile ||
         target.absoluteFilePath() == sourcePath_ ||
         (!target.canonicalFilePath().isEmpty() &&
@@ -129,19 +129,36 @@ void PdfDocument::startSaveWorker(const QByteArray& baseline)
     }
     saveWorker_ = new QProcess(this);
     auto args = sandboxArgs_;
-    const int inputIndex = args.indexOf("/input.pdf");
-    if (inputIndex < 1)
+#ifdef Q_OS_LINUX
+    const int inputIndex = args.indexOf("/input.pdf") - 1;
+#else
+    const int marker = args.indexOf("--input");
+    const int inputIndex = marker < 0 ? -1 : marker + 1;
+#endif
+    if (inputIndex < 0 || inputIndex >= args.size())
     {
         finishSave("The save sandbox is not configured.");
         return;
     }
-    args[inputIndex - 1] = input;
+    args[inputIndex] = input;
     args << "--save";
     connect(saveWorker_, &QProcess::readyReadStandardError, this,
             [this]
             {
                 if (saveWorker_)
-                    saveWorker_->readAllStandardError();
+                {
+                    auto diagnostics = saveWorker_->readAllStandardError();
+                    if (qEnvironmentVariableIsSet("PDF_EDITOR_WORKER_DIAGNOSTICS"))
+                    {
+                        const int used = saveWorker_->property("diagnosticBytes").toInt();
+                        diagnostics = diagnostics.left(std::max(0, 4096 - used));
+                        saveWorker_->setProperty("diagnosticBytes",
+                                                 used + static_cast<int>(diagnostics.size()));
+                        if (!diagnostics.isEmpty())
+                            qWarning().noquote()
+                                << "PDF save worker:" << QString::fromUtf8(diagnostics);
+                    }
+                }
             });
     connect(saveWorker_, &QProcess::readyReadStandardOutput, this,
             [this]
@@ -168,12 +185,8 @@ void PdfDocument::startSaveWorker(const QByteArray& baseline)
                 }
                 // Recheck immediately before commit: a destination can change while the worker
                 // runs.
-                struct stat original{}, destination{};
                 if (saveDestination_ == sourcePath_ ||
-                    (::stat(sourcePath_.toLocal8Bit().constData(), &original) == 0 &&
-                     ::stat(saveDestination_.toLocal8Bit().constData(), &destination) == 0 &&
-                     original.st_dev == destination.st_dev &&
-                     original.st_ino == destination.st_ino))
+                    pdf::detail::sameFile(sourcePath_, saveDestination_))
                 {
                     finishSave("The source PDF cannot be overwritten.");
                     return;
@@ -193,7 +206,20 @@ void PdfDocument::startSaveWorker(const QByteArray& baseline)
                 finishSave({});
             });
     saveDeadline_.start(30000);
+#ifdef Q_OS_LINUX
+    // Preserve the missing-sandbox failure behavior of native development tests.
     saveWorker_->start(QStandardPaths::findExecutable("bwrap"), args);
+#else
+#ifdef Q_OS_MACOS
+    QProcessEnvironment environment;
+    environment.insert("PATH", "/usr/bin:/bin");
+    environment.insert("HOME", "/tmp");
+    environment.insert("LANG", "en_US.UTF-8");
+    environment.insert("QT_PLUGIN_PATH", QCoreApplication::applicationDirPath() + "/../PlugIns");
+    saveWorker_->setProcessEnvironment(environment);
+#endif
+    saveWorker_->start(sandboxProgram_, args);
+#endif
     if (saveWorker_)
     {
         saveWorker_->write(saveOverlay_);

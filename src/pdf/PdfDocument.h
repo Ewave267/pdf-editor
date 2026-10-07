@@ -111,6 +111,7 @@ class PdfDocument : public QObject
     QByteArray saveBytes_, saveOverlay_;
     QString sourcePath_, saveDestination_, saveError_, savedPath_;
     QStringList sandboxArgs_;
+    QString sandboxProgram_;
     std::unique_ptr<QTemporaryDir> snapshot_;
     quint64 savedRevision_ = 0, saveRevision_ = 0;
     bool saving_ = false, xfaFull_ = false;

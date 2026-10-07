@@ -19,10 +19,16 @@ jobs:
       - name: Install build, Qt, and sandbox tools
         run: |
           sudo apt-get update
-          sudo apt-get install --yes bubblewrap ninja-build fonts-liberation qt6-base-dev qt6-declarative-dev \
+          sudo apt-get install --yes bubblewrap ninja-build meson libcap-dev libselinux1-dev \
+            fonts-liberation qt6-base-dev qt6-declarative-dev \
             qml6-module-qtquick qml6-module-qtquick-controls qml6-module-qtquick-dialogs \
             qml6-module-qtquick-layouts qml6-module-qtquick-templates \
             qml6-module-qtquick-window qml6-module-qtqml-workerscript qml6-module-qt-labs-folderlistmodel
+      - name: Build the sandbox version required by the worker
+        run: |
+          python3 tools/build_bubblewrap.py
+          # Keep the distro's existing executable path and user-namespace profile.
+          sudo install -m 0755 .deps/bubblewrap-build/bwrap /usr/bin/bwrap
       - uses: actions/cache@v4
         id: pdfium
         with:

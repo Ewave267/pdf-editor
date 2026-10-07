@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "PdfDocument.h"
+#include "NativeFile.h"
 
 #include <QBuffer>
 #include <QClipboard>
 #include <QCoreApplication>
+#include <QDebug>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -12,12 +14,10 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QProcessEnvironment>
 #include <QStandardPaths>
 #include <algorithm>
 #include <cmath>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <unistd.h>
 
 PdfDocument::PdfDocument(QObject* parent) : QObject(parent), additions_(new AddedContent(this))
 {
@@ -140,21 +140,9 @@ void PdfDocument::open(const QUrl& url)
     }
     snapshot_ = std::make_unique<QTemporaryDir>();
     QFile source, copy(snapshot_->filePath("input.pdf"));
-    const int descriptor =
-        ::open(sourcePath_.toLocal8Bit().constData(), O_RDONLY | O_NONBLOCK | O_CLOEXEC);
-    struct stat opened{};
-    if (descriptor < 0 || ::fstat(descriptor, &opened) != 0 || !S_ISREG(opened.st_mode) ||
-        opened.st_size <= 0 || opened.st_size > 64 * 1024 * 1024)
+    if (!pdf::detail::openRegularInput(source, sourcePath_))
     {
-        if (descriptor >= 0)
-            ::close(descriptor);
         fail("Select a regular PDF file of at most 64 MiB.");
-        return;
-    }
-    if (!source.open(descriptor, QIODevice::ReadOnly, QFileDevice::AutoCloseHandle))
-    {
-        ::close(descriptor);
-        fail("Cannot read the selected PDF.");
         return;
     }
     if (!snapshot_->isValid() || !copy.open(QIODevice::WriteOnly | QIODevice::NewOnly))
@@ -179,6 +167,7 @@ void PdfDocument::open(const QUrl& url)
     loading_ = true;
     fitting_ = true;
     emit stateChanged();
+#ifdef Q_OS_LINUX
     const QString bwrap = QStandardPaths::findExecutable("bwrap");
     const QString binary = QCoreApplication::applicationDirPath() + "/pdf-render-worker";
     const QString installedLibrary = QDir(QCoreApplication::applicationDirPath())
@@ -228,6 +217,53 @@ void PdfDocument::open(const QUrl& url)
          << "--ro-bind" << library << "/pdfium/libpdfium.so"
          << "--ro-bind" << snapshot_->filePath("input.pdf") << "/input.pdf"
          << "--chdir" << "/tmp" << "/probe";
+    sandboxProgram_ = bwrap;
+#elif defined(Q_OS_WIN)
+    const QString binary = QCoreApplication::applicationDirPath() + "/pdf-render-worker.exe";
+    sandboxProgram_ = QCoreApplication::applicationDirPath() + "/pdf-sandbox.exe";
+    if (!QFileInfo::exists(binary) || !QFileInfo::exists(sandboxProgram_))
+    {
+        fail("The native PDF worker or sandbox launcher is missing.");
+        return;
+    }
+    QStringList args{"--input", snapshot_->filePath("input.pdf")};
+#elif defined(Q_OS_MACOS)
+    const QString binary = QCoreApplication::applicationDirPath() + "/pdf-render-worker";
+    sandboxProgram_ = "/usr/bin/sandbox-exec";
+    if (!QFileInfo::exists(binary) || !QFileInfo::exists(sandboxProgram_))
+    {
+        fail("The native PDF worker or macOS sandbox is missing.");
+        return;
+    }
+    auto quoted = [](QString path)
+    {
+        path.replace("\\", "\\\\");
+        path.replace("\"", "\\\"");
+        return "\"" + path + "\"";
+    };
+    const QString resources =
+        QFileInfo(QCoreApplication::applicationDirPath() + "/..").canonicalFilePath();
+    const QString snapshotRoot = QFileInfo(snapshot_->path()).canonicalFilePath();
+    const QString profile =
+        "(version 1)(deny default)(allow sysctl-read)(allow file-read-metadata)"
+        // PDFium/V8 maps its bundled code and generates JavaScript JIT code.
+        // File reads remain limited to the paths below.
+        "(allow file-map-executable)(allow dynamic-code-generation)"
+        "(allow process-info* (target same-sandbox))(allow signal (target same-sandbox))"
+        "(allow mach-lookup (global-name \"com.apple.FontObjectsServer\")"
+        " (global-name \"com.apple.fontd\"))"
+        "(allow file-read* (subpath \"/System\") (subpath \"/usr/lib\")"
+        " (subpath \"/Library/Fonts\") (subpath \"/Library/Apple/System/Library\")"
+        " (literal \"/dev/null\") (literal \"/dev/random\") (literal \"/dev/urandom\")"
+        " (subpath " +
+        quoted(resources) + ") (subpath " + quoted(snapshotRoot) +
+        "))"
+        "(allow process-exec (literal " +
+        quoted(QFileInfo(binary).canonicalFilePath()) + "))";
+    QStringList args{"-p", profile, binary, "--input", snapshot_->filePath("input.pdf")};
+#else
+#error "No native worker sandbox for this platform"
+#endif
     sandboxArgs_ = args;
     worker_ = new QProcess(this);
     worker_->setProcessChannelMode(QProcess::SeparateChannels);
@@ -245,13 +281,24 @@ void PdfDocument::open(const QUrl& url)
     connect(worker_, &QProcess::finished, this,
             [this](int, QProcess::ExitStatus)
             {
+                if (qEnvironmentVariableIsSet("PDF_EDITOR_WORKER_DIAGNOSTICS") &&
+                    !diagnostics_.isEmpty())
+                    qWarning().noquote() << "PDF worker:" << QString::fromUtf8(diagnostics_);
                 fail(loading_ && diagnostics_.contains("bwrap:")
                          ? "Your system could not start the PDF sandbox. Check the viewer setup "
                            "instructions."
                          : "The isolated PDF renderer stopped unexpectedly.");
             });
     deadline_.start(15000);
-    worker_->start(bwrap, args);
+#ifdef Q_OS_MACOS
+    QProcessEnvironment environment;
+    environment.insert("PATH", "/usr/bin:/bin");
+    environment.insert("HOME", "/tmp");
+    environment.insert("LANG", "en_US.UTF-8");
+    environment.insert("QT_PLUGIN_PATH", QCoreApplication::applicationDirPath() + "/../PlugIns");
+    worker_->setProcessEnvironment(environment);
+#endif
+    worker_->start(sandboxProgram_, args);
 }
 
 void PdfDocument::receive()

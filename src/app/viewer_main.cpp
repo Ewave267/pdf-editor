@@ -40,7 +40,8 @@ int main(int argc, char** argv)
         return 1;
     if (auto* window = qobject_cast<QQuickWindow*>(engine.rootObjects().first()))
         window->showFullScreen();
-    if (argc == 2)
-        document.open(QUrl::fromLocalFile(QString::fromLocal8Bit(argv[1])));
+    const auto arguments = app.arguments();
+    if (arguments.size() == 2)
+        document.open(QUrl::fromLocalFile(arguments[1]));
     return app.exec();
 }

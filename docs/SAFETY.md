@@ -1,9 +1,17 @@
 # Step 7 — Untrusted document safety
 
-All PDF parsing, native form handling, document JavaScript, rendering and native
+On Linux, all PDF parsing, native form handling, document JavaScript, rendering and native
 saving run in Linux Bubblewrap workers. A missing sandbox or failed kernel policy
 returns an error; there is no unsandboxed fallback. The Qt/QML application receives
 bounded metadata, field text, rendered images and saved PDF bytes.
+
+The policy and validation details below describe Linux. New Windows candidates
+use an AppContainer with no capabilities and a bounded Job Object; new macOS
+candidates use a deny-default Seatbelt profile and resource limits. Both reject
+direct worker execution without their sandbox. These ports await native CI
+validation and do not claim Linux's tested seccomp/resource-limit coverage.
+In particular, Darwin's data limit does not establish the same bound on anonymous
+memory mappings. See [NATIVE-RELEASES](NATIVE-RELEASES.md).
 
 ## Boundaries
 

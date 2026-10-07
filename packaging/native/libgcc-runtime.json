@@ -1,0 +1,7 @@
+{
+  "version": "11.2.1-9.4.el9",
+  "url": "https://dl.rockylinux.org/vault/rocky/9.0/BaseOS/x86_64/os/Packages/l/libgcc-11.2.1-9.4.el9.x86_64.rpm",
+  "sha256": "9a398d6d429ff0de5b7811165fd2cdb628f2fce12fdd20254a2891a985ff8526",
+  "source": "https://dl.rockylinux.org/vault/rocky/9.0/BaseOS/source/tree/Packages/g/gcc-11.2.1-9.4.el9.src.rpm",
+  "reason": "The current RHEL 9 unwinder requires GLIBC_2.35 through a vendor backport. This GCC 11 runtime requires only GLIBC_2.34 and preserves the supported GCC ABI."
+}

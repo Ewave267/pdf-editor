@@ -3,7 +3,10 @@
 The active release direction is native desktop distribution. See
 [NATIVE-RELEASES](NATIVE-RELEASES.md) for Windows ZIP, Linux portable tarball and
 AppImage, and macOS app bundle targets, implementation status and build commands.
-The CPack preview below relies on host Qt; the new native bundler includes Qt.
+The GitHub-hosted **Native release candidates** workflow builds and uploads
+the four native platform/CPU artifacts. See the linked guide for download and
+run instructions. The CPack preview below is historical and relies on host Qt;
+the native bundler includes Qt.
 
 ## Earlier Linux preview package
 
@@ -11,9 +14,9 @@ The package is an offline Linux desktop preview, not a completed MVP release.
 It includes the GUI, isolated renderer, patched PDFium, desktop entry, icon and
 PDFium dependency notices. Qt and operating-system libraries come from the host.
 
-## Standalone Docker launcher
+## Archived standalone Docker launcher
 
-The separate Go launcher is distributed as native executables for Linux, Windows
+The archived Go launcher can be built as native executables for Linux, Windows
 and macOS; see [LAUNCHER](LAUNCHER.md) for commands and the support matrix. Users
 need Docker and a browser, but no Go or desktop Qt installation. The developer
 archive helper produces binaries, ZIPs with licenses, a launcher-source ZIP and

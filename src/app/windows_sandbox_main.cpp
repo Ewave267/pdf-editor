@@ -1,0 +1,254 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Native Windows broker. Only the worker receives document bytes. It runs in
+// an AppContainer without capabilities and a one-process, memory/CPU bounded
+// job. Killing this broker closes the job and kills the worker as well.
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#include <aclapi.h>
+#include <cwctype>
+#include <filesystem>
+#include <iostream>
+#include <objbase.h>
+#include <stdexcept>
+#include <string>
+#include <userenv.h>
+#include <vector>
+#include <windows.h>
+
+namespace fs = std::filesystem;
+namespace
+{
+struct Handle
+{
+    HANDLE value = nullptr;
+    explicit Handle(HANDLE handle = nullptr) : value(handle) {}
+    ~Handle()
+    {
+        if (value && value != INVALID_HANDLE_VALUE)
+            CloseHandle(value);
+    }
+    Handle(const Handle&) = delete;
+    Handle& operator=(const Handle&) = delete;
+};
+void require(bool condition, const char* message)
+{
+    if (!condition)
+        throw std::runtime_error(std::string(message) + " (Windows error " +
+                                 std::to_string(GetLastError()) + ")");
+}
+std::wstring quote(const std::wstring& argument)
+{
+    std::wstring result = L"\"";
+    unsigned slashes = 0;
+    for (wchar_t character : argument)
+    {
+        if (character == L'\\')
+            ++slashes;
+        else
+        {
+            result.append(character == L'"' ? slashes * 2 + 1 : slashes, L'\\');
+            result += character;
+            slashes = 0;
+        }
+    }
+    result.append(slashes * 2, L'\\');
+    return result + L'"';
+}
+void grantRead(const fs::path& path, PSID sid)
+{
+    PACL oldAcl = nullptr, newAcl = nullptr;
+    PSECURITY_DESCRIPTOR descriptor = nullptr;
+    const DWORD query =
+        GetNamedSecurityInfoW(path.c_str(), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, nullptr,
+                              nullptr, &oldAcl, nullptr, &descriptor);
+    require(query == ERROR_SUCCESS, "Cannot inspect private runtime permissions");
+    EXPLICIT_ACCESSW access{};
+    access.grfAccessPermissions = FILE_GENERIC_READ | FILE_GENERIC_EXECUTE;
+    access.grfAccessMode = GRANT_ACCESS;
+    access.grfInheritance = SUB_CONTAINERS_AND_OBJECTS_INHERIT;
+    access.Trustee.TrusteeForm = TRUSTEE_IS_SID;
+    access.Trustee.TrusteeType = TRUSTEE_IS_UNKNOWN;
+    access.Trustee.ptstrName = static_cast<LPWSTR>(sid);
+    const DWORD merge = SetEntriesInAclW(1, &access, oldAcl, &newAcl);
+    DWORD apply = merge;
+    if (merge == ERROR_SUCCESS)
+        apply = SetNamedSecurityInfoW(const_cast<LPWSTR>(path.c_str()), SE_FILE_OBJECT,
+                                      DACL_SECURITY_INFORMATION, nullptr, nullptr, newAcl, nullptr);
+    if (newAcl)
+        LocalFree(newAcl);
+    LocalFree(descriptor);
+    require(apply == ERROR_SUCCESS, "Cannot grant read-only sandbox runtime access");
+}
+struct Sid
+{
+    PSID value = nullptr;
+    ~Sid()
+    {
+        if (value)
+            FreeSid(value);
+    }
+};
+struct PrivateRuntime
+{
+    fs::path path;
+    ~PrivateRuntime()
+    {
+        std::error_code ignored;
+        fs::remove_all(path, ignored);
+    }
+};
+struct Attributes
+{
+    std::vector<unsigned char> storage;
+    LPPROC_THREAD_ATTRIBUTE_LIST list = nullptr;
+    Attributes()
+    {
+        SIZE_T size = 0;
+        InitializeProcThreadAttributeList(nullptr, 3, 0, &size);
+        storage.resize(size);
+        list = reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(storage.data());
+        require(InitializeProcThreadAttributeList(list, 3, 0, &size),
+                "Cannot initialize worker launch attributes");
+    }
+    ~Attributes()
+    {
+        if (list)
+            DeleteProcThreadAttributeList(list);
+    }
+};
+} // namespace
+
+int wmain(int argc, wchar_t** argv)
+{
+    try
+    {
+        require((argc == 3 || argc == 4) && std::wstring(argv[1]) == L"--input" &&
+                    (argc == 3 || std::wstring(argv[3]) == L"--save"),
+                "Invalid sandbox launch arguments");
+        const fs::path input = fs::absolute(argv[2]);
+        require(fs::is_regular_file(input) && fs::file_size(input) > 0 &&
+                    fs::file_size(input) <= 64 * 1024 * 1024,
+                "Invalid worker input snapshot");
+        std::vector<wchar_t> filename(32768);
+        const DWORD length =
+            GetModuleFileNameW(nullptr, filename.data(), static_cast<DWORD>(filename.size()));
+        require(length > 0 && length < filename.size(), "Cannot locate native runtime");
+        const fs::path installation = fs::path(filename.data()).parent_path();
+        Sid sid;
+        HRESULT result =
+            CreateAppContainerProfile(L"PdfEditor.Renderer", L"PDF Editor Renderer",
+                                      L"Isolated offline PDF renderer", nullptr, 0, &sid.value);
+        if (result == HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS))
+            result = DeriveAppContainerSidFromAppContainerName(L"PdfEditor.Renderer", &sid.value);
+        require(SUCCEEDED(result), "Cannot create worker AppContainer");
+        GUID guid{};
+        require(SUCCEEDED(CoCreateGuid(&guid)), "Cannot create private runtime identity");
+        wchar_t identity[40]{};
+        require(StringFromGUID2(guid, identity, 40) > 0, "Cannot format runtime identity");
+        PrivateRuntime runtime{input.parent_path() / (std::wstring(L"runtime-") + identity)};
+        require(fs::create_directory(runtime.path), "Cannot create private worker runtime");
+        grantRead(runtime.path, sid.value);
+        const fs::path worker = runtime.path / L"pdf-render-worker.exe";
+        fs::copy_file(installation / L"pdf-render-worker.exe", worker);
+        grantRead(worker, sid.value);
+        for (const auto& entry : fs::directory_iterator(installation))
+        {
+            if (!entry.is_regular_file())
+                continue;
+            auto extension = entry.path().extension().wstring();
+            for (auto& character : extension)
+                character = std::towlower(character);
+            if (extension == L".dll")
+            {
+                fs::copy_file(entry.path(), runtime.path / entry.path().filename());
+                grantRead(runtime.path / entry.path().filename(), sid.value);
+            }
+        }
+        fs::copy_file(input, runtime.path / L"input.pdf");
+        grantRead(runtime.path / L"input.pdf", sid.value);
+        Handle job(CreateJobObjectW(nullptr, nullptr));
+        require(job.value != nullptr, "Cannot create worker job");
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};
+        limits.BasicLimitInformation.LimitFlags =
+            JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION |
+            JOB_OBJECT_LIMIT_ACTIVE_PROCESS | JOB_OBJECT_LIMIT_PROCESS_MEMORY |
+            JOB_OBJECT_LIMIT_PROCESS_TIME;
+        limits.BasicLimitInformation.ActiveProcessLimit = 1;
+        limits.BasicLimitInformation.PerProcessUserTimeLimit.QuadPart = 300LL * 10000000;
+        limits.ProcessMemoryLimit = 768ULL * 1024 * 1024;
+        require(SetInformationJobObject(job.value, JobObjectExtendedLimitInformation, &limits,
+                                        sizeof(limits)),
+                "Cannot restrict worker job");
+        HANDLE inherited[3]{};
+        Handle standard[3];
+        const DWORD identifiers[3] = {STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, STD_ERROR_HANDLE};
+        for (int index = 0; index < 3; ++index)
+        {
+            require(DuplicateHandle(GetCurrentProcess(), GetStdHandle(identifiers[index]),
+                                    GetCurrentProcess(), &standard[index].value, 0, TRUE,
+                                    DUPLICATE_SAME_ACCESS),
+                    "Cannot prepare worker protocol pipes");
+            inherited[index] = standard[index].value;
+        }
+        Attributes attributes;
+        SECURITY_CAPABILITIES capabilities{};
+        capabilities.AppContainerSid = sid.value;
+        DWORD childPolicy = PROCESS_CREATION_CHILD_PROCESS_RESTRICTED;
+        require(UpdateProcThreadAttribute(attributes.list, 0,
+                                          PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES,
+                                          &capabilities, sizeof(capabilities), nullptr, nullptr),
+                "Cannot apply worker AppContainer");
+        require(UpdateProcThreadAttribute(attributes.list, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
+                                          inherited, sizeof(inherited), nullptr, nullptr),
+                "Cannot restrict inherited handles");
+        require(UpdateProcThreadAttribute(attributes.list, 0,
+                                          PROC_THREAD_ATTRIBUTE_CHILD_PROCESS_POLICY, &childPolicy,
+                                          sizeof(childPolicy), nullptr, nullptr),
+                "Cannot prohibit worker child processes");
+        STARTUPINFOEXW startup{};
+        startup.StartupInfo.cb = sizeof(startup);
+        startup.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+        startup.StartupInfo.hStdInput = inherited[0];
+        startup.StartupInfo.hStdOutput = inherited[1];
+        startup.StartupInfo.hStdError = inherited[2];
+        startup.lpAttributeList = attributes.list;
+        std::wstring command = quote(worker.wstring()) + L" --input " +
+                               quote((runtime.path / L"input.pdf").wstring()) +
+                               (argc == 4 ? L" --save" : L"");
+        // Do not inherit Qt/plugin configuration or search paths from the GUI.
+        wchar_t systemRoot[32768]{};
+        require(GetEnvironmentVariableW(L"SystemRoot", systemRoot, 32768) > 0,
+                "Cannot locate Windows system libraries");
+        std::wstring environment = L"PATH=" + std::wstring(systemRoot) + L"\\System32";
+        environment.push_back(L'\0');
+        environment += L"SystemRoot=" + std::wstring(systemRoot);
+        environment.push_back(L'\0');
+        environment.push_back(L'\0');
+        PROCESS_INFORMATION process{};
+        require(CreateProcessW(worker.c_str(), command.data(), nullptr, nullptr, TRUE,
+                               EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT |
+                                   CREATE_SUSPENDED | CREATE_NO_WINDOW,
+                               environment.data(), runtime.path.c_str(), &startup.StartupInfo,
+                               &process),
+                "Cannot launch AppContainer worker");
+        Handle child(process.hProcess), thread(process.hThread);
+        if (!AssignProcessToJobObject(job.value, child.value))
+        {
+            TerminateProcess(child.value, 1);
+            WaitForSingleObject(child.value, INFINITE);
+            throw std::runtime_error("Cannot assign worker to its bounded job.");
+        }
+        if (ResumeThread(thread.value) == static_cast<DWORD>(-1))
+            throw std::runtime_error("Cannot resume isolated worker.");
+        require(WaitForSingleObject(child.value, INFINITE) == WAIT_OBJECT_0,
+                "Cannot wait for worker completion");
+        DWORD exitCode = 1;
+        require(GetExitCodeProcess(child.value, &exitCode), "Cannot read worker exit status");
+        return static_cast<int>(exitCode);
+    }
+    catch (const std::exception& error)
+    {
+        std::cerr << "Native PDF sandbox: " << error.what() << '\n';
+        return 1;
+    }
+}

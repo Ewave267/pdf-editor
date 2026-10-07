@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Bundle the real native Linux viewer as a relocatable tarball and AppImage.
 
-Never downloads tools or builds PDFium implicitly. Windows/macOS are gated until
-their native workers and patched PDFium recipes exist.
+Never downloads tools or builds PDFium implicitly. Use package_desktop.py for
+native Windows/macOS candidates.
 """
 import argparse
 import hashlib
@@ -86,6 +86,16 @@ def stage(args, directory):
         raise RuntimeError("Bubblewrap is required on the packaging host")
     shutil.copy2(bwrap, directory / "bin/bwrap")
     (directory / "bin/bwrap").chmod(0o755)  # Never distribute a setuid executable.
+    if "--size" not in run([bwrap, "--help"], capture_output=True, text=True).stdout:
+        raise RuntimeError("Bubblewrap needs bounded tmpfs support; run tools/build_bubblewrap.py")
+    if args.bwrap_notices:
+        shutil.copytree(args.bwrap_notices, directory / "share/doc/pdf-form-editor/bubblewrap",
+                        dirs_exist_ok=True)
+    if args.libgcc_runtime:
+        if not args.libgcc_notices:
+            raise RuntimeError("--libgcc-notices is required for an overridden compiler runtime")
+        shutil.copytree(args.libgcc_notices, directory / "share/doc/pdf-form-editor/libgcc",
+                        dirs_exist_ok=True)
     originals = [Path(bwrap)]
     seeds = [binary, worker, directory / "bin/bwrap",
              directory / "lib/pdf-form-editor/libpdfium.so"]
@@ -95,6 +105,8 @@ def stage(args, directory):
     copied = {}
     for seed in seeds:
         for soname, source in dependencies(seed):
+            if soname == "libgcc_s.so.1" and args.libgcc_runtime:
+                source = args.libgcc_runtime.resolve()
             # Preserve PDFium's existing dedicated location.
             if soname == "libpdfium.so":
                 continue
@@ -118,6 +130,14 @@ def stage(args, directory):
 <!DOCTYPE fontconfig SYSTEM "fonts.dtd">
 <fontconfig><dir>/runtime/fonts</dir><cachedir>/tmp/fontconfig</cachedir>
 <alias><family>Arial</family><prefer><family>Liberation Sans</family></prefer></alias>
+<alias><family>sans-serif</family><prefer><family>Liberation Sans</family></prefer></alias>
+</fontconfig>
+''')
+    (fonts / "fontconfig.conf").write_text('''<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+<fontconfig>
+<include ignore_missing="yes">/etc/fonts/fonts.conf</include>
+<dir prefix="relative">.</dir><cachedir prefix="xdg">fontconfig</cachedir>
 <alias><family>sans-serif</family><prefer><family>Liberation Sans</family></prefer></alias>
 </fontconfig>
 ''')
@@ -164,6 +184,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--target", choices=("linux", "windows", "macos"), default="linux")
     parser.add_argument("--build-dir", type=Path, default=ROOT / "build-release")
+    parser.add_argument("--bwrap-notices", type=Path, help="Notices for a source-built Bubblewrap")
+    parser.add_argument("--libgcc-runtime", type=Path, help="Pinned baseline-compatible libgcc_s.so.1")
+    parser.add_argument("--libgcc-notices", type=Path, help="Notices for the overridden libgcc runtime")
     parser.add_argument("--qt-runtime", type=Path, help="Qt directory containing plugins/ and qml/")
     parser.add_argument("--font-dir", type=Path, help="Liberation fonts directory")
     parser.add_argument("--version", default="0.1.0-rc.1")
@@ -173,7 +196,7 @@ def main():
     parser.add_argument("--appimage-license", type=Path, help="License distributed with the AppImage runtime")
     args = parser.parse_args()
     if args.target != "linux":
-        parser.error(f"{args.target} native worker/PDFium port is not implemented; no placeholder package will be produced")
+        parser.error("Use tools/package_desktop.py on a native Windows/macOS runner")
     if platform.system() != "Linux" or platform.machine() != "x86_64":
         parser.error("Linux packaging currently requires an x86_64 Linux build host")
     if not args.qt_runtime or not args.font_dir:

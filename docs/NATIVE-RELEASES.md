@@ -1,130 +1,174 @@
 # Native release candidates
 
-The native application opens its own desktop window. End users do not need Go,
-Docker, a browser, a compiler, or a Qt installation. Three platform releases are
-planned, with two distribution formats on Linux:
+These packages run the Qt desktop editor directly. End users do not need Go,
+Docker, a browser, a compiler or a separate Qt installation. The earlier
+Docker/Go implementation is preserved on `archive/docker-go`; native work is
+on `native-releases`.
 
-| Platform | Download | Run | Current status |
-| --- | --- | --- | --- |
-| Windows x64 | `pdf-editor-VERSION-windows-x64.zip` | Extract, double-click `pdf-editor.exe` | Native worker and patched PDFium port required |
-| Linux x86_64 | `pdf-editor-VERSION-linux-x86_64.tar.gz` | Extract, run `./pdf-editor` | Packaging implemented; host compatibility must be validated |
-| Linux x86_64 | `pdf-editor-VERSION-linux-x86_64.AppImage` | Mark executable, run | Packaging implemented; host compatibility must be validated |
-| macOS | ZIP containing `PDF Editor.app`, then a signed/notarized DMG | Open the app | Native worker and patched PDFium port required |
+## Build and download on GitHub
 
-The previous Docker/Go implementation is preserved on `archive/docker-go`.
-Native packaging development happens on `native-releases`. No release is
-published automatically, and Windows/macOS artifacts must not contain the
-foundation smoke executable or Docker launcher in place of the actual editor.
+Push the repository, including `.github/workflows/native.yml`, to GitHub on
+`native-releases`, `main` or `master`. Relevant code changes trigger **Native
+release candidates** automatically. You can also select **Actions → Native
+release candidates → Run workflow**, choose the branch and start it manually.
+No self-hosted runner, Docker Hub account or signing secrets are required.
 
-## Linux usage
+Wait for the jobs to finish, then open the workflow run and download its
+**Artifacts**. GitHub wraps each artifact in an extra ZIP; extract that first
+to find the actual application archive and `SHA256SUMS`.
 
-Extract the tarball into any user-owned directory and run its top-level
-`pdf-editor` executable script. Keep the complete extracted folder together.
-Optional: `./pdf-editor /path/to/document.pdf`.
+| GitHub artifact | Application package | Start |
+| --- | --- | --- |
+| `pdf-editor-linux-x86_64` | Portable `.tar.gz` and `.AppImage` | Extract tarball and run `./pdf-editor`, or run AppImage |
+| `pdf-editor-windows-x64` | ZIP with EXE and DLLs | Extract completely, double-click `pdf-editor.exe` |
+| `pdf-editor-macos-arm64` | ZIP with `PDF Editor.app` | Extract on an Apple Silicon Mac, open the app |
+| `pdf-editor-macos-x64` | ZIP with `PDF Editor.app` | Extract on an Intel Mac, open the app |
 
-For the AppImage:
+Keep the full extracted application folder together. The current package
+version is `0.1.0-rc.1`. These are test candidates, not an automatically published
+GitHub Release. The first PDFium/V8 build is substantial; later runs cache the
+patched PDFium library. Each job has a three-hour limit and separate diagnostics
+on failure. Windows and macOS are new ports and require their first native CI
+runs before their runtime behavior can be confirmed.
+
+## Linux compatibility and usage
+
+Linux binaries and bundled dependencies are built in a Rocky Linux 9 builder
+with glibc 2.34. The builder runs on GitHub's Ubuntu runner; Docker is used only
+to build, never to run the downloaded application. Packaging rejects ELF
+dependencies requiring a newer glibc and records the minimum in
+`release-info.json`.
+
+The bundle uses a checksum-pinned Rocky Linux 9.0 GCC 11 unwinder. Newer RHEL 9
+unwinders depend on a `GLIBC_2.35` vendor backport despite reporting glibc 2.34;
+the older runtime keeps the GCC ABI while avoiding that newer requirement.
+Its vendor signature is checked during extraction and its notices/source URL
+are included in the package.
+
+The target is x86_64 RHEL 9, Fedora and Ubuntu 22.04/24.04 or newer with a
+graphical desktop session. This baseline improves portability; it does not
+replace testing on those desktops. Older glibc systems, ARM Linux and musl
+systems such as Alpine are outside this candidate's target.
+
+```sh
+tar -xzf pdf-editor-0.1.0-rc.1-linux-x86_64.tar.gz
+cd pdf-editor-0.1.0-rc.1-linux-x86_64
+./pdf-editor
+# Optional: ./pdf-editor /path/to/document.pdf
+```
+
+Alternatively:
 
 ```sh
 chmod +x pdf-editor-0.1.0-rc.1-linux-x86_64.AppImage
 ./pdf-editor-0.1.0-rc.1-linux-x86_64.AppImage
-# If the host does not provide a usable FUSE mount:
+# Use this if FUSE is unavailable:
 ./pdf-editor-0.1.0-rc.1-linux-x86_64.AppImage --appimage-extract-and-run
 ```
 
-Qt libraries, QML modules, platform plugins, PDFium, Bubblewrap, and Liberation
-fonts are bundled. The OS still supplies glibc, the kernel, and a desktop session.
-Targets are RHEL 9 (glibc 2.34), Fedora, and Ubuntu 22.04/24.04 or newer, on
-x86_64. This is the intended test matrix, not completed compatibility validation.
-Build all native components on a RHEL 9-compatible host, including PDFium and
-Bubblewrap. The packaging tool refuses a requirement above glibc 2.34 by default.
-The precise glibc minimum is recorded in `release-info.json`; an AppImage cannot
-remove this requirement. A local Fedora build is not a compatible binary for
-older RHEL systems. The release builder should use the oldest supported build
-environment, followed by tests on the intended RHEL versions.
+Qt libraries, QML modules, plugins, PDFium, Bubblewrap and Liberation fonts are
+bundled. Bubblewrap is rebuilt from pinned source against glibc 2.34 because
+RHEL 9's distro version lacks the bounded tmpfs option used by the worker. Its source pin and license
+are included with the package.
 
-Bubblewrap must be permitted to create unprivileged user namespaces. No root
-installation or setuid Bubblewrap is distributed. A host that blocks namespaces
-cannot run the PDF worker; no unsandboxed fallback is provided. Running the
-AppImage without FUSE does not bypass the worker sandbox.
+The GUI selects its bundled fonts and includes the host font configuration when
+available. The host supplies glibc, the kernel and the desktop session. Bubblewrap requires
+permitted unprivileged user namespaces; SELinux/AppArmor or local
+administrator policy can prevent them. The worker fails closed with no
+unsandboxed fallback. FUSE extraction does not bypass this requirement.
 
-## Build Linux artifacts
+Local Fedora preview archives require glibc 2.39 and are explicitly named
+`preview.fedora42`; they are not the RHEL 9 candidates built by GitHub.
 
-Configure a Release viewer using the commands in README.md.
-Reuse the existing patched PDFium package; packaging does not
-recompile it. Build-time tools include Python 3, CMake, `ldd`, `readelf`, and an
-RPM/DEB package database for dependency notices. Relocation validation requires
-Python 3.12+. AppImage creation also needs
-`mksquashfs` from squashfs-tools.
+## Windows and macOS
+
+Windows x64 builds use MSVC, Qt 6.8.3 and the Windows SDK required by pinned
+PDFium. `windeployqt` collects Qt/QML/plugins; the redistributable MSVC CRT DLLs
+are copied beside the EXE so no redistributable installer is needed. The PDF
+worker runs through `pdf-sandbox.exe` in a capability-free AppContainer with
+CPU, memory, lifetime and child-process limits. No administrator installation
+is required. Keep its helper, worker and DLLs beside the editor EXE.
+
+Mac builds target macOS 13 or newer, separately for Intel and Apple Silicon.
+`macdeployqt` bundles the Qt frameworks, QML/plugins and PDFium worker. The worker
+uses `/usr/bin/sandbox-exec` with a deny-default profile and resource limits;
+no network, child-process or host file-write access is granted. The worker
+verifies its sandbox before parsing a document. This uses Darwin sandbox SPI;
+unsupported hosts fail closed rather than silently disabling isolation.
+Native workers receive a minimal environment rather than the GUI's host environment.
+
+Windows candidates are unsigned. Mac candidates are ad-hoc signed for native
+execution, not Developer ID signed or notarized. Downloaded candidates may need
+explicit approval through the operating system's security UI. Production signing
+and notarization are future release work.
+
+## What the workflow checks
+
+Before uploading a package, the workflow launches the actual GUI offscreen
+from a path containing spaces and tests its deployed dependencies. A separate
+validation helper opens normal PDFs, adds text, edits AcroForm/XFA text,
+checkboxes, radio buttons and dropdowns, saves and reopens twice, verifies the
+source PDF stays unchanged, and checks malformed-document recovery. Pinned
+PDF.js independently checks both saved form generations. The helper is removed
+from Windows/Mac ZIPs and is not included in Linux archives.
+
+Linux tarball and AppImage are extracted and validated separately, outside
+the build container. Checksums and the glibc baseline are checked. Windows/Mac
+packaging also rejects direct worker execution outside its sandbox. Existing
+Linux hostile-document/regression suites remain available via CTest.
+
+Local validation built the glibc 2.34 candidates, passed all 69 PDFium XML tests,
+and passed both relocated formats with independent PDF.js checks. GUI startup
+with bundled libraries/fonts also passed on minimal Ubuntu 22.04 without Qt.
+Worker tests ran outside Docker on Fedora; Windows/Mac native CI and the full
+clean-desktop compatibility matrix are still pending.
+
+Offscreen checks do not establish usability on a clean desktop. Download the
+matching artifact and test opening your PDFs, editing, Save As and reopening.
+Existing form limits in [FORMS](FORMS.md) and [SAVING](SAVING.md) still apply;
+dynamic XFA documents with added content cannot yet be saved.
+
+## Reproduce Linux packaging locally
+
+On a developer machine with Docker, the same baseline build can be run with:
 
 ```sh
-python3 tools/package_native.py \
-  --build-dir build-release \
-  --qt-runtime /usr/lib64/qt6 \
-  --font-dir /usr/share/fonts/liberation-sans-fonts
+docker build -f packaging/native/linux-build.Dockerfile -t pdf-editor-native-builder .
+docker run --rm --user "$(id -u):$(id -g)" \
+  --mount "type=bind,source=$PWD,target=/source" \
+  --env HOME=/tmp/pdf-editor-build-home \
+pdf-editor-native-builder bash tools/build_native_linux.sh
 ```
 
-Use the Qt runtime matching the viewer build. On Debian/Ubuntu, Qt is usually
-under `/usr/lib/x86_64-linux-gnu/qt6`, and Liberation fonts under
-`/usr/share/fonts/truetype/liberation`. For an extracted SDK, point `--qt-runtime`
-to its directory containing `plugins/` and `qml/`.
+For a local SELinux host such as Fedora, use
+`-v "$PWD:/source:Z"` instead of `--mount` in a dedicated build checkout to
+give that checkout a private container label. This is unnecessary on GitHub's
+Ubuntu runner.
 
-To also produce the AppImage, provide the official runtime matching the hash
-in `packaging/native/appimage-runtime.json`, and its upstream license:
+This writes `build-native/`, `.deps/` and `dist/native/` in the checkout. Start
+with a clean checkout or remove incompatible local build products first; do
+not reuse a Fedora-built PDFium library for the RHEL baseline. To validate on
+a host with Python 3.12+ and usable namespaces:
 
 ```sh
-python3 tools/package_native.py \
-  --build-dir build-release \
-  --qt-runtime /usr/lib64/qt6 \
-  --font-dir /usr/share/fonts/liberation-sans-fonts \
-  --appimage-runtime /path/to/runtime-x86_64 \
-  --appimage-license /path/to/type2-runtime-LICENSE
+python3 tools/check_native.py dist/native/*.tar.gz \
+  --smoke build-native/native-smoke --max-glibc 2.34
+python3 tools/check_native.py dist/native/*.AppImage \
+  --smoke build-native/native-smoke --max-glibc 2.34
 ```
 
-For a Fedora-only local preview, pass `--version 0.1.0-preview.fedora42
---max-glibc 2.39`. This override does not establish RHEL 9 compatibility.
-The manual `native-linux.yml` workflow requires a configured self-hosted
-`pdf-editor-rhel9` builder with build tools, Qt 6.4+, Liberation fonts, Python 3.12+
-and Node.js 24+ already installed. It performs the source build, safety tests,
-packaging and relocation checks for both formats. It does not publish a release.
+Native Windows/Mac source builds use `tools/build_pdfium.py`, the viewer CMake
+configuration in README and `tools/package_desktop.py`; the workflow contains
+the complete SDK, Qt and packaging commands. They require native platform SDKs.
 
-Outputs go to `dist/native/`, with `SHA256SUMS`. The tool checks the runtime hash,
-collects shared-library dependencies and distro notices, verifies relocated
-linkage, and records the build host and minimum glibc. It does not download or
-install anything. The runtime is prepended to a SquashFS payload, following the
-[type-2 AppImage format](https://docs.appimage.org/reference/architecture.html).
+## Sources and notices
 
-## Windows and macOS implementation gates
+The application is GPL-3.0-only. Packages contain application/PDFium/dependency
+notices and build manifests. Windows/Mac jobs also upload matching Qt source
+archives as separate `qt-sources-*` artifacts. Pinned PDFium revisions, patches
+and rebuild tooling are checked into this repository.
 
-The current renderer is Linux-specific: Bubblewrap starts the worker, seccomp
-restricts its syscalls, input snapshots use POSIX APIs, and the PDFium build
-recipe explicitly targets Linux x64. Removing the CMake platform check would
-not create a working native release.
-
-Windows requires a native worker process sandbox, bounded resources and lifetime,
-safe document-handle transfer, Windows-compatible input snapshots, and a pinned
-Windows build of the patched XFA/V8-enabled PDFium. Package the viewer and worker
-with `windeployqt`, including QML, plugins, Qt DLLs, PDFium and the compiler
-runtime. Test the extracted ZIP on Windows without a development Qt installation.
-
-macOS requires the equivalent native worker policy, input/library paths,
-resource limits, and a pinned patched PDFium build for each supported CPU.
-Package a real `.app` bundle with `macdeployqt`, including the worker and required
-frameworks/plugins; sign all nested code and notarize the distributed artifact.
-Intel and Apple Silicon must each be validated before offering a universal app.
-
-These are implementation tasks, not packaging-only changes. No Windows/macOS
-candidate is currently advertised as runnable. Their native build and UI checks
-require Windows and macOS builders; neither is available in this workspace.
-
-## Release verification and sources
-
-Before publishing, test relocated artifacts with no host Qt/QML dependency,
-open normal PDFs, edit AcroForm and XFA controls, add content where supported,
-save/reopen twice, and rerun hostile-document isolation tests. Test the tarball
-and AppImage independently, including paths containing spaces. Verify all
-archive checksums and the minimum host OS on a clean desktop.
-
-Keep GPL-3.0 application sources, patched PDFium/V8 corresponding source, Qt and
-all bundled dependency notices/rebuild inputs with each exact binary release.
-Collected license notices alone are not a corresponding-source distribution.
-Signing credentials are provided through release secrets, never committed.
+Before a public binary release, provide complete corresponding sources and
+build inputs for the exact application and modified bundled dependencies.
+Collected notices alone are not a corresponding-source distribution. No signing
+credentials or release-publishing permissions are committed in this workflow.

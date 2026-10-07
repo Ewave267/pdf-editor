@@ -21,12 +21,26 @@ outside the agent's outer sandbox, which blocks Bubblewrap namespace sockets.
 
 The local Fedora previews in `dist/native-local/` require glibc 2.39 and cannot
 run on RHEL 9. Package generation defaults to refusing dependencies newer than
-glibc 2.34; the validation gate correctly rejected the local preview for that
-baseline. A manual workflow prepares Linux candidates on a configured
-`pdf-editor-rhel9` self-hosted builder, which is not available in this workspace.
-Windows/macOS native workers and patched PDFium build recipes remain
-unimplemented. They are not runnable candidates yet; no placeholder executables
-or unsupported cross-platform releases are emitted. See NATIVE-RELEASES.md.
+glibc 2.34. The GitHub-hosted `native.yml` workflow now builds Linux inside a
+Rocky Linux 9 environment and validates the tarball and AppImage outside the
+build container. The build image was constructed and its Python 3.12, Qt 6.6.2,
+fonts and glibc 2.34 were checked locally. The full baseline build passed all
+69 upstream XML tests. Its tarball/AppImage passed the strict glibc 2.34 gate,
+relocated GUI startup, normal-text and AcroForm/XFA edit/save/reopen checks,
+malformed-document recovery, and independent PDF.js verification of both saved
+generations. The GUI also starts with its bundled fonts in a minimal Ubuntu
+22.04 container with no Qt installed; PDF workers were tested outside Docker
+on Fedora. Clean RHEL/Fedora/Ubuntu desktop walkthroughs remain pending.
+
+Windows and macOS native worker launch paths, input handling and patched PDFium
+recipes are implemented. Windows uses a zero-capability AppContainer and a
+bounded Job Object; macOS uses a deny-default Seatbelt profile and resource
+limits. Native GitHub jobs deploy Qt, run the real GUI offscreen, edit/save/reopen
+normal PDFs and AcroForm/XFA fixtures twice, independently check saved fields
+with PDF.js, and upload ZIPs only after these checks pass. Windows/macOS execution
+is not locally verified and awaits the first native CI runs. Mac candidates are
+ad-hoc signed, not notarized; Windows candidates are unsigned. No GitHub release
+or image is published automatically. See [NATIVE-RELEASES](docs/NATIVE-RELEASES.md).
 
 Steps 1, 2, 3, 4, 5 and 7 are implemented and verified locally. Step 2's isolated PDFium
 probe preserves exact XFA input and calculated values across two save/reopen
@@ -42,6 +56,25 @@ for full AcroForm script behavior, dynamic XFA additions and foreground XFA;
 see [FORMS](docs/FORMS.md) and [SAVING](docs/SAVING.md). Step 7 adds kernel
 restrictions, allocation limits, hostile-document tests and controlled worker
 failure; see [SAFETY](docs/SAFETY.md).
+
+## GitHub native candidates — 2026-10-07
+
+- [x] Replace the self-hosted Linux workflow with GitHub-hosted Linux, Windows
+  x64, Intel Mac and Apple Silicon Mac jobs.
+- [x] Build Linux against glibc 2.34, bundle Qt/QML/fonts and enforce the ELF baseline.
+- [x] Build pinned Bubblewrap 0.11.0 against the baseline; verify its 64 MiB tmpfs
+  on the host. RHEL 9's Bubblewrap 0.6.3 lacks the required `--size` option.
+- [x] Port worker launch, input snapshots and source identity checks to Windows/macOS.
+- [x] Deploy app-local MSVC runtime DLLs and Qt dependencies for the Windows ZIP.
+- [x] Deploy Mac frameworks, normalize library paths, and ad-hoc sign native bundles.
+- [x] Add portable edit/save/reopen checks and independent PDF.js checks for added
+  text and native controls; validate both Fedora preview formats after relocation.
+- [x] Pass all six Linux regression suites and Actionlint workflow validation.
+- [x] Compile Windows broker/policy against MinGW Windows headers.
+- [x] Build and validate local glibc 2.34 baseline artifacts; include a signed,
+  checksum-pinned Rocky 9.0 GCC 11 unwinder to avoid newer vendor-backported symbols.
+- [ ] Run the first Windows/MSVC and macOS GitHub jobs and clean-desktop walkthroughs.
+- [ ] Finish production signing/notarization and complete corresponding-source packaging.
 
 ## Compatibility fix — XFA radios and clipped captions
 

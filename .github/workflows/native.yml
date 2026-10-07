@@ -1,0 +1,192 @@
+name: Native release candidates
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [native-releases, main, master]
+    paths:
+      - 'src/**'
+      - 'qml/**'
+      - 'CMakeLists.txt'
+      - 'tools/**'
+      - 'packaging/native/**'
+      - 'third_party/pdfium/**'
+      - '.github/workflows/native.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Linux x86_64 (RHEL 9 baseline)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Free build space on the ephemeral runner
+        run: |
+          sudo rm -rf /usr/local/lib/android /opt/ghc /usr/share/dotnet
+          df -h "$GITHUB_WORKSPACE"
+      - uses: actions/cache@v4
+        with:
+          path: .deps/pdfium-patched
+          key: pdfium-native-rhel9-x64-${{ hashFiles('tools/build_pdfium.py', 'third_party/pdfium/patches/*.patch', 'packaging/native/linux-build.Dockerfile', 'LICENSE') }}
+      - name: Build native binaries and portable bundles against glibc 2.34
+        run: |
+          docker build --file packaging/native/linux-build.Dockerfile --tag pdf-editor-native-builder:ci .
+          docker run --rm --user "$(id -u):$(id -g)" \
+            --mount "type=bind,source=$PWD,target=/source" \
+            --env HOME=/tmp/pdf-editor-build-home \
+            pdf-editor-native-builder:ci bash tools/build_native_linux.sh
+      - name: Check tarball and AppImage outside the build container
+        run: |
+          python3 tools/check_native.py dist/native/*.tar.gz --smoke build-native/native-smoke \
+            --max-glibc 2.34 --results dist/native/validation-tar
+          python3 tools/check_native.py dist/native/*.AppImage --smoke build-native/native-smoke \
+            --max-glibc 2.34 --results dist/native/validation-appimage
+          dist/native/*.AppImage --appimage-extract-and-run --version
+          cd dist/native
+          sha256sum --check SHA256SUMS
+      - name: Independently verify saved form values
+        run: |
+          npm ci --prefix tests/reader --ignore-scripts
+          for folder in dist/native/validation-tar dist/native/validation-appimage; do
+            for generation in 1 2; do
+              node tools/check_form_controls.mjs tests/reader/node_modules/pdfjs-dist "$folder/normal-$generation.pdf" normal
+              node tools/check_form_controls.mjs tests/reader/node_modules/pdfjs-dist "$folder/acroform-$generation.pdf" acroform
+              node tools/check_form_controls.mjs tests/reader/node_modules/pdfjs-dist "$folder/xfa-$generation.pdf" xfa
+            done
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pdf-editor-linux-x86_64
+          path: |
+            dist/native/*.tar.gz
+            dist/native/*.AppImage
+            dist/native/SHA256SUMS
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: linux-build-diagnostics
+          path: .deps/logs/
+
+  desktop:
+    name: ${{ matrix.target }} ${{ matrix.cpu }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: windows
+            cpu: x64
+            runner: windows-2025
+            qt-arch: win64_msvc2022_64
+          - target: macos
+            cpu: arm64
+            runner: macos-15
+            qt-arch: clang_64
+          - target: macos
+            cpu: x64
+            runner: macos-15-intel
+            qt-arch: clang_64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Keep patches in LF format
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.longpaths true
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: matrix.target == 'windows'
+        with:
+          arch: x64
+      - name: Install the Windows SDK required by pinned PDFium
+        if: matrix.target == 'windows'
+        shell: pwsh
+        run: |
+          $sdkBin = 'C:\Program Files (x86)\Windows Kits\10\bin\10.0.28000.0\x64'
+          if (!(Test-Path "$sdkBin\rc.exe")) {
+            $installer = Join-Path $env:RUNNER_TEMP 'pdf-editor-winsdk.exe'
+            Invoke-WebRequest 'https://go.microsoft.com/fwlink/?linkid=2370315' -OutFile $installer
+            $process = Start-Process $installer -ArgumentList '/features','OptionId.DesktopCPPx64','/quiet','/norestart' -Wait -PassThru
+            if ($process.ExitCode -notin @(0, 3010)) { throw "Windows SDK installation failed: $($process.ExitCode)" }
+          }
+          if (!(Test-Path "$sdkBin\rc.exe")) { throw 'Required SDK 10.0.28000.0 is missing' }
+          $sdkBin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          'PDF_EDITOR_BASH=C:/Program Files/Git/bin/bash.exe' | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          setup-python: false
+          arch: ${{ matrix.qt-arch }}
+          cache: true
+      - uses: actions/cache@v4
+        id: pdfium
+        with:
+          path: .deps/pdfium-patched
+          key: pdfium-native-${{ matrix.target }}-${{ matrix.cpu }}-${{ hashFiles('tools/build_pdfium.py', 'third_party/pdfium/patches/*.patch', 'LICENSE') }}
+      - name: Build and XML-test pinned patched PDFium
+        if: steps.pdfium.outputs.cache-hit != 'true'
+        run: python tools/build_pdfium.py --jobs 2
+      - name: Configure and build real native viewer
+        env:
+          MACOSX_DEPLOYMENT_TARGET: '13.0'
+        run: |
+          cmake -S . -B build-native -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DPDF_EDITOR_BUILD_VIEWER=ON -DBUILD_TESTING=OFF \
+            -DPDF_EDITOR_BUILD_NATIVE_SMOKE=ON -DPDFium_DIR="$PWD/.deps/pdfium-patched"
+          cmake --build build-native --parallel 2
+      - name: Fetch matching Qt source and license inputs
+        run: python tools/fetch_native_inputs.py --qt-version 6.8.3
+      - name: Deploy and test packaged application
+        run: |
+          helper=build-native/native-smoke
+          if [[ '${{ matrix.target }}' == windows ]]; then helper+=.exe; fi
+          python tools/package_desktop.py --target '${{ matrix.target }}' \
+            --build-dir build-native --qt-prefix "$QT_ROOT_DIR" \
+            --qt-notices .deps/release-inputs/qt-notices --smoke "$helper"
+      - name: Independently verify both saved generations
+        run: |
+          npm ci --prefix tests/reader --ignore-scripts
+          for generation in 1 2; do
+            node tools/check_form_controls.mjs tests/reader/node_modules/pdfjs-dist "dist/native/validation/normal-$generation.pdf" normal
+            node tools/check_form_controls.mjs tests/reader/node_modules/pdfjs-dist "dist/native/validation/acroform-$generation.pdf" acroform
+            node tools/check_form_controls.mjs tests/reader/node_modules/pdfjs-dist "dist/native/validation/xfa-$generation.pdf" xfa
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pdf-editor-${{ matrix.target }}-${{ matrix.cpu }}
+          path: |
+            dist/native/*.zip
+            dist/native/SHA256SUMS
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qt-sources-${{ matrix.target }}-${{ matrix.cpu }}
+          path: .deps/release-inputs/qt-sources/
+          compression-level: 0
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: diagnostics-${{ matrix.target }}-${{ matrix.cpu }}
+          path: .deps/logs/

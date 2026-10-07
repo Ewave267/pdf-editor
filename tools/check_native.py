@@ -14,7 +14,11 @@ import tempfile
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("artifact", type=Path)
-    parser.add_argument("--harness", type=Path, required=True, help="Matching viewer-tests executable")
+    helpers = parser.add_mutually_exclusive_group(required=True)
+    helpers.add_argument("--harness", type=Path, help="Matching viewer-tests executable")
+    helpers.add_argument("--smoke", type=Path, help="Portable native-smoke executable")
+    parser.add_argument("--fixtures", type=Path, default=Path(__file__).resolve().parents[1] / "tests/pdfs")
+    parser.add_argument("--results", type=Path, default=Path("dist/native/validation"))
     parser.add_argument("--max-glibc", help="Reject packages newer than this host baseline, e.g. 2.34")
     args = parser.parse_args()
     artifact = args.artifact.resolve()
@@ -44,9 +48,9 @@ def main():
         subprocess.run([str(root / "pdf-editor"), "--version"], env=env, check=True)
         with tempfile.TemporaryFile() as diagnostics:
             process = subprocess.Popen([str(root / "pdf-editor")], env=env, stderr=diagnostics)
+            exited = None
             try:
-                process.wait(timeout=3)
-                raise RuntimeError(f"Native GUI exited prematurely: {process.returncode}")
+                exited = process.wait(timeout=3)
             except subprocess.TimeoutExpired:
                 pass
             finally:
@@ -55,20 +59,32 @@ def main():
                     process.wait(timeout=5)
             diagnostics.seek(0)
             errors = diagnostics.read().decode(errors="replace")
+            if exited is not None:
+                raise RuntimeError(f"Native GUI exited prematurely: {exited}\n{errors}")
             if "failed to load component" in errors.lower():
                 raise RuntimeError(errors)
         # Package libraries are resolved first. The harness uses the exact same
         # PdfDocument library, while production binaries remain unmodified.
-        shutil.copy2(args.harness.resolve(), root / "bin/viewer-tests")
-        probe = args.harness.resolve().parent / "xfa-probe-worker"
-        if probe.is_file():
-            shutil.copy2(probe, root / "bin/xfa-probe-worker")
+        helper = args.harness or args.smoke
+        helper_name = "viewer-tests" if args.harness else "native-smoke"
+        shutil.copy2(helper.resolve(), root / "bin" / helper_name)
+        if args.harness:
+            probe = args.harness.resolve().parent / "xfa-probe-worker"
+            if probe.is_file():
+                shutil.copy2(probe, root / "bin/xfa-probe-worker")
         env["PATH"] = str(root / "bin") + os.pathsep + env.get("PATH", "")
         env["LD_LIBRARY_PATH"] = str(root / "lib/runtime") + ":" + str(root / "lib/pdf-form-editor")
         env["QT_PLUGIN_PATH"] = str(root / "plugins")
         env["QML_IMPORT_PATH"] = str(root / "qml")
         env["QML2_IMPORT_PATH"] = str(root / "qml")
-        subprocess.run([str(root / "bin/viewer-tests")], env=env, check=True)
+        fonts = root / "share/fonts/fontconfig.conf"
+        if fonts.is_file():
+            env["FONTCONFIG_FILE"] = str(fonts)
+        command = [str(root / "bin" / helper_name)]
+        if args.smoke:
+            args.results.mkdir(parents=True, exist_ok=True)
+            command += [str(args.fixtures.resolve()), str(args.results.resolve())]
+        subprocess.run(command, env=env, check=True, timeout=240)
     print(f"Relocated native GUI and PDF integration checks passed: {artifact.name}")
 
 

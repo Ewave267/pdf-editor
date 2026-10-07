@@ -19,7 +19,11 @@ function find(node, predicate) {
 try {
   const pdf = await task.promise;
   assert.equal(pdf.numPages, 1);
-  if (kind === "acroform") {
+  if (kind === "normal") {
+    const text = await (await pdf.getPage(1)).getTextContent();
+    assert.ok(text.items.map(item => item.str ?? "").join(" ").includes("Native release smoke test"),
+      "Added text did not survive saving/reopening");
+  } else if (kind === "acroform") {
     const fields = await pdf.getFieldObjects();
     assert.equal(fields.get("Input")[0].value, "edited");
     assert.equal(fields.get("Check")[0].value, checked === "1" ? "Yes" : "Off");
@@ -46,7 +50,8 @@ try {
     assert.equal(!!control("optionB").attributes.checked, radio === "B");
     assert.equal(control("dropdown").attributes.value, dropdown);
   }
-  console.log(`PASS: PDF.js verified saved ${kind} text, checkbox, radio and dropdown values`);
+  console.log(kind === "normal" ? "PASS: PDF.js verified saved added text" :
+    `PASS: PDF.js verified saved ${kind} text, checkbox, radio and dropdown values`);
 } finally {
   await task.destroy();
 }

@@ -25,7 +25,11 @@ a dependency-free foundation check. Enable the viewer explicitly with
 The primary distribution direction is now native desktop packages: Windows ZIP
 with an executable and DLLs, Linux portable tarball and AppImage, and macOS app
 bundle. See [native release status and build instructions](docs/NATIVE-RELEASES.md).
-Linux bundling is implemented; native Windows/macOS workers still require porting.
+GitHub Actions builds and tests the real editor on native Windows, macOS and
+Linux runners, then uploads downloadable artifacts. Push this branch to GitHub
+and open **Actions → Native release candidates**. See the linked instructions
+for downloading and running each package. Windows and macOS are new ports; their
+first native CI runs are still pending.
 The previous Docker/Go implementation is preserved on `archive/docker-go`.
 
 Linux release targets are RHEL 9, Fedora, and Ubuntu 22.04/24.04 or newer.
@@ -49,7 +53,8 @@ cmake --build build-release --parallel 4
 ```
 
 Developers need Qt 6.4+ development packages, CMake, a C++20 compiler, Ninja,
-Python, Git and Bubblewrap. Skip the PDFium source build when a matching patched
+Python and Git. Linux also needs Bubblewrap; Windows needs MSVC and the Windows
+SDK, and macOS needs Xcode. The commands above show the Linux build. Skip the PDFium source build when a matching patched
 package already exists. End users run the packaged application directly.
 See [native release instructions](docs/NATIVE-RELEASES.md) for bundling Qt and
 building against the RHEL 9 compatibility baseline.

@@ -17,6 +17,10 @@
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
+#ifdef Q_OS_WIN
+#include <fcntl.h>
+#include <io.h>
+#endif
 
 namespace
 {
@@ -37,7 +41,7 @@ void reply(const QJsonObject& result)
 class PdfDocument
 {
   public:
-    PdfDocument()
+    explicit PdfDocument(const QString& inputPath)
     {
         host_.lookupPage = [this](int index) -> FPDF_PAGE
         {
@@ -47,7 +51,7 @@ class PdfDocument
         };
         host_.FFI_GetRotation = [](FPDF_FORMFILLINFO*, FPDF_PAGE page)
         { return FPDFPage_GetRotation(page); };
-        QFile input("/input.pdf");
+        QFile input(inputPath);
         require(input.open(QIODevice::ReadOnly), "Cannot read the selected PDF.");
         require(input.size() > 0 && input.size() <= 64 * 1024 * 1024,
                 "The viewer currently supports PDF files up to 64 MiB.");
@@ -379,11 +383,30 @@ int main(int argc, char** argv)
 {
     try
     {
+#ifdef Q_OS_WIN
+        _setmode(_fileno(stdin), _O_BINARY);
+        _setmode(_fileno(stdout), _O_BINARY);
+#endif
         pdf::detail::installWorkerPolicy();
         QCoreApplication app(argc, argv);
+        const auto arguments = app.arguments();
+        QString inputPath = "/input.pdf";
+        bool save = false;
+        for (int index = 1; index < arguments.size(); ++index)
+        {
+            const QString argument = arguments[index];
+            if (argument == "--save")
+                save = true;
+#if !defined(Q_OS_LINUX)
+            else if (argument == "--input" && index + 1 < arguments.size())
+                inputPath = arguments[++index];
+#endif
+            else
+                throw std::runtime_error("Unknown worker argument.");
+        }
         pdf::detail::Library library;
-        PdfDocument document;
-        if (argc == 2 && QString::fromLocal8Bit(argv[1]) == "--save")
+        PdfDocument document(inputPath);
+        if (save)
         {
             document.initialize();
             QByteArray overlay;
