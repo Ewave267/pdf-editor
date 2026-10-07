@@ -1,20 +1,21 @@
 # MVP Progress
 
-Last updated: 2026-10-06
+Last updated: 2026-10-07
 
 ## Current state
 
-Steps 1, 2, 3 and 5 are implemented and verified locally. Step 2's isolated PDFium
+Steps 1, 2, 3, 4 and 5 are implemented and verified locally. Step 2's isolated PDFium
 probe preserves exact XFA input and calculated values across two save/reopen
 cycles for both packet-array and single-stream forms. Pinned PDF.js independently
 opens and lays out both saved generations and verifies the values.
 The Linux Qt/QML viewer opens and scrolls PDFs, zooms, fits pages, navigates by
 page number, and shows thumbnails. Rendering runs in an isolated asynchronous
 worker behind a C++ interface. Added text, images, and image-based signatures
-can be placed, selected, moved, resized, edited, and deleted. Step 4 form editing
-remains pending. Save As now embeds additions in new PDFs and preserves existing
-form structures. Step 6 still has validation gaps for interactive AcroForm edits
-and dynamic XFA additions; see [SAVING](docs/SAVING.md).
+can be placed, selected, moved, resized, edited, and deleted. Native form input
+supports text, checkboxes, radios, dropdowns and keyboard traversal. Save As
+captures live form edits and embeds additions in new PDFs. Step 6 still has gaps
+for full AcroForm script behavior, dynamic XFA additions and foreground XFA;
+see [FORMS](docs/FORMS.md) and [SAVING](docs/SAVING.md).
 
 ## Step 1 — Repository Foundation
 
@@ -98,6 +99,27 @@ The viewer currently opens local, unencrypted PDFs; it has no form-editing or
 save controls yet. CI is configured for the combined suite but has not been run
 remotely. GPL-3.0-only licensing remains in place.
 
+## Step 4 — Forms
+
+- [x] Keep native form pages alive in the isolated PDFium worker.
+- [x] Forward mouse, keyboard and committed text input from Qt/QML.
+- [x] Read/edit text fields and redraw pages/thumbnails after input.
+- [x] Check/uncheck checkboxes, switch radio choices and select dropdown values.
+- [x] Traverse focus with Tab and Shift+Tab; select, copy, paste and delete text.
+- [x] Preserve required XFA exit events and calculated values after editing.
+- [x] Save the live native form state, including an uncommitted focused field.
+- [x] Reopen edited AcroForm and dynamic XFA with exact values.
+- [x] Verify all control states with independent PDF.js, including unchecked states.
+- [x] Retain form edits and additions after destination write failure.
+- [x] Store original, reproducible GPL-3.0-only control fixtures.
+- [x] Exercise actual QML mouse/key input and inspect the refreshed interface.
+
+Validated against the committed synthetic single-page fixtures. Full XFA additions,
+dynamic page relayout, foreground/static XFA, pointer-drag text selection, complex
+input methods and broader production compatibility remain outstanding. The pinned
+AcroForm keystroke script's uppercase conversion is not applied by PDFium's native
+path; actions remain present in saved output. See [FORMS](docs/FORMS.md).
+
 ## Step 5 — Added Content
 
 - [x] Add document-owned objects with stable IDs, page, geometry, type and content.
@@ -130,15 +152,16 @@ No PDFium rebuild was needed. GPL-3.0-only licensing remains unchanged.
 - [x] Verify native XFA values and calculation/round trips after saving a copy.
 - [x] Independently verify added content, AcroForm, and XFA output with PDF.js.
 - [x] Retain changes on failed save; track edits made while saving separately.
-- [ ] Validate newly edited forms through the viewer after step 4 is implemented.
-- [ ] Validate interactive AcroForm behavior after saving.
+- [x] Validate newly edited forms through the viewer and independent PDF.js.
+- [x] Validate native AcroForm widget editing after saving.
+- [ ] Fix the pinned AcroForm keystroke script conversion path.
 - [ ] Support additions on dynamic full XFA while preserving its behavior.
 - [ ] Validate representative foreground/static XFA documents with additions.
 
 Implementation and limits are in [SAVING](docs/SAVING.md). Step 6 is implemented
 for ordinary PDFs and existing AcroForm content, with the validation gaps above.
-The combined suite passes 4/4 CTest entries, including eleven viewer cases,
-eleven XFA regressions, and seven independent PDF.js output checks. The final
+The 2026-10-07 combined suite passes 4/4 CTest entries, including fifteen viewer cases,
+eleven XFA regressions, and independent PDF.js output checks for additions and every form control. The final
 interface screenshot, C++ formatting, Python/JavaScript syntax, and whitespace
 checks pass. CI is configured but was not run remotely.
 
@@ -183,9 +206,9 @@ now requires the patched package and rejects the original binary.
 | --- | --- | --- |
 | 2 — Prove XFA First | Complete for committed fixtures | Expand compatibility during forms work |
 | 3 — Minimal Viewer | Complete for committed fixtures | Extend form interaction in step 4 |
-| 4 — Forms | Not started | AcroForm and representative XFA field interaction |
+| 4 — Forms | Complete for synthetic fixtures | Expand production-form and script compatibility |
 | 5 — Added Content | Complete for synthetic fixtures | Save additions in step 6 |
-| 6 — Save | Implemented; validation partial | Viewer form edits and dynamic XFA additions |
+| 6 — Save | Implemented; validation partial | AcroForm script fix, dynamic XFA additions and foreground XFA |
 | 7 — Safety | Not started | Broader untrusted PDF and JavaScript isolation testing |
 | 8 — MVP Release | Not started | Package the verified workflow for one desktop platform |
 

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "pdf/PdfDocument.h"
 #include "ui/AddedOverlay.h"
+#include "ui/FormInput.h"
 #include "ui/PdfPageItem.h"
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
@@ -19,6 +20,7 @@ int main(int argc, char** argv)
     app.setApplicationName("PDF Form Editor");
     app.setOrganizationName("PDF Form Editor");
     QQuickStyle::setStyle("Basic");
+    qmlRegisterType<FormInput>("PdfEditor", 1, 0, "FormInput");
     qmlRegisterType<AddedOverlay>("PdfEditor", 1, 0, "AddedOverlay");
     qmlRegisterUncreatableType<AddedContent>("PdfEditor", 1, 0, "AddedContent",
                                              "Owned by document");

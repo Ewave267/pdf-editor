@@ -42,3 +42,11 @@ Step 4 must provide viewer form interaction and transport live form changes into
 the save baseline; the current snapshot represents existing persisted values.
 Full XFA additions need a separate compatibility solution. Interactive AcroForm
 validation and representative static/foreground XFA fixtures remain outstanding.
+
+## Step 4 update — 2026-10-07
+
+[ADR 0005](0005-native-form-events.md) replaces the original immutable save
+baseline with a live native form snapshot. Additions still enter only the
+independent save worker. Form input, calculations and exact saved values are
+now tested in the viewer; full XFA additions and the pinned AcroForm script
+conversion limitation remain outstanding.

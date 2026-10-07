@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "PdfiumRuntime.h"
+#include <fpdf_annot.h>
 #include <fpdf_edit.h>
 #include <fpdf_ppo.h>
 #include <fpdf_save.h>
@@ -11,6 +12,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QMap>
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
@@ -37,6 +39,14 @@ class PdfDocument
   public:
     PdfDocument()
     {
+        host_.lookupPage = [this](int index) -> FPDF_PAGE
+        {
+            if (index < 0 || index >= FPDF_GetPageCount(document_))
+                return nullptr;
+            return loadPage(index);
+        };
+        host_.FFI_GetRotation = [](FPDF_FORMFILLINFO*, FPDF_PAGE page)
+        { return FPDFPage_GetRotation(page); };
         QFile input("/input.pdf");
         require(input.open(QIODevice::ReadOnly), "Cannot read the selected PDF.");
         require(input.size() > 0 && input.size() <= 64 * 1024 * 1024,
@@ -48,7 +58,19 @@ class PdfDocument
     ~PdfDocument()
     {
         if (form_)
+        {
+            FORM_ForceToKillFocus(form_);
+            while (!openPages_.isEmpty())
+            {
+                auto it = openPages_.begin();
+                auto page = it.value();
+                FORM_OnBeforeClosePage(page, form_);
+                openPages_.erase(it);
+                FPDF_ClosePage(page);
+            }
+            host_.page = nullptr;
             FPDFDOC_ExitFormFillEnvironment(form_);
+        }
         if (document_)
             FPDF_CloseDocument(document_);
     }
@@ -56,10 +78,13 @@ class PdfDocument
     QJsonObject initialize()
     {
         type_ = FPDF_GetFormType(document_);
+        host_.topLeftCoordinates = type_ == FORMTYPE_XFA_FULL;
         form_ = FPDFDOC_InitFormFillEnvironment(document_, &host_);
         require(form_, "Cannot initialize the document's form environment.");
         if (type_ == FORMTYPE_XFA_FULL || type_ == FORMTYPE_XFA_FOREGROUND)
             require(FPDF_LoadXFA(document_), "Cannot load this document's XFA form.");
+        FORM_DoDocumentJSAction(form_);
+        FORM_DoDocumentOpenAction(form_);
         const int count = FPDF_GetPageCount(document_);
         require(count > 0 && count <= 2000, "The viewer supports documents with 1 to 2000 pages.");
         QJsonArray pages;
@@ -78,6 +103,149 @@ class PdfDocument
         return {{"pages", pages}, {"formType", type_}};
     }
 
+    FPDF_PAGE loadPage(int index)
+    {
+        require(index >= 0 && index < FPDF_GetPageCount(document_), "Invalid form page.");
+        auto page = openPages_.value(index);
+        if (!page)
+        {
+            page = FPDF_LoadPage(document_, index);
+            require(page, "Cannot load the form page.");
+            openPages_.insert(index, page);
+            host_.page = page;
+            host_.pageIndex = index;
+            FORM_OnAfterLoadPage(page, form_);
+        }
+        host_.page = page;
+        host_.pageIndex = index;
+        return page;
+    }
+    QString focusedText(FPDF_PAGE page, bool selected = false)
+    {
+        const auto size = selected ? FORM_GetSelectedText(form_, page, nullptr, 0)
+                                   : FORM_GetFocusedText(form_, page, nullptr, 0);
+        require(size <= 128 * 1024 && size % 2 == 0, "The field text is too large.");
+        if (size < 2)
+            return {};
+        QByteArray bytes(size, 0);
+        if (selected)
+            FORM_GetSelectedText(form_, page, bytes.data(), size);
+        else
+            FORM_GetFocusedText(form_, page, bytes.data(), size);
+        QString text;
+        for (int i = 0; i + 2 < bytes.size(); i += 2)
+            text.append(
+                QChar(static_cast<uchar>(bytes[i]) | (static_cast<uchar>(bytes[i + 1]) << 8)));
+        return text;
+    }
+    QJsonObject event(const QJsonObject& request)
+    {
+        const int index = request.value("page").toInt(-1);
+        currentFormPage_ = index;
+        FPDF_PAGE page = loadPage(index);
+        const QString action = request.value("action").toString();
+        const int flags = request.value("flags").toInt() & 7;
+        bool handled = false;
+        host_.changed = false;
+        if (action == "click")
+        {
+            double x = request.value("x").toDouble(), y = request.value("y").toDouble();
+            require(std::isfinite(x) && std::isfinite(y), "Invalid field coordinates.");
+            if (type_ != FORMTYPE_XFA_FULL)
+            {
+                const double width = FPDF_GetPageWidth(page), height = FPDF_GetPageHeight(page);
+                double x0, y0, x1, y1, x2, y2;
+                require(FPDF_DeviceToPage(page, 0, 0, 10000, 10000, 0, 0, 0, &x0, &y0) &&
+                            FPDF_DeviceToPage(page, 0, 0, 10000, 10000, 0, 10000, 0, &x1, &y1) &&
+                            FPDF_DeviceToPage(page, 0, 0, 10000, 10000, 0, 0, 10000, &x2, &y2),
+                        "Cannot map form coordinates.");
+                const double px = x0 + x / width * (x1 - x0) + y / height * (x2 - x0);
+                y = y0 + x / width * (y1 - y0) + y / height * (y2 - y0);
+                x = px;
+            }
+            selectAllPending_ = false;
+            focusedType_ = FPDFPage_HasFormFieldAtPoint(form_, page, x, y);
+            FORM_OnMouseMove(form_, page, flags, x, y);
+            handled = FORM_OnLButtonDown(form_, page, flags, x, y);
+            handled = FORM_OnLButtonUp(form_, page, flags, x, y) || handled;
+        }
+        else if (action == "text")
+        {
+            const auto text = request.value("text").toString();
+            require(text.size() <= 4096, "Text input is too large.");
+            if (type_ == FORMTYPE_XFA_FULL && selectAllPending_)
+            {
+                const unsigned short empty[] = {0};
+                FORM_ReplaceSelection(form_, page, empty);
+            }
+            selectAllPending_ = false;
+            for (QChar character : text)
+                handled = FORM_OnChar(form_, page, character.unicode(), flags) || handled;
+        }
+        else if (action == "key")
+        {
+            const int key = request.value("key").toInt();
+            require(key >= 0 && key <= 255, "Invalid field key.");
+            if (type_ == FORMTYPE_XFA_FULL && selectAllPending_ &&
+                (key == 8 || key == 46 || key == 32 || key == 13))
+            {
+                const unsigned short empty[] = {0};
+                FORM_ReplaceSelection(form_, page, empty);
+                handled = true;
+            }
+            selectAllPending_ = false;
+            handled = FORM_OnKeyDown(form_, page, key, flags) || handled;
+            if (key == 8 || key == 13 || key == 32)
+                handled = FORM_OnChar(form_, page, key, flags) || handled;
+        }
+        else if (action == "selectAll")
+        {
+            handled = FORM_SelectAllText(form_, page);
+            selectAllPending_ = handled;
+        }
+        else if (action == "blur")
+        {
+            selectAllPending_ = false;
+            handled = FORM_ForceToKillFocus(form_);
+            focusedType_ = -1;
+        }
+        else if (action == "copy")
+            handled = true;
+        else
+            throw std::runtime_error("Unsupported form event.");
+        // Public focused-annotation enumeration supports AcroForm, but not full XFA.
+        if (type_ == FORMTYPE_ACRO_FORM)
+        {
+            int focusedPage = -1;
+            FPDF_ANNOTATION annotation = nullptr;
+            if (FORM_GetFocusedAnnot(form_, &focusedPage, &annotation))
+            {
+                focusedType_ = annotation ? FPDFAnnot_GetFormFieldType(form_, annotation) : -1;
+                if (annotation)
+                    FPDFPage_CloseAnnot(annotation);
+            }
+        }
+        const bool mutation =
+            host_.changed ||
+            (handled &&
+             (action == "text" ||
+              (action == "key" &&
+               (request.value("key").toInt() == 8 || request.value("key").toInt() == 46)) ||
+              (action == "click" && (focusedType_ == 2 || focusedType_ == 3 || focusedType_ == 4 ||
+                                     focusedType_ == 9 || focusedType_ == 10))));
+        return {{"handled", handled},
+                {"changed", mutation},
+                {"fieldType", focusedType_},
+                {"text", focusedText(page)},
+                {"selectedText", action == "copy" ? focusedText(page, true) : QString()}};
+    }
+
+    QJsonObject snapshot()
+    {
+        host_.changed = false;
+        const auto bytes = save({});
+        return {{"pdf", QString::fromLatin1(bytes.toBase64())}, {"changed", host_.changed}};
+    }
     QByteArray save(const QByteArray& overlayBytes)
     {
         require(type_ != FORMTYPE_XFA_FULL || overlayBytes.isEmpty(),
@@ -130,6 +298,7 @@ class PdfDocument
                 require(FPDFPage_GenerateContent(page), "Cannot update page content.");
             }
         }
+        FORM_ForceToKillFocus(form_);
         struct Writer : FPDF_FILEWRITE
         {
             QByteArray bytes;
@@ -163,23 +332,7 @@ class PdfDocument
     {
         require(index >= 0 && index < FPDF_GetPageCount(document_), "Invalid page number.");
         require(width >= 96 && width <= 2400, "Unsupported rendering resolution.");
-        FPDF_PAGE page = FPDF_LoadPage(document_, index);
-        require(page, "Cannot load the requested page.");
-        struct PageGuard
-        {
-            FPDF_PAGE page;
-            FPDF_FORMHANDLE form;
-            pdf::detail::Host& host;
-            ~PageGuard()
-            {
-                FORM_OnBeforeClosePage(page, form);
-                FPDF_ClosePage(page);
-                host.page = nullptr;
-            }
-        } guard{page, form_, host_};
-        host_.page = page;
-        host_.pageIndex = index;
-        FORM_OnAfterLoadPage(page, form_);
+        FPDF_PAGE page = loadPage(index);
         const double ratio = FPDF_GetPageHeight(page) / FPDF_GetPageWidth(page);
         const int height = static_cast<int>(std::ceil(width * ratio));
         require(height > 0 && height <= 12000 && static_cast<qint64>(width) * height <= 16000000,
@@ -197,6 +350,11 @@ class PdfDocument
         QBuffer buffer(&encoded);
         buffer.open(QIODevice::WriteOnly);
         require(image.save(&buffer, "PNG"), "Cannot encode the rendered page.");
+        if (currentFormPage_ >= 0)
+        {
+            host_.page = openPages_.value(currentFormPage_);
+            host_.pageIndex = currentFormPage_;
+        }
         return {{"png", QString::fromLatin1(encoded.toBase64())}};
     }
 
@@ -205,7 +363,9 @@ class PdfDocument
     pdf::detail::Host host_;
     FPDF_DOCUMENT document_ = nullptr;
     FPDF_FORMHANDLE form_ = nullptr;
-    int type_ = 0;
+    bool selectAllPending_ = false;
+    int type_ = 0, focusedType_ = -1, currentFormPage_ = -1;
+    QMap<int, FPDF_PAGE> openPages_;
 };
 } // namespace
 
@@ -242,14 +402,21 @@ int main(int argc, char** argv)
         std::string line;
         while (std::getline(std::cin, line))
         {
-            if (line.size() > 4096)
+            if (line.size() > 64 * 1024)
                 return 2;
             const auto request = QJsonDocument::fromJson(QByteArray::fromStdString(line)).object();
             const auto id = request.value("id");
             try
             {
-                auto result = document.render(request.value("page").toInt(-1),
-                                              request.value("width").toInt());
+                QJsonObject result;
+                const QString op = request.value("op").toString();
+                if (op == "event")
+                    result = document.event(request);
+                else if (op == "snapshot")
+                    result = document.snapshot();
+                else
+                    result = document.render(request.value("page").toInt(-1),
+                                             request.value("width").toInt());
                 result.insert("id", id);
                 reply(result);
             }

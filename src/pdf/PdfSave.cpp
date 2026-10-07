@@ -110,8 +110,32 @@ void PdfDocument::saveAs(const QUrl& url)
     saveDestination_ = target.absoluteFilePath();
     saveBytes_.clear();
     emit saveStateChanged();
+    saveOverlay_ = overlay;
+    const quint64 id = ++nextId_;
+    queue_.append({id, 0, 0, {}, QJsonObject{{"op", "snapshot"}}});
+    nextRequest();
+}
+void PdfDocument::startSaveWorker(const QByteArray& baseline)
+{
+    if (!saving_)
+        return;
+    const QString input = snapshot_->filePath("form-state.pdf");
+    QSaveFile snapshot(input);
+    if (!snapshot.open(QIODevice::WriteOnly) || snapshot.write(baseline) != baseline.size() ||
+        !snapshot.commit())
+    {
+        finishSave("Cannot prepare the current form state. Your edits are retained.");
+        return;
+    }
     saveWorker_ = new QProcess(this);
     auto args = sandboxArgs_;
+    const int inputIndex = args.indexOf("/input.pdf");
+    if (inputIndex < 1)
+    {
+        finishSave("The save sandbox is not configured.");
+        return;
+    }
+    args[inputIndex - 1] = input;
     args << "--save";
     connect(saveWorker_, &QProcess::readyReadStandardError, this,
             [this]
@@ -163,6 +187,7 @@ void PdfDocument::saveAs(const QUrl& url)
                                "Your changes are retained.");
                     return;
                 }
+                savedFormRevision_ = saveFormRevision_;
                 savedRevision_ = saveRevision_;
                 savedPath_ = saveDestination_;
                 finishSave({});
@@ -171,7 +196,7 @@ void PdfDocument::saveAs(const QUrl& url)
     saveWorker_->start(QStandardPaths::findExecutable("bwrap"), args);
     if (saveWorker_)
     {
-        saveWorker_->write(overlay);
+        saveWorker_->write(saveOverlay_);
         saveWorker_->closeWriteChannel();
     }
 }
@@ -190,6 +215,7 @@ void PdfDocument::finishSave(const QString& error)
         saveWorker_ = nullptr;
     }
     saveBytes_.clear();
+    saveOverlay_.clear();
     saving_ = false;
     saveError_ = error;
     emit saveStateChanged();

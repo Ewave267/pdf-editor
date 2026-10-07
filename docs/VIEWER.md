@@ -84,8 +84,9 @@ render requests have 15- and 10-second deadlines; the worker has a cumulative
 Current development limits are 64 MiB input, 2000 pages, page dimensions up to
 14400 points, raster widths of 96–2400 pixels and at most 16 million pixels per
 image. Very unusual aspect ratios or oversized raster requests return an error.
-The probe's broader security work, timers, passwords, Unicode form interaction
-and real-world XFA compatibility remain later milestones.
+The probe's broader security work, timers, passwords, comprehensive Unicode input
+and real-world XFA compatibility remain later milestones. See [FORMS](FORMS.md)
+for native form input and its current compatibility limits.
 
 ## Validation
 
@@ -107,6 +108,10 @@ placement, dragging, resizing, deletion, and discard protection; see
 Five additional save cases cover export, reopen, rotated/cropped coordinates,
 save failures, revision tracking, existing forms, and the Save As file dialog.
 The combined build invokes PDF.js and the native XFA probe on saved outputs.
+
+Four form data cases validate native control interaction and actual QML keyboard/
+mouse input for both AcroForm and dynamic XFA. Independent PDF.js checks cover
+every persisted control value; see [FORMS](FORMS.md).
 
 The screenshot was visually inspected. Source fixtures are original synthetic
 GPL-3.0-only documents, not evidence of arbitrary PDF compatibility. The complete

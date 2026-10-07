@@ -2,6 +2,7 @@
 #pragma once
 #include <fpdf_formfill.h>
 #include <fpdfview.h>
+#include <functional>
 
 namespace pdf::detail
 {
@@ -27,6 +28,8 @@ struct Host : FPDF_FORMFILLINFO
     FPDF_PAGE page = nullptr;
     int deniedRequests = 0;
     int pageIndex = 0;
+    bool changed = false, topLeftCoordinates = false;
+    std::function<FPDF_PAGE(int)> lookupPage;
 
     static Host& host(FPDF_FORMFILLINFO* info) { return *static_cast<Host*>(info); }
 
@@ -52,6 +55,7 @@ struct Host : FPDF_FORMFILLINFO
         javascript.Field_browse = [](IPDF_JSPLATFORM*, void*, int) { return 0; };
         m_pJsPlatform = &javascript;
 
+        FFI_OnChange = [](FPDF_FORMFILLINFO* info) { host(info).changed = true; };
         FFI_Invalidate = [](FPDF_FORMFILLINFO*, FPDF_PAGE, double, double, double, double) {};
         FFI_SetCursor = [](FPDF_FORMFILLINFO*, int) {};
         // Timer-driven forms are deliberately outside this synchronous probe.
@@ -59,7 +63,11 @@ struct Host : FPDF_FORMFILLINFO
         FFI_KillTimer = [](FPDF_FORMFILLINFO*, int) {};
         FFI_GetLocalTime = [](FPDF_FORMFILLINFO*) { return FPDF_SYSTEMTIME{}; };
         FFI_GetPage = [](FPDF_FORMFILLINFO* info, FPDF_DOCUMENT, int index)
-        { return index == host(info).pageIndex ? host(info).page : nullptr; };
+        {
+            return host(info).lookupPage
+                       ? host(info).lookupPage(index)
+                       : (index == host(info).pageIndex ? host(info).page : nullptr);
+        };
         FFI_GetCurrentPage = [](FPDF_FORMFILLINFO* info, FPDF_DOCUMENT) { return host(info).page; };
         FFI_GetRotation = [](FPDF_FORMFILLINFO*, FPDF_PAGE) { return 0; };
         FFI_ExecuteNamedAction = [](FPDF_FORMFILLINFO*, FPDF_BYTESTRING) {};
@@ -73,13 +81,13 @@ struct Host : FPDF_FORMFILLINFO
         FFI_SetCurrentPage = [](FPDF_FORMFILLINFO*, FPDF_DOCUMENT, int) {};
         FFI_GotoURL = [](FPDF_FORMFILLINFO* info, FPDF_DOCUMENT, FPDF_WIDESTRING)
         { ++host(info).deniedRequests; };
-        FFI_GetPageViewRect = [](FPDF_FORMFILLINFO*, FPDF_PAGE page, double* left, double* top,
+        FFI_GetPageViewRect = [](FPDF_FORMFILLINFO* info, FPDF_PAGE page, double* left, double* top,
                                  double* right, double* bottom)
         {
             *left = 0;
-            *top = FPDF_GetPageHeight(page);
+            *top = host(info).topLeftCoordinates ? 0 : FPDF_GetPageHeight(page);
             *right = FPDF_GetPageWidth(page);
-            *bottom = 0;
+            *bottom = host(info).topLeftCoordinates ? FPDF_GetPageHeight(page) : 0;
         };
         FFI_PageEvent = [](FPDF_FORMFILLINFO*, int, FPDF_DWORD) {};
         FFI_PopupMenu = [](FPDF_FORMFILLINFO*, FPDF_PAGE, FPDF_WIDGET, int, float, float)

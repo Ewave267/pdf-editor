@@ -1,27 +1,27 @@
 # Step 6 — Save As
 
 Use **Save As** or **Ctrl+Shift+S** to choose a new local PDF. The application
-preserves the open document's original content and form structures and embeds
+preserves the open document's original content, edited form values and form structures and embeds
 its text, image, and signature additions in the new PDF. Text uses embedded
 fonts; images use lossless encoding, including signature transparency.
 
 The original source filename and its existing file aliases are rejected as
 save destinations. Saving to another existing filename uses the file dialog's
 overwrite confirmation. The application commits the output atomically through
-`QSaveFile`, with direct-write fallback disabled. A failed write leaves additions
-and the current document available, and displays an error.
+`QSaveFile`, with direct-write fallback disabled. A failed write leaves form edits,
+additions and the current document available, and displays an error.
 
 The open document uses a private snapshot created on opening. Later external
 changes to the source file cannot change the rendering or save baseline.
-Repeated saves combine this snapshot with the current additions, so additions
-do not accumulate duplicate copies. Editing during an asynchronous save keeps
-later changes marked unsaved. A successful save clears the unsaved marker for
+Each save captures a fresh native snapshot of the live form state before adding
+content in a separate worker, so additions do not accumulate duplicate copies.
+Form input is paused during saving. Later addition edits during an asynchronous
+save remain marked unsaved. A successful save clears the unsaved marker for
 the saved revision. Closing the document or window during a save is prevented
 in the UI. No autosave or crash recovery is included.
 
 Reopening the new PDF displays additions as ordinary PDF content. They are no
-longer separately selectable app objects. Existing forms remain forms; the
-viewer form-editing UI is still pending in step 4.
+longer separately selectable app objects. Existing forms remain editable forms; see [FORMS](FORMS.md).
 
 ## Supported documents and limits
 
@@ -36,12 +36,13 @@ retain those additions. Flattening XFA would discard form behavior, so this
 implementation refuses that operation. Foreground/static XFA insertion has not
 been validated with representative fixtures.
 
-Form values already present in a document are preserved. New form edits through
-the viewer cannot be tested until step 4 provides that interface. The native XFA
-probe does verify editing, calculation, and repeated saving of a viewer-saved
-XFA copy. AcroForm field values, editable widgets, defaults, and JavaScript
-keystroke actions are checked structurally in PDF.js; interactive AcroForm
-behavior remains a validation gap.
+Step 4 verifies viewer edits, checked and unchecked states, radio selections,
+dropdown values, XFA calculations, and independent saved values in both form
+types. AcroForm fields remain editable after saving with additions. AcroForm
+JavaScript actions survive structurally, but the pinned PDFium native keystroke
+path does not apply the fixture's text conversion; see [FORMS](FORMS.md).
+The existing native XFA probe also verifies calculation and repeated saving of
+a viewer-saved XFA copy.
 
 Input and output PDFs are limited to 64 MiB; the generated addition PDF is
 limited to 32 MiB. The save worker has a 30-second deadline. The renderer and
@@ -51,15 +52,17 @@ output directory; it returns PDF bytes over stdout for the application to commit
 ## Architecture
 
 `PdfSave.cpp` creates a transparent, page-sized addition PDF with Qt's
-`QPdfWriter`. A fresh `pdf-render-worker --save` opens the same read-only snapshot
-as the renderer, imports each addition page as a PDF Form XObject, maps displayed
+`QPdfWriter`. The renderer first commits focus and returns a live native form
+snapshot. A fresh `pdf-render-worker --save` opens that read-only snapshot,
+imports each addition page as a PDF Form XObject, maps displayed
 page coordinates through `FPDF_DeviceToPage`, and generates/saves page content.
 It invokes PDFium's document save actions in the sandbox. All PDFium handles
 stay in that worker, and its mutations never reach the live renderer.
 
 `AddedContent` tracks a content revision separately from selection changes.
-`PdfDocument` tracks the last saved revision and the revision captured for an
-active save. See [ADR 0004](adr/0004-isolated-save-as.md).
+`PdfDocument` tracks saved and active-save revisions for both forms and additions.
+See [ADR 0004](adr/0004-isolated-save-as.md) and its live-form update in
+[ADR 0005](adr/0005-native-form-events.md).
 
 ## Validation
 
@@ -75,6 +78,8 @@ The save cases extend `viewer-integration` and verify:
 - Preserve AcroForm values/widgets/actions and dynamic XFA values/layout in
   PDF.js; run the existing native edit/calculation/round-trip probe on the saved
   XFA copy; refuse unsafe dynamic XFA additions without losing them.
+- Verify viewer form edits, native keyboard traversal, XFA calculations and
+  every control value with PDF.js, including checked/unchecked checkbox states.
 - Exercise the actual QML Save As file dialog and close after a successful save.
 
 These checks run with the combined viewer/XFA build. The independent-reader and

@@ -4,6 +4,7 @@
 #include "content/AddedContent.h"
 #include <QCache>
 #include <QImage>
+#include <QJsonObject>
 #include <QObject>
 #include <QProcess>
 #include <QTemporaryDir>
@@ -16,6 +17,10 @@
 class PdfDocument : public QObject
 {
     Q_OBJECT
+    Q_PROPERTY(QString formText READ formText NOTIFY formsChanged)
+    Q_PROPERTY(QString formError READ formError NOTIFY formsChanged)
+    Q_PROPERTY(int formFieldType READ formFieldType NOTIFY formsChanged)
+    Q_PROPERTY(bool formBusy READ formBusy NOTIFY formsChanged)
     Q_PROPERTY(bool saving READ saving NOTIFY saveStateChanged)
     Q_PROPERTY(bool dirty READ dirty NOTIFY saveStateChanged)
     Q_PROPERTY(QString saveError READ saveError NOTIFY saveStateChanged)
@@ -37,9 +42,20 @@ class PdfDocument : public QObject
     ~PdfDocument() override;
     AddedContent* additions() const { return additions_; }
     bool saving() const { return saving_; }
-    bool dirty() const { return additions_->revision() != savedRevision_; }
+    bool dirty() const
+    {
+        return pendingFormEvents_ > 0 || additions_->revision() != savedRevision_ ||
+               formRevision_ != savedFormRevision_;
+    }
     QString saveError() const { return saveError_; }
     QString savedPath() const { return savedPath_; }
+    QString formText() const { return formText_; }
+    QString formError() const { return formError_; }
+    int formFieldType() const { return formFieldType_; }
+    bool formBusy() const { return pendingFormEvents_ > 0; }
+    Q_INVOKABLE quint64 formEvent(int page, const QString& action, double x = 0, double y = 0,
+                                  int key = 0, const QString& text = {}, int flags = 0);
+    Q_INVOKABLE void commitForm();
     Q_INVOKABLE void saveAs(const QUrl& url);
     bool ready() const { return ready_; }
     bool loading() const { return loading_; }
@@ -62,6 +78,9 @@ class PdfDocument : public QObject
     void cancelRender(quint64 id);
     qint64 workerPid() const;
   signals:
+    void formsChanged();
+    void formRepaint();
+    void formEventFinished(quint64 id, bool handled);
     void saveStateChanged();
     void saveFinished(bool success);
     void stateChanged();
@@ -76,6 +95,7 @@ class PdfDocument : public QObject
         int page;
         int width;
         QList<quint64> listeners;
+        QJsonObject command;
         QString key() const { return QString::number(page) + "/" + QString::number(width); }
     };
     void stopWorker();
@@ -83,16 +103,20 @@ class PdfDocument : public QObject
     void receive();
     void nextRequest();
     void updateFit();
+    void startSaveWorker(const QByteArray& baseline);
     void finishSave(const QString& error);
     AddedContent* additions_;
     QProcess* saveWorker_ = nullptr;
     QTimer saveDeadline_;
-    QByteArray saveBytes_;
+    QByteArray saveBytes_, saveOverlay_;
     QString sourcePath_, saveDestination_, saveError_, savedPath_;
     QStringList sandboxArgs_;
     std::unique_ptr<QTemporaryDir> snapshot_;
     quint64 savedRevision_ = 0, saveRevision_ = 0;
     bool saving_ = false, xfaFull_ = false;
+    quint64 formRevision_ = 0, savedFormRevision_ = 0, saveFormRevision_ = 0;
+    int pendingFormEvents_ = 0, formFieldType_ = -1, formPage_ = 0;
+    QString formText_, formError_;
     QProcess* worker_ = nullptr;
     QTimer deadline_;
     QByteArray incoming_, diagnostics_;

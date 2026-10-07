@@ -57,7 +57,7 @@ Do not introduce dependencies unless they solve a current requirement.
 - [ ] The application launches successfully.
 - [ ] The test command can be executed.
 - [ ] CI performs at least the configure and build steps.
-- [ ] The project license is present and identified as `GPL-3.0-or-later`.
+- [ ] The project license is present and identified as `GPL-3.0-only`.
 
 ## Step 2 — Prove XFA First
 
@@ -155,17 +155,20 @@ Add representative documents to the compatibility test corpus.
 
 Using representative AcroForm and XFA test documents:
 
-- [ ] Text fields can be read and edited.
-- [ ] Checkboxes can be checked and unchecked.
-- [ ] Radio button selections work correctly.
-- [ ] Dropdown values can be selected.
-- [ ] Keyboard focus can move between fields.
-- [ ] AcroForm values remain after save and reopen.
-- [ ] XFA values remain after save and reopen.
-- [ ] Required XFA calculations or events still occur after editing.
-- [ ] Editing one form type does not break support for the other.
-- [ ] Representative test PDFs are stored in the compatibility suite when licensing and privacy allow.
-- [ ] Form regressions can be reproduced with a specific test document.
+- [x] Text fields can be read and edited.
+- [x] Checkboxes can be checked and unchecked.
+- [x] Radio button selections work correctly.
+- [x] Dropdown values can be selected.
+- [x] Keyboard focus can move between fields.
+- [x] AcroForm values remain after save and reopen.
+- [x] XFA values remain after save and reopen.
+- [x] Required XFA calculations or events still occur after editing.
+- [x] Editing one form type does not break support for the other.
+- [x] Representative test PDFs are stored in the compatibility suite when licensing and privacy allow.
+- [x] Form regressions can be reproduced with a specific test document.
+
+Validation covers the original synthetic AcroForm and dynamic XFA control
+fixtures; see [FORMS](FORMS.md) for commands and compatibility limits.
 
 ## Step 5 — Added Content
 
@@ -256,9 +259,11 @@ Using documents containing both form changes and added content:
 Implementation status: Save As works for ordinary PDFs and retains existing
 AcroForm values, widgets, and script actions. Dynamic XFA copies preserve
 values and pass the native calculation/edit/save probe, but additions on full
-XFA are refused safely. New form changes through the viewer depend on pending
-step 4. The checks above cover existing persisted form values; interactive
-AcroForm validation and representative foreground XFA remain outstanding.
+XFA are refused safely. Step 4 now verifies live viewer form edits, checked/unchecked states, native
+focus traversal and independent saved values for AcroForm and dynamic XFA.
+AcroForm widgets remain editable after saving, but the pinned native keystroke
+path does not apply script text conversion; full AcroForm script behavior and
+representative foreground XFA remain outstanding.
 See [SAVING](SAVING.md).
 
 ## Step 7 — Safety

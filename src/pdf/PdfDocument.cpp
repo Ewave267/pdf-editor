@@ -2,9 +2,11 @@
 #include "PdfDocument.h"
 
 #include <QBuffer>
+#include <QClipboard>
 #include <QCoreApplication>
 #include <QFile>
 #include <QFileInfo>
+#include <QGuiApplication>
 #include <QImageReader>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -26,7 +28,7 @@ PdfDocument::PdfDocument(QObject* parent) : QObject(parent), additions_(new Adde
 }
 PdfDocument::~PdfDocument()
 {
-    if (saveWorker_)
+    if (saving_)
         finishSave("Save cancelled.");
     stopWorker();
 }
@@ -66,10 +68,16 @@ void PdfDocument::stopWorker()
 
 void PdfDocument::close()
 {
-    if (saveWorker_)
+    if (saving_)
         finishSave("Save cancelled.");
     additions_->clear();
     savedRevision_ = additions_->revision();
+    formRevision_ = savedFormRevision_ = saveFormRevision_ = 0;
+    pendingFormEvents_ = 0;
+    formFieldType_ = -1;
+    formText_.clear();
+    formError_.clear();
+    emit formsChanged();
     saveError_.clear();
     savedPath_.clear();
     snapshot_.reset();
@@ -176,7 +184,7 @@ void PdfDocument::open(const QUrl& url)
 void PdfDocument::receive()
 {
     incoming_ += worker_->readAllStandardOutput();
-    if (incoming_.size() > 64 * 1024 * 1024)
+    if (incoming_.size() > 96 * 1024 * 1024)
     {
         fail("The PDF renderer returned too much data.");
         return;
@@ -194,6 +202,24 @@ void PdfDocument::receive()
         return;
     }
     deadline_.stop();
+    if (response.contains("error") && !active_.command.isEmpty())
+    {
+        const auto id = active_.id;
+        const auto op = active_.command.value("op").toString();
+        active_ = {};
+        if (op == "snapshot")
+            finishSave(response["error"].toString());
+        else
+        {
+            --pendingFormEvents_;
+            formError_ = response["error"].toString();
+            emit formsChanged();
+            emit saveStateChanged();
+            emit formEventFinished(id, false);
+        }
+        nextRequest();
+        return;
+    }
     if (response.contains("error"))
     {
         fail(response.value("error").toString("Cannot render this PDF."));
@@ -232,6 +258,44 @@ void PdfDocument::receive()
     if (!active_.id || response.value("id").toDouble() != static_cast<double>(active_.id))
     {
         fail("The PDF renderer returned an unexpected page response.");
+        return;
+    }
+    if (!active_.command.isEmpty())
+    {
+        const auto command = active_.command;
+        const auto id = active_.id;
+        active_ = {};
+        if (command["op"].toString() == "snapshot")
+        {
+            const QByteArray baseline =
+                QByteArray::fromBase64(response["pdf"].toString().toLatin1());
+            if (!baseline.startsWith("%PDF-") || baseline.size() > 64 * 1024 * 1024)
+                finishSave("The renderer returned invalid PDF data. Your edits are retained.");
+            else
+            {
+                if (response["changed"].toBool())
+                    ++formRevision_;
+                saveFormRevision_ = formRevision_;
+                startSaveWorker(baseline);
+            }
+        }
+        else
+        {
+            if (command["action"].toString() == "copy")
+                QGuiApplication::clipboard()->setText(response["selectedText"].toString());
+            --pendingFormEvents_;
+            formText_ = response["text"].toString();
+            formFieldType_ = response["fieldType"].toInt(-1);
+            formError_.clear();
+            if (response["changed"].toBool())
+                ++formRevision_;
+            cache_.clear();
+            emit formsChanged();
+            emit saveStateChanged();
+            emit formRepaint();
+            emit formEventFinished(id, response["handled"].toBool());
+        }
+        nextRequest();
         return;
     }
     const auto bytes = QByteArray::fromBase64(response.value("png").toString().toLatin1());
@@ -294,7 +358,7 @@ quint64 PdfDocument::requestRender(int page, int width)
         if (it != queue_.end())
             it->listeners.append(id);
         else
-            queue_.append({id, page, width, {id}});
+            queue_.append({id, page, width, {id}, {}});
     }
     nextRequest();
     return id;
@@ -306,7 +370,7 @@ void PdfDocument::cancelRender(quint64 id)
     for (auto it = queue_.begin(); it != queue_.end();)
     {
         it->listeners.removeAll(id);
-        if (it->listeners.isEmpty())
+        if (it->command.isEmpty() && it->listeners.isEmpty())
             it = queue_.erase(it);
         else
             ++it;
@@ -318,11 +382,35 @@ void PdfDocument::nextRequest()
     if (!worker_ || active_.id || queue_.isEmpty())
         return;
     active_ = queue_.takeFirst();
-    const QJsonObject request{
-        {"id", static_cast<double>(active_.id)}, {"page", active_.page}, {"width", active_.width}};
+    QJsonObject request = active_.command;
+    if (request.isEmpty())
+        request = {{"page", active_.page}, {"width", active_.width}};
+    request.insert("id", static_cast<double>(active_.id));
     worker_->write(QJsonDocument(request).toJson(QJsonDocument::Compact) + '\n');
-    deadline_.start(10000);
+    deadline_.start(active_.command.value("op").toString() == "snapshot" ? 30000 : 10000);
 }
+
+quint64 PdfDocument::formEvent(int page, const QString& action, double x, double y, int key,
+                               const QString& text, int flags)
+{
+    if (!ready_ || saving_ || page < 0 || page >= pageCount() || formType_ == "PDF" ||
+        text.size() > 4096)
+        return 0;
+    const QStringList allowed{"click", "text", "key", "selectAll", "blur", "copy"};
+    if (!allowed.contains(action))
+        return 0;
+    const quint64 id = ++nextId_;
+    formPage_ = page;
+    QJsonObject command{{"op", "event"}, {"page", page}, {"action", action}, {"x", x},
+                        {"y", y},        {"key", key},   {"text", text},     {"flags", flags}};
+    queue_.append({id, page, 0, {}, command});
+    ++pendingFormEvents_;
+    emit formsChanged();
+    emit saveStateChanged();
+    nextRequest();
+    return id;
+}
+void PdfDocument::commitForm() { formEvent(formPage_, "blur"); }
 
 void PdfDocument::setCurrentPage(int page)
 {

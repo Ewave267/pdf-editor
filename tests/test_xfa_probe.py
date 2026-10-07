@@ -150,7 +150,8 @@ print('sandbox policy verified')
         paths = [FIXTURE, FIXTURE.with_name("single-stream.pdf"),
                  ROOT / "tests/pdfs/normal/blank.pdf", ROOT / "tests/pdfs/normal/single-page.pdf",
                  ROOT / "tests/pdfs/normal/multi-page.pdf", ROOT / "tests/pdfs/normal/rotated-cropped.pdf",
-                 ROOT / "tests/pdfs/acroform/text.pdf", ROOT / "tests/pdfs/malformed/not-a-pdf.pdf"]
+                 ROOT / "tests/pdfs/acroform/text.pdf", ROOT / "tests/pdfs/acroform/controls.pdf",
+                 ROOT / "tests/pdfs/xfa-dynamic/controls.pdf", ROOT / "tests/pdfs/malformed/not-a-pdf.pdf"]
         before = [path.read_bytes() for path in paths]
         generated_root = self.directory / "generated"
         generate(generated_root)

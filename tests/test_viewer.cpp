@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "pdf/PdfDocument.h"
 #include "ui/AddedOverlay.h"
+#include "ui/FormInput.h"
 #include "ui/PdfPageItem.h"
+#include <QClipboard>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -59,7 +61,215 @@ class ViewerTests : public QObject
         Q_UNUSED(kind);
 #endif
     }
+    void checkFormOutput(const QString& path, const QString& kind, const QString& checked = "1",
+                         const QString& radio = "B", const QString& dropdown = "Beta")
+    {
+#ifdef SAVE_NODE
+        QProcess reader;
+        reader.start(QString(SAVE_NODE),
+                     {QString(TEST_ROOT) + "/tools/check_form_controls.mjs", QString(SAVE_PDFJS),
+                      path, kind, checked, radio, dropdown});
+        QVERIFY(reader.waitForFinished(20000));
+        const auto diagnostics = reader.readAllStandardOutput() + reader.readAllStandardError();
+        QVERIFY2(reader.exitCode() == 0 && reader.exitStatus() == QProcess::NormalExit,
+                 diagnostics.constData());
+#else
+        Q_UNUSED(path);
+        Q_UNUSED(kind);
+        Q_UNUSED(checked);
+        Q_UNUSED(radio);
+        Q_UNUSED(dropdown);
+#endif
+    }
   private slots:
+    void formEventsAndPersistence_data()
+    {
+        QTest::addColumn<QString>("path");
+        QTest::newRow("acroform") << QString("acroform/controls.pdf");
+        QTest::newRow("xfa") << QString("xfa-dynamic/controls.pdf");
+    }
+    void formEventsAndPersistence()
+    {
+        QFETCH(QString, path);
+        const bool xfa = path.startsWith("xfa");
+        PdfDocument document;
+        document.open(fixture(path));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        auto draw = [&]()
+        {
+            QSignalSpy images(&document, &PdfDocument::rendered);
+            document.requestRender(0, 612);
+            if (!images.wait(10000))
+                return QImage{};
+            return qvariant_cast<QImage>(images.first()[1]);
+        };
+        auto event = [&](QString action, double x = 0, double y = 0, int key = 0, QString text = {},
+                         int flags = 0)
+        {
+            QSignalSpy done(&document, &PdfDocument::formEventFinished);
+            const quint64 id = document.formEvent(0, action, x, y, key, text, flags);
+            if (!id)
+                return false;
+            const bool completed = done.wait(10000);
+            if (!completed || !document.formError().isEmpty())
+                return false;
+            return done.first()[0].toULongLong() == id && done.first()[1].toBool();
+        };
+        QVERIFY(!draw().isNull());
+        QSignalSpy rejected(&document, &PdfDocument::formEventFinished);
+        QVERIFY(document.formEvent(0, "key", 0, 0, 1000));
+        QVERIFY(rejected.wait(10000));
+        QVERIFY(!rejected.first()[1].toBool());
+        QVERIFY(!document.formError().isEmpty());
+        QVERIFY(document.ready());
+        QVERIFY(!document.formBusy());
+        QVERIFY(!document.dirty());
+        QVERIFY(event("click", 100, 87));
+        QCOMPARE(document.formText(), "original");
+        QVERIFY(event("selectAll"));
+        QVERIFY(event("text", 0, 0, 0, "edited"));
+        QCOMPARE(document.formText(), "edited");
+        QVERIFY(event("key", 0, 0, 9)); // Native keyboard focus traversal commits the text.
+        if (xfa)
+        {
+            QCOMPARE(document.formText(), "JS:edited");
+        }
+        QVERIFY(document.dirty());
+        QTemporaryDir states;
+        auto saveCheckbox = [&](const QString& checked)
+        {
+            const auto filename = states.filePath("state-" + checked + ".pdf");
+            document.saveAs(QUrl::fromLocalFile(filename));
+            QTRY_VERIFY_WITH_TIMEOUT(!document.saving(), 30000);
+            QVERIFY2(document.saveError().isEmpty(), qPrintable(document.saveError()));
+            checkFormOutput(filename, xfa ? "xfa" : "acroform", checked, "A", "Alpha");
+        };
+        QFile originalFile(fixture(path).toLocalFile());
+        QVERIFY(originalFile.open(QIODevice::ReadOnly));
+        const QByteArray original = originalFile.readAll();
+        QVERIFY(event("click", 82, xfa ? 212 : 150));
+        saveCheckbox("1");
+        QVERIFY(event("click", 82, xfa ? 212 : 150));
+        saveCheckbox("0");
+        QVERIFY(event("click", 82, xfa ? 212 : 150));  // leave checked
+        QVERIFY(event("click", 152, xfa ? 272 : 212)); // choose B
+        QVERIFY(event("click", xfa ? 268 : 262, xfa ? 337 : 275));
+        QVERIFY(!draw().isNull());
+        QVERIFY(event("key", 0, 0, 40));
+
+        QVERIFY(event("key", 0, 0, 13)); // choose Beta
+        QVERIFY(event("blur"));
+        QTemporaryDir directory;
+        const auto output = QUrl::fromLocalFile(directory.filePath("saved.pdf"));
+        if (!xfa)
+            document.additions()->addText(0, 50, 400, "Form and additions");
+        document.saveAs(QUrl::fromLocalFile(directory.filePath("missing/failure.pdf")));
+        QTRY_VERIFY_WITH_TIMEOUT(!document.saving(), 30000);
+        QVERIFY(!document.saveError().isEmpty());
+        QVERIFY(document.dirty());
+        QVERIFY(document.ready());
+        document.saveAs(output);
+        QTRY_VERIFY_WITH_TIMEOUT(!document.saving(), 30000);
+        QVERIFY2(document.saveError().isEmpty(), qPrintable(document.saveError()));
+        QVERIFY(!document.dirty());
+        QFile source(fixture(path).toLocalFile());
+        QVERIFY(source.open(QIODevice::ReadOnly));
+        QCOMPARE(source.readAll(), original);
+        checkFormOutput(output.toLocalFile(), xfa ? "xfa" : "acroform");
+        if (qEnvironmentVariableIsSet("PDF_FORM_ARTIFACT_DIR"))
+        {
+            QDir dir(qEnvironmentVariable("PDF_FORM_ARTIFACT_DIR"));
+            QVERIFY(dir.mkpath("."));
+            QVERIFY(
+                QFile::copy(output.toLocalFile(), dir.filePath(xfa ? "xfa.pdf" : "acroform.pdf")));
+        }
+        document.close();
+        document.open(output);
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        QVERIFY(event("click", 100, 87));
+        QCOMPARE(document.formText(), "edited");
+        if (xfa)
+        {
+            QVERIFY(event("click", 100, 147));
+            QCOMPARE(document.formText(), "JS:edited");
+        }
+        QVERIFY(event("click", 110, xfa ? 337 : 275));
+        QCOMPARE(document.formText(), "Beta");
+        document.close();
+    }
+    void formMouseAndKeyboard_data() { formEventsAndPersistence_data(); }
+    void formMouseAndKeyboard()
+    {
+        QFETCH(QString, path);
+        const bool xfa = path.startsWith("xfa");
+        PdfDocument document;
+        QQmlApplicationEngine engine;
+        engine.rootContext()->setContextProperty("pdfDocument", &document);
+        engine.load(QUrl("qrc:/qml/Main.qml"));
+        QVERIFY(!engine.rootObjects().isEmpty());
+        auto* window = qobject_cast<QQuickWindow*>(engine.rootObjects().first());
+        QVERIFY(QTest::qWaitForWindowExposed(window));
+        document.open(fixture(path));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        QTRY_VERIFY(item(window->contentItem(), "formInput0"));
+        auto* input = item(window->contentItem(), "formInput0");
+        auto* page = qobject_cast<PdfPageItem*>(item(window->contentItem(), "page0"));
+        QVERIFY(page);
+        QTRY_VERIFY_WITH_TIMEOUT(page->rendered(), 15000);
+        auto click = [&](double x, double y)
+        {
+            QTest::mouseClick(
+                window, Qt::LeftButton, Qt::NoModifier,
+                input->mapToScene(QPointF(x / 612 * input->width(), y / 792 * input->height()))
+                    .toPoint());
+        };
+        click(100, 87);
+        QTRY_COMPARE(document.formText(), "original");
+        QVERIFY(input->hasActiveFocus());
+        QTest::keyClick(window, Qt::Key_A, Qt::ControlModifier);
+        for (const char character : QByteArray("edited"))
+            QTest::keyClick(window, character);
+        QTRY_COMPARE(document.formText(), "edited");
+        QTest::keyClick(window, Qt::Key_A, Qt::ControlModifier);
+        QTest::keyClick(window, Qt::Key_C, Qt::ControlModifier);
+        QTRY_COMPARE(QGuiApplication::clipboard()->text(), "edited");
+        QTest::keyClick(window, Qt::Key_Delete);
+        QTRY_COMPARE(document.formText(), "");
+        QTest::keyClick(window, Qt::Key_V, Qt::ControlModifier);
+        QTRY_COMPARE(document.formText(), "edited");
+        QTest::keyClick(window, Qt::Key_Tab);
+        QTRY_VERIFY(!document.formBusy());
+        QVERIFY(input->hasActiveFocus());
+        if (xfa)
+            QCOMPARE(document.formText(), "JS:edited");
+        QTest::keyClick(window, Qt::Key_Backtab, Qt::ShiftModifier);
+        QTRY_COMPARE(document.formText(), "edited");
+        click(82, xfa ? 212 : 150);
+        QTRY_VERIFY(!document.formBusy());
+        click(152, xfa ? 272 : 212);
+        QTRY_VERIFY(!document.formBusy());
+        click(xfa ? 268 : 262, xfa ? 337 : 275);
+        QTRY_COMPARE(document.formText(), "Alpha");
+        QTest::keyClick(window, Qt::Key_Down);
+        QTest::keyClick(window, Qt::Key_Return);
+        QTRY_COMPARE(document.formText(), "Beta");
+        QTRY_VERIFY(!document.formBusy());
+        QSignalSpy refreshed(page, &PdfPageItem::renderedChanged);
+        document.commitForm();
+        QTRY_VERIFY(!document.formBusy());
+        QTRY_VERIFY_WITH_TIMEOUT(!refreshed.isEmpty(), 15000);
+        QVERIFY(document.dirty());
+        if (qEnvironmentVariableIsSet("PDF_FORM_SCREENSHOT") && xfa)
+            QVERIFY(window->grabWindow().save(qEnvironmentVariable("PDF_FORM_SCREENSHOT")));
+        QTemporaryDir directory;
+        const auto output = QUrl::fromLocalFile(directory.filePath("filled.pdf"));
+        document.saveAs(output);
+        QTRY_VERIFY_WITH_TIMEOUT(!document.saving(), 30000);
+        QVERIFY2(document.saveError().isEmpty(), qPrintable(document.saveError()));
+        checkFormOutput(output.toLocalFile(), xfa ? "xfa" : "acroform");
+        document.close();
+        QVERIFY(window->close());
+    }
     void saveAdditionsAndReopen()
     {
         PdfDocument document;
@@ -271,6 +481,20 @@ class ViewerTests : public QObject
             QSignalSpy images(&document, &PdfDocument::rendered);
             document.requestRender(0, 612);
             QTRY_VERIFY_WITH_TIMEOUT(!images.isEmpty(), 10000);
+            if (name.startsWith("acroform"))
+            {
+                auto event = [&](const QString& action, const QString& text = {})
+                {
+                    QSignalSpy done(&document, &PdfDocument::formEventFinished);
+                    document.formEvent(0, action, 100, 152, 0, text);
+                    return done.wait(10000) && done.first()[1].toBool();
+                };
+                QVERIFY(event("click"));
+                QCOMPARE(document.formText(), "Edited value");
+                QVERIFY(event("selectAll"));
+                QVERIFY(event("text", "ABC"));
+                QCOMPARE(document.formText(), "ABC");
+            }
             if (name.startsWith("xfa"))
             {
                 document.additions()->addText(0, 20, 400, "retained");
@@ -704,6 +928,7 @@ int main(int argc, char** argv)
 {
     QGuiApplication app(argc, argv);
     QQuickStyle::setStyle("Basic");
+    qmlRegisterType<FormInput>("PdfEditor", 1, 0, "FormInput");
     qmlRegisterType<AddedOverlay>("PdfEditor", 1, 0, "AddedOverlay");
     qmlRegisterUncreatableType<AddedContent>("PdfEditor", 1, 0, "AddedContent",
                                              "Owned by document");

@@ -36,6 +36,7 @@ void PdfPageItem::setDocument(PdfDocument* document)
                     emit renderedChanged();
                     schedule();
                 });
+        connect(document_, &PdfDocument::formRepaint, this, &PdfPageItem::schedule);
         connect(document_, &PdfDocument::rendered, this,
                 [this](quint64 id, const QImage& image)
                 {

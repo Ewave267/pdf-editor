@@ -46,11 +46,11 @@ ApplicationWindow {
     Dialog {
         id: discardDialog
         objectName: "discardDialog"
-        title: "Discard additions?"
+        title: "Discard changes?"
         anchors.centerIn: parent
         modal: true
         standardButtons: Dialog.Discard | Dialog.Cancel
-        Label { text: "Added content has not been saved. Discard it to continue?" }
+        Label { text: "Form edits or added content have not been saved. Discard changes to continue?" }
         onDiscarded: { const action = root.discardAction; root.discardAction = null; action() }
     }
     Dialog {
@@ -232,7 +232,7 @@ ApplicationWindow {
                 Button { objectName: "addSignatureButton"; text: "Signature"; onClicked: { imageDialog.signature = true; imageDialog.open() } }
                 Button { objectName: "editTextButton"; text: "Edit text"; visible: root.selectedObject.type === "text"; onClicked: { textDialog.editing = true; textInput.text = root.selectedObject.text; textDialog.open() } }
                 Button { objectName: "deleteObjectButton"; text: "Delete"; enabled: pdfDocument.additions.selected >= 0; onClicked: pdfDocument.additions.removeSelected() }
-                Label { Layout.fillWidth: true; elide: Text.ElideRight; text: root.placement ? "Click a page to place " + root.placement + " · Esc cancels" : pdfDocument.additions.error || (pdfDocument.dirty ? "Unsaved additions · Drag to move; corner to resize" : pdfDocument.savedPath ? "Saved · " + pdfDocument.savedPath : "Add content to a page"); color: "#596878" }
+                Label { Layout.fillWidth: true; elide: Text.ElideRight; text: pdfDocument.formError || (root.placement ? "Click a page to place " + root.placement + " · Esc cancels" : pdfDocument.additions.error || (pdfDocument.dirty ? "Unsaved changes · Save As keeps edits" : pdfDocument.savedPath ? "Saved · " + pdfDocument.savedPath : pdfDocument.formType !== "PDF" ? "Click a field · Tab moves focus · Save As keeps edits" : "Add content to a page")); color: "#596878" }
             }
             ListView {
                 id: pageView
@@ -267,6 +267,7 @@ ApplicationWindow {
                         color: "#ffffff"
                         border.color: "#c3cbd5"
                         PdfPage { id: fullPage; objectName: "page" + index; anchors.fill: parent; anchors.margins: 1; document: pdfDocument; page: index }
+                        FormInput { objectName: "formInput" + index; anchors.fill: fullPage; document: pdfDocument; page: index; enabled: pdfDocument.formType !== "PDF" && !pdfDocument.saving }
                         AddedOverlay { anchors.fill: fullPage; content: pdfDocument.additions; page: index }
                         MouseArea {
                             objectName: "contentMouse" + index
@@ -281,6 +282,7 @@ ApplicationWindow {
                                 pdfDocument.currentPage = index + 1
                                 const x = mouse.x / pdfDocument.zoom, y = mouse.y / pdfDocument.zoom
                                 if (root.placement) {
+                                    pdfDocument.commitForm()
                                     if (root.placement === "text") pdfDocument.additions.addText(index, x, y, root.pendingText)
                                     else pdfDocument.additions.addImage(index, x, y, root.pendingImage, root.placement === "signature")
                                     root.placement = ""
@@ -288,6 +290,7 @@ ApplicationWindow {
                                     return
                                 }
                                 const id = pdfDocument.additions.hit(index, x, y)
+                                if (id >= 0) pdfDocument.commitForm()
                                 pdfDocument.additions.select(id)
                                 original = pdfDocument.additions.object(id)
                                 startX = x; startY = y
