@@ -12,8 +12,8 @@ jobs:
   xfa:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: '24'
       - name: Install build, Qt, and sandbox tools
@@ -29,7 +29,7 @@ jobs:
           python3 tools/build_bubblewrap.py
           # Keep the distro's existing executable path and user-namespace profile.
           sudo install -m 0755 .deps/bubblewrap-build/bwrap /usr/bin/bwrap
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         id: pdfium
         with:
           path: .deps/pdfium-patched
@@ -56,7 +56,7 @@ jobs:
           mkdir -p /tmp/pdf-editor-preview
           tar -xzf dist/*.tar.gz -C /tmp/pdf-editor-preview
           python3 tools/check_package.py /tmp/pdf-editor-preview/pdf-form-editor-* build-xfa/viewer-tests
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: linux-ubuntu-24.04-preview
           path: |

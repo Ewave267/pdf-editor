@@ -374,3 +374,13 @@ upstream checkout is unchanged. Local checks passed Python compilation, wrapper
 resolution through the pinned depot_tools parser (including a Git path with
 spaces), missing-Git rejection, and whitespace validation. Windows execution
 awaits the next GitHub run.
+
+## CI runtime warning cleanup — 2026-10-07
+
+Updated checkout, cache, Node/Python setup and artifact actions to verified
+Node 24 versions. Replaced the Node 20 MSVC action with the installed Microsoft
+developer-shell script and explicit environment export. Qt installation uses
+Python 3.14; PDFium and packaging retain Python 3.12. The foundation job now
+pins Ubuntu 24.04 instead of following the changing latest label. Workflow
+lint and whitespace checks passed; native MSVC setup awaits the next Windows
+GitHub run.

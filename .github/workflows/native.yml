@@ -29,10 +29,10 @@ jobs:
     steps:
       - name: Install checkout prerequisites
         run: dnf -y install git tar gzip ca-certificates
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Install baseline SDK and packaging dependencies
         run: bash tools/setup_native_linux.sh
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: .deps/pdfium-patched
           key: pdfium-native-rhel9-x64-${{ hashFiles('tools/build_pdfium.py', 'third_party/pdfium/patches/*.patch', 'tools/setup_native_linux.sh', 'LICENSE') }}
@@ -44,7 +44,7 @@ jobs:
           runuser -u native-builder -- env HOME=/home/native-builder bash tools/build_native_linux.sh
           mkdir -p ci-linux
           cp build-native/native-smoke ci-linux/
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: linux-validation-inputs
           compression-level: 0
@@ -55,7 +55,7 @@ jobs:
             dist/native/SHA256SUMS
             ci-linux/native-smoke
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: failure()
         with:
           name: linux-build-diagnostics
@@ -67,14 +67,14 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '24'
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           name: linux-validation-inputs
           path: .
@@ -99,7 +99,7 @@ jobs:
               node tools/check_form_controls.mjs tests/reader/node_modules/pdfjs-dist "$folder/xfa-$generation.pdf" xfa
             done
           done
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: pdf-editor-linux-x86_64
           path: |
@@ -107,7 +107,7 @@ jobs:
             dist/native/*.AppImage
             dist/native/SHA256SUMS
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: failure()
         with:
           name: linux-validation-diagnostics
@@ -141,17 +141,17 @@ jobs:
         run: |
           git config --global core.autocrlf false
           git config --global core.longpaths true
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
-          python-version: '3.12'
-      - uses: actions/setup-node@v4
+          python-version: '3.14'
+      - uses: actions/setup-node@v6
         with:
           node-version: '24'
-      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Configure the native MSVC x64 developer environment
         if: matrix.target == 'windows'
-        with:
-          arch: x64
+        shell: pwsh
+        run: ./tools/setup_msvc.ps1
       - name: Install the Windows SDK required by pinned PDFium
         if: matrix.target == 'windows'
         shell: pwsh
@@ -172,7 +172,11 @@ jobs:
           setup-python: false
           arch: ${{ matrix.qt-arch }}
           cache: true
-      - uses: actions/cache@v4
+      - name: Select Python for the pinned PDFium build tools
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/cache@v5
         id: pdfium
         with:
           path: .deps/pdfium-patched
@@ -205,19 +209,19 @@ jobs:
             node tools/check_form_controls.mjs tests/reader/node_modules/pdfjs-dist "dist/native/validation/acroform-$generation.pdf" acroform
             node tools/check_form_controls.mjs tests/reader/node_modules/pdfjs-dist "dist/native/validation/xfa-$generation.pdf" xfa
           done
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: pdf-editor-${{ matrix.target }}-${{ matrix.cpu }}
           path: |
             dist/native/*.zip
             dist/native/SHA256SUMS
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: qt-sources-${{ matrix.target }}-${{ matrix.cpu }}
           path: .deps/release-inputs/qt-sources/
           compression-level: 0
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: failure()
         with:
           name: diagnostics-${{ matrix.target }}-${{ matrix.cpu }}
