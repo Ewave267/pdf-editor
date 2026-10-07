@@ -282,18 +282,21 @@ Document JavaScript must remain isolated from unrestricted operating-system func
 
 ### Validation
 
-- [ ] Opening an invalid file produces a controlled error.
-- [ ] Opening a corrupted PDF does not crash the application.
-- [ ] A malformed form does not crash the application.
-- [ ] Large documents can be opened without unreasonable memory growth.
-- [ ] Closing a large document releases resources.
-- [ ] PDF JavaScript cannot arbitrarily execute operating-system commands.
-- [ ] PDF JavaScript cannot arbitrarily read local files.
-- [ ] PDF JavaScript cannot arbitrarily write local files.
-- [ ] PDF JavaScript cannot access environment variables.
-- [ ] PDF JavaScript cannot make unrestricted network requests.
-- [ ] Failures in document JavaScript do not crash the application.
-- [ ] A PDF that causes a crash or security issue becomes a regression test when practical.
+- [x] Opening an invalid file produces a controlled error.
+- [x] Opening a corrupted PDF does not crash the application.
+- [x] A malformed form does not crash the application.
+- [x] Large documents can be opened without unreasonable memory growth.
+- [x] Closing a large document releases resources.
+- [x] PDF JavaScript cannot arbitrarily execute operating-system commands.
+- [x] PDF JavaScript cannot arbitrarily read local files.
+- [x] PDF JavaScript cannot arbitrarily write local files.
+- [x] PDF JavaScript cannot access environment variables.
+- [x] PDF JavaScript cannot make unrestricted network requests.
+- [x] Failures in document JavaScript do not crash the application.
+- [x] A PDF that causes a crash or security issue becomes a regression test when practical.
+
+Validation covers the reproducible Linux safety corpus and native policy tests.
+See [SAFETY](SAFETY.md) for enforced limits, evidence and remaining release work.
 
 ## Step 8 — MVP Release
 

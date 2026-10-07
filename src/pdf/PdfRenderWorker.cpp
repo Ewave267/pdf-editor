@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "PdfiumRuntime.h"
+#include "WorkerPolicy.h"
 #include <fpdf_annot.h>
 #include <fpdf_edit.h>
 #include <fpdf_ppo.h>
@@ -16,7 +17,6 @@
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
-#include <sys/resource.h>
 
 namespace
 {
@@ -95,12 +95,13 @@ class PdfDocument
             const double width = FPDF_GetPageWidth(page);
             const double height = FPDF_GetPageHeight(page);
             FPDF_ClosePage(page);
-            require(std::isfinite(width) && std::isfinite(height) && width > 0 && height > 0 &&
+            require(std::isfinite(width) && std::isfinite(height) && width >= 1 && height >= 1 &&
                         width <= 14400 && height <= 14400,
                     "The document contains an unsupported page size.");
             pages.append(QJsonObject{{"width", width}, {"height", height}});
         }
-        return {{"pages", pages}, {"formType", type_}};
+        return {
+            {"pages", pages}, {"formType", type_}, {"deniedHostRequests", host_.deniedRequests}};
     }
 
     FPDF_PAGE loadPage(int index)
@@ -237,6 +238,7 @@ class PdfDocument
                 {"changed", mutation},
                 {"fieldType", focusedType_},
                 {"text", focusedText(page)},
+                {"deniedHostRequests", host_.deniedRequests},
                 {"selectedText", action == "copy" ? focusedText(page, true) : QString()}};
     }
 
@@ -333,10 +335,14 @@ class PdfDocument
         require(index >= 0 && index < FPDF_GetPageCount(document_), "Invalid page number.");
         require(width >= 96 && width <= 2400, "Unsupported rendering resolution.");
         FPDF_PAGE page = loadPage(index);
-        const double ratio = FPDF_GetPageHeight(page) / FPDF_GetPageWidth(page);
-        const int height = static_cast<int>(std::ceil(width * ratio));
-        require(height > 0 && height <= 12000 && static_cast<qint64>(width) * height <= 16000000,
+        const double pageWidth = FPDF_GetPageWidth(page), pageHeight = FPDF_GetPageHeight(page);
+        require(std::isfinite(pageWidth) && std::isfinite(pageHeight) && pageWidth >= 1 &&
+                    pageHeight >= 1 && pageWidth <= 14400 && pageHeight <= 14400,
+                "This page has unsupported dimensions.");
+        const double rasterHeight = std::ceil(width * pageHeight / pageWidth);
+        require(rasterHeight >= 1 && rasterHeight <= 12000 && width * rasterHeight <= 16000000,
                 "This page is too large to render at the requested zoom.");
+        const int height = static_cast<int>(rasterHeight);
         QImage image(width, height, QImage::Format_ARGB32);
         require(!image.isNull(), "Cannot allocate the page image.");
         image.fill(Qt::white);
@@ -371,13 +377,10 @@ class PdfDocument
 
 int main(int argc, char** argv)
 {
-    QCoreApplication app(argc, argv);
-    rlimit cpu{300, 300}, core{0, 0}, files{128, 128};
-    setrlimit(RLIMIT_CPU, &cpu);
-    setrlimit(RLIMIT_CORE, &core);
-    setrlimit(RLIMIT_NOFILE, &files);
     try
     {
+        pdf::detail::installWorkerPolicy();
+        QCoreApplication app(argc, argv);
         pdf::detail::Library library;
         PdfDocument document;
         if (argc == 2 && QString::fromLocal8Bit(argv[1]) == "--save")
@@ -399,24 +402,30 @@ int main(int argc, char** argv)
             return 0;
         }
         reply(document.initialize());
-        std::string line;
-        while (std::getline(std::cin, line))
+        char line[64 * 1024 + 1];
+        while (std::cin.getline(line, sizeof(line)))
         {
-            if (line.size() > 64 * 1024)
-                return 2;
-            const auto request = QJsonDocument::fromJson(QByteArray::fromStdString(line)).object();
+            QJsonParseError parseError;
+            const auto request = QJsonDocument::fromJson(QByteArray(line), &parseError).object();
             const auto id = request.value("id");
             try
             {
+                require(parseError.error == QJsonParseError::NoError && !request.isEmpty() &&
+                            id.isDouble() && id.toDouble() > 0 &&
+                            id.toDouble() <= 9007199254740991.0 &&
+                            std::floor(id.toDouble()) == id.toDouble(),
+                        "Invalid worker request.");
                 QJsonObject result;
                 const QString op = request.value("op").toString();
                 if (op == "event")
                     result = document.event(request);
                 else if (op == "snapshot")
                     result = document.snapshot();
-                else
+                else if (op.isEmpty() || op == "render")
                     result = document.render(request.value("page").toInt(-1),
                                              request.value("width").toInt());
+                else
+                    throw std::runtime_error("Unsupported worker command.");
                 result.insert("id", id);
                 reply(result);
             }
@@ -425,6 +434,8 @@ int main(int argc, char** argv)
                 reply({{"id", id}, {"error", error.what()}});
             }
         }
+        if (!std::cin.eof())
+            return 2; // Oversized/incomplete protocol requests never grow an unbounded string.
     }
     catch (const std::exception& error)
     {

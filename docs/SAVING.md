@@ -10,6 +10,8 @@ save destinations. Saving to another existing filename uses the file dialog's
 overwrite confirmation. The application commits the output atomically through
 `QSaveFile`, with direct-write fallback disabled. A failed write leaves form edits,
 additions and the current document available, and displays an error.
+A crashed or unresponsive renderer is terminated; native form loss is explicitly
+reported and application-owned additions are retained. See [SAFETY](SAFETY.md).
 
 The open document uses a private snapshot created on opening. Later external
 changes to the source file cannot change the rendering or save baseline.

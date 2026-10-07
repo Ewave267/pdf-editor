@@ -69,8 +69,8 @@ QML contains no PDFium headers, handles or API calls.
 
 A persistent `pdf-render-worker` owns all PDFium resources on one thread. It
 opens only `/input.pdf`, initializes XFA when necessary, reads page geometry,
-and replies to JSON-line render requests with bounded PNG images. Pages and
-bitmaps are released after each render; document/form/library handles close on
+and replies to JSON-line render requests with bounded PNG images. Native pages stay alive for form interaction; bitmaps are released after each
+render, and document/form/page/library handles close on
 normal worker exit. Closing during a render has a short grace period before
 killing the isolated process, which releases its resources at the OS boundary.
 
@@ -79,10 +79,12 @@ capabilities, read-only system runtime/fonts, its executable/library and the
 selected input PDF. It has no writable host output directory. The shared
 PDFium host callbacks deny external document actions and timers. Startup and
 render requests have 15- and 10-second deadlines; the worker has a cumulative
-300-second CPU limit, no core dumps and a 128-descriptor limit.
+300-second CPU limit, a 768 MiB writable-data limit, no core dumps and a
+128-descriptor limit. A fail-closed kernel syscall policy also blocks execution,
+process creation, sockets and writable file opens. See [SAFETY](SAFETY.md).
 
-Current development limits are 64 MiB input, 2000 pages, page dimensions up to
-14400 points, raster widths of 96–2400 pixels and at most 16 million pixels per
+Current development limits are 64 MiB input, 2000 pages, page dimensions of
+1–14400 points, raster widths of 96–2400 pixels and at most 16 million pixels per
 image. Very unusual aspect ratios or oversized raster requests return an error.
 The probe's broader security work, timers, passwords, comprehensive Unicode input
 and real-world XFA compatibility remain later milestones. See [FORMS](FORMS.md)
@@ -112,6 +114,10 @@ The combined build invokes PDF.js and the native XFA probe on saved outputs.
 Four form data cases validate native control interaction and actual QML keyboard/
 mouse input for both AcroForm and dynamic XFA. Independent PDF.js checks cover
 every persisted control value; see [FORMS](FORMS.md).
+
+Step 7 adds dedicated controller/native safety gates for malformed input, large
+documents, memory limits, blocked host access, script exceptions and real
+startup/form/save deadlines; see [SAFETY](SAFETY.md).
 
 The screenshot was visually inspected. Source fixtures are original synthetic
 GPL-3.0-only documents, not evidence of arbitrary PDF compatibility. The complete

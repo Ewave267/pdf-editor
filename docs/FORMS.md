@@ -70,3 +70,5 @@ exit scripts are verified independently and continue to pass.
 Dynamic full XFA form edits can be saved without added content. Saving additions
 on full XFA still returns a controlled error and retains the edits/additions.
 There is no autosave or recovery of in-memory form edits after a renderer crash.
+Step 7 retains application-owned additions, clears pending operations, and
+explicitly reports native form loss; see [SAFETY](SAFETY.md).

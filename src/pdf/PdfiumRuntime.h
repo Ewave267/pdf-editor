@@ -32,27 +32,38 @@ struct Host : FPDF_FORMFILLINFO
     std::function<FPDF_PAGE(int)> lookupPage;
 
     static Host& host(FPDF_FORMFILLINFO* info) { return *static_cast<Host*>(info); }
+    static Host& host(IPDF_JSPLATFORM* info) { return *static_cast<Host*>(info->m_pFormfillinfo); }
 
     Host() : FPDF_FORMFILLINFO{}
     {
         version = 2;
         xfa_disabled = false;
         javascript.version = 3;
+        javascript.m_pFormfillinfo = this;
         javascript.app_alert = [](IPDF_JSPLATFORM*, FPDF_WIDESTRING, FPDF_WIDESTRING, int, int)
         { return JSPLATFORM_ALERT_RETURN_CANCEL; };
         javascript.app_beep = [](IPDF_JSPLATFORM*, int) {};
         javascript.app_response = [](IPDF_JSPLATFORM*, FPDF_WIDESTRING, FPDF_WIDESTRING,
                                      FPDF_WIDESTRING, FPDF_WIDESTRING, FPDF_BOOL, void*, int)
         { return 0; };
-        javascript.Doc_getFilePath = [](IPDF_JSPLATFORM*, void*, int) { return 0; };
-        javascript.Doc_mail = [](IPDF_JSPLATFORM*, void*, int, FPDF_BOOL, FPDF_WIDESTRING,
-                                 FPDF_WIDESTRING, FPDF_WIDESTRING, FPDF_WIDESTRING,
-                                 FPDF_WIDESTRING) {};
-        javascript.Doc_print = [](IPDF_JSPLATFORM*, FPDF_BOOL, int, int, FPDF_BOOL, FPDF_BOOL,
-                                  FPDF_BOOL, FPDF_BOOL, FPDF_BOOL) {};
-        javascript.Doc_submitForm = [](IPDF_JSPLATFORM*, void*, int, FPDF_WIDESTRING) {};
+        javascript.Doc_getFilePath = [](IPDF_JSPLATFORM* info, void*, int)
+        {
+            ++host(info).deniedRequests;
+            return 0;
+        };
+        javascript.Doc_mail = [](IPDF_JSPLATFORM* info, void*, int, FPDF_BOOL, FPDF_WIDESTRING,
+                                 FPDF_WIDESTRING, FPDF_WIDESTRING, FPDF_WIDESTRING, FPDF_WIDESTRING)
+        { ++host(info).deniedRequests; };
+        javascript.Doc_print = [](IPDF_JSPLATFORM* info, FPDF_BOOL, int, int, FPDF_BOOL, FPDF_BOOL,
+                                  FPDF_BOOL, FPDF_BOOL, FPDF_BOOL) { ++host(info).deniedRequests; };
+        javascript.Doc_submitForm = [](IPDF_JSPLATFORM* info, void*, int, FPDF_WIDESTRING)
+        { ++host(info).deniedRequests; };
         javascript.Doc_gotoPage = [](IPDF_JSPLATFORM*, int) {};
-        javascript.Field_browse = [](IPDF_JSPLATFORM*, void*, int) { return 0; };
+        javascript.Field_browse = [](IPDF_JSPLATFORM* info, void*, int)
+        {
+            ++host(info).deniedRequests;
+            return 0;
+        };
         m_pJsPlatform = &javascript;
 
         FFI_OnChange = [](FPDF_FORMFILLINFO* info) { host(info).changed = true; };

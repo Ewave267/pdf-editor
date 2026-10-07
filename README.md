@@ -12,7 +12,9 @@ and image-based signatures. Save As embeds additions in a new PDF, with atomic w
 protection. Native text fields, checkboxes, radio buttons, dropdowns, and keyboard
 navigation work for the synthetic AcroForm and dynamic XFA fixtures. Save As
 preserves edited values and XFA calculations. Dynamic XFA copies without additions
-are supported; dynamic XFA additions cannot yet be saved.
+are supported; dynamic XFA additions cannot yet be saved. The Linux safety
+gate now tests malformed documents, restricted JavaScript access, memory limits
+and worker recovery; see [SAFETY](docs/SAFETY.md).
 
 The stack is C++20, Qt Quick / QML, PDFium, and CMake. The default build remains
 a dependency-free foundation check. Enable the viewer explicitly with

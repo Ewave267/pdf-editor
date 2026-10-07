@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
+#include "pdf/WorkerPolicy.h"
 #include "pdf/XfaProbe.h"
 
 #include <exception>
@@ -13,6 +14,7 @@ int main(int argc, char* argv[])
     }
     try
     {
+        pdf::detail::installWorkerPolicy(true);
         pdf::runXfaProbe({argv[1], argv[2], argv[3]});
         return 0;
     }

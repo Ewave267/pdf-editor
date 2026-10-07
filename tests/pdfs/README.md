@@ -26,3 +26,26 @@ See [FORMS](../../docs/FORMS.md) for the pinned AcroForm script limitation.
 No real-world static or dynamic XFA documents have been added yet. The empty
 category directories reserve space for future licensed/privacy-reviewed
 regression documents.
+
+## Safety corpus
+
+`tests/pdfs/safety/` contains original, synthetic GPL-3.0-only documents generated
+by `safety_fixtures()` in `tools/generate_probe_fixtures.py`:
+
+- `corrupted.pdf`, `broken-xfa.pdf`, `cyclic-acroform.pdf`: broken catalog,
+  incomplete XDP and cyclic radio-field hierarchy.
+- `tiny-page.pdf`, `extreme-page.pdf`: dimension and raster-overflow boundaries.
+- `host-access-acroform.pdf`, `host-access-xfa.pdf`: actual scripts audit missing
+  process/environment/network APIs and attempt file, URL and submission access.
+- `throw-acroform.pdf`, `throw-xfa.pdf`: set a marker, then throw an exception.
+- `stress-acroform.pdf`, `stress-xfa.pdf`: compute an exact 100000-iteration sum.
+- `memory-acroform.pdf`, `memory-xfa.pdf`: attempt a 1 GiB typed-array allocation.
+- `loop-acroform.pdf`, `loop-xfa.pdf`: intentionally infinite startup scripts.
+- `exit-loop-xfa.pdf`: intentionally infinite field-exit script.
+- `save-loop-acroform.pdf`: intentionally infinite pre-save script.
+- `many-pages.pdf`: 1000 pages; tests also generate temporary 20 MiB/2001-page
+  variants rather than storing large binary files in the repository.
+
+Only open the loop fixtures through the isolated viewer/test harness. They are
+intended to reach real deadlines. See [SAFETY](../../docs/SAFETY.md) for the tests,
+measured budgets, scope and remaining release work.

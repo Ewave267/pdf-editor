@@ -1,0 +1,97 @@
+%PDF-1.7
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R /AcroForm 4 0 R /NeedsRendering true /Extensions << /ADBE << /BaseVersion /1.7 /ExtensionLevel 8 >> >> >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << >> >>
+endobj
+4 0 obj
+<< /XFA 5 0 R /Fields [] >>
+endobj
+5 0 obj
+<< /Length 3425 >>
+stream
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- Copyright (c) 2026 PDF Form Editor contributors. Original synthetic fixture. -->
+<xdp:xdp xmlns:xdp="http://ns.adobe.com/xdp/">
+  <config xmlns="http://www.xfa.org/schema/xci/3.0/">
+    <present>
+      <pdf><version>1.7</version><renderPolicy>client</renderPolicy><interactive>1</interactive></pdf>
+      <script><runScripts>client</runScripts></script>
+    </present>
+    <acrobat><acrobat7><dynamicRender>required</dynamicRender></acrobat7></acrobat>
+  </config>
+  <template xmlns="http://www.xfa.org/schema/xfa-template/3.3/">
+    <subform name="form1" layout="tb" locale="en_US" restoreState="auto">
+      <pageSet>
+        <pageArea name="page1">
+          <contentArea x="0pt" y="0pt" w="612pt" h="792pt"/>
+          <medium stock="default" short="612pt" long="792pt"/>
+        </pageArea>
+      </pageSet>
+      <subform name="body" w="612pt" h="792pt" layout="position">
+        <field name="input" x="72pt" y="72pt" w="200pt" h="30pt">
+          <ui><textEdit/></ui>
+          <font typeface="Helvetica" size="12pt"/>
+          <value><text>original</text></value>
+          <event activity="initialize">
+            <script contentType="application/x-javascript" runAt="client">xfa.host.gotoURL("https://example.invalid/blocked");</script>
+          </event>
+          <event activity="exit">
+            <script contentType="application/x-javascript" runAt="client">while (true) {}</script>
+          </event>
+          <border><edge/></border>
+        </field>
+        <field name="calculated" x="72pt" y="132pt" w="240pt" h="30pt">
+          <ui><textEdit/></ui>
+          <font typeface="Helvetica" size="12pt"/>
+          <calculate>
+            <script contentType="application/x-javascript" runAt="client">this.rawValue = "JS:" + input.rawValue;</script>
+          </calculate>
+          <border><edge/></border>
+        </field>
+        <field name="check" x="72pt" y="202pt" w="20pt" h="20pt">
+          <ui><checkButton size="20pt"/></ui><items><integer>1</integer><integer>0</integer></items>
+          <value><integer>0</integer></value><border><edge/></border>
+        </field>
+        <exclGroup name="choice" x="72pt" y="262pt" w="180pt" h="20pt">
+          <field name="optionA" x="0pt" y="0pt" w="20pt" h="20pt">
+            <ui><checkButton shape="round" size="20pt"><border><edge/></border></checkButton></ui><items><text>A</text><text>0</text></items><value><text>A</text></value>
+          </field>
+          <field name="optionB" x="70pt" y="0pt" w="20pt" h="20pt">
+            <ui><checkButton shape="round" size="20pt"><border><edge/></border></checkButton></ui><items><text>B</text><text>0</text></items><value><text>0</text></value>
+          </field>
+        </exclGroup>
+        <field name="dropdown" x="72pt" y="322pt" w="200pt" h="30pt">
+          <ui><choiceList open="userControl" commitOn="select"/></ui>
+          <items><text>Alpha</text><text>Beta</text><text>Gamma</text></items>
+          <value><text>Alpha</text></value><font typeface="Helvetica" size="12pt"/><border><edge/></border>
+        </field>
+      </subform>
+    </subform>
+  </template>
+  <xfa:datasets xmlns:xfa="http://www.xfa.org/schema/xfa-data/1.0/">
+    <xfa:data><form1><body><input>original</input><check>0</check><choice>A</choice><dropdown>Alpha</dropdown></body></form1></xfa:data>
+  </xfa:datasets>
+</xdp:xdp>
+
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000015 00000 n 
+0000000167 00000 n 
+0000000224 00000 n 
+0000000312 00000 n 
+0000000355 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+3832
+%%EOF

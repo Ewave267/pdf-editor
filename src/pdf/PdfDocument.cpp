@@ -14,6 +14,9 @@
 #include <QStandardPaths>
 #include <algorithm>
 #include <cmath>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 PdfDocument::PdfDocument(QObject* parent) : QObject(parent), additions_(new AddedContent(this))
 {
@@ -96,8 +99,26 @@ void PdfDocument::close()
 
 void PdfDocument::fail(const QString& message)
 {
-    close();
+    const bool lostFormEdits = ready_ && (formRevision_ != savedFormRevision_ || formBusy());
+    if (saving_)
+        finishSave(message);
+    stopWorker();
+    // Application-owned additions survive a parser crash; native in-memory form
+    // state cannot be recovered. Make that loss explicit instead of clearing edits.
+    if (lostFormEdits)
+        ++formRevision_;
+    pendingFormEvents_ = 0;
+    ready_ = loading_ = false;
+    pages_.clear();
+    formText_.clear();
+    formFieldType_ = -1;
     error_ = message;
+    if (lostFormEdits)
+        error_ += " Unsaved form edits could not be recovered. The source PDF is unchanged.";
+    if (additions_->count())
+        error_ += " Added content is retained until you close or replace the document.";
+    emit formsChanged();
+    emit saveStateChanged();
     emit stateChanged();
 }
 
@@ -117,11 +138,42 @@ void PdfDocument::open(const QUrl& url)
         return;
     }
     snapshot_ = std::make_unique<QTemporaryDir>();
-    if (!snapshot_->isValid() || !QFile::copy(sourcePath_, snapshot_->filePath("input.pdf")))
+    QFile source, copy(snapshot_->filePath("input.pdf"));
+    const int descriptor =
+        ::open(sourcePath_.toLocal8Bit().constData(), O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+    struct stat opened{};
+    if (descriptor < 0 || ::fstat(descriptor, &opened) != 0 || !S_ISREG(opened.st_mode) ||
+        opened.st_size <= 0 || opened.st_size > 64 * 1024 * 1024)
+    {
+        if (descriptor >= 0)
+            ::close(descriptor);
+        fail("Select a regular PDF file of at most 64 MiB.");
+        return;
+    }
+    if (!source.open(descriptor, QIODevice::ReadOnly, QFileDevice::AutoCloseHandle))
+    {
+        ::close(descriptor);
+        fail("Cannot read the selected PDF.");
+        return;
+    }
+    if (!snapshot_->isValid() || !copy.open(QIODevice::WriteOnly | QIODevice::NewOnly))
     {
         fail("Cannot create a private document snapshot.");
         return;
     }
+    qint64 copied = 0;
+    while (!source.atEnd())
+    {
+        const auto block = source.read(65536);
+        copied += block.size();
+        if (block.isEmpty() || copied > 64 * 1024 * 1024 || copy.write(block) != block.size())
+        {
+            copy.close();
+            fail("Cannot snapshot this PDF within the 64 MiB input limit.");
+            return;
+        }
+    }
+    copy.close();
     fileName_ = input.fileName();
     loading_ = true;
     fitting_ = true;
@@ -147,6 +199,7 @@ void PdfDocument::open(const QUrl& url)
                      "usr/lib64",     "/lib64",
                      "--proc",        "/proc",
                      "--dev",         "/dev",
+                     "--size",        "67108864",
                      "--tmpfs",       "/tmp"};
     for (const QString& path : {QString("/etc/fonts"), QString("/var/cache/fontconfig")})
         if (QFileInfo::exists(path))
@@ -238,7 +291,7 @@ void PdfDocument::receive()
             const auto page = value.toObject();
             const double width = page.value("width").toDouble(),
                          height = page.value("height").toDouble();
-            if (!std::isfinite(width) || !std::isfinite(height) || width <= 0 || height <= 0 ||
+            if (!std::isfinite(width) || !std::isfinite(height) || width < 1 || height < 1 ||
                 width > 14400 || height > 14400)
             {
                 fail("The PDF renderer returned an invalid page size.");
@@ -396,6 +449,12 @@ quint64 PdfDocument::formEvent(int page, const QString& action, double x, double
     if (!ready_ || saving_ || page < 0 || page >= pageCount() || formType_ == "PDF" ||
         text.size() > 4096)
         return 0;
+    if (pendingFormEvents_ >= 128)
+    {
+        formError_ = "The form is busy. Wait for pending input to finish.";
+        emit formsChanged();
+        return 0;
+    }
     const QStringList allowed{"click", "text", "key", "selectAll", "blur", "copy"};
     if (!allowed.contains(action))
         return 0;
