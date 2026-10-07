@@ -205,6 +205,29 @@ Broader fuzzing, dependency monitoring, kernel/architecture coverage and native
 form crash recovery remain release work. Remote CI was not run. GPL-3.0-only
 remains unchanged; no commit or push was performed.
 
+## Step 8 — Linux Preview Packaging
+
+- [x] Add CMake install rules and a relocatable CPack TGZ archive.
+- [x] Package the GUI, renderer, patched PDFium, desktop entry, icon and notices.
+- [x] Remove development runtime paths from installed binaries and resolve packaged PDFium.
+- [x] Build a separate Linux x86-64 Release artifact using system Qt runtime libraries.
+- [x] Add repeatable relocated-package validation and Ubuntu preview artifact CI.
+- [ ] Verify a fresh desktop installation with the complete MVP workflow.
+- [ ] Resolve step 6 compatibility gaps and prepare complete corresponding source before publication.
+
+Relocated package validation passed all 17 QtTest results, including native
+AcroForm/XFA edits, text/signatures, saving/reopening and independent readers.
+Installed GUI startup and host-runtime linkage checks passed. The complete
+6/6 CTest suite passed again in 101 seconds, including security regressions.
+Python syntax, C++ formatting, workflow YAML and whitespace checks passed.
+
+The local archive is `dist/pdf-form-editor-0.1.0-Linux-x86_64.tar.gz`, built on
+Fedora 42 against Qt 6.10.2. See [RELEASE](docs/RELEASE.md) for dependencies,
+installation and the limited distribution compatibility. The package does not
+include a compiler, SDK, Python, Node.js, PDF.js or test binaries. Remote CI and
+public publication have not been performed. The final release remains blocked
+by full XFA additions, AcroForm script conversion and foreground XFA validation.
+
 ## Validation
 
 Passed locally:
@@ -246,7 +269,7 @@ now requires the patched package and rejects the original binary.
 | 5 — Added Content | Complete for synthetic fixtures | Expand combined XFA addition/save coverage |
 | 6 — Save | Implemented; validation partial | AcroForm script fix, dynamic XFA additions and foreground XFA |
 | 7 — Safety | Complete for synthetic Linux safety corpus | Broader fuzzing, compatibility and recovery |
-| 8 — MVP Release | Not started | Package the verified workflow for one desktop platform |
+| 8 — MVP Release | Linux preview packaging implemented; release gate partial | Clean desktop walkthrough, step 6 compatibility and source distribution |
 
 Update this file as milestones land, including checks actually run and remaining
 limitations. Do not infer broad PDF compatibility from the synthetic probe.

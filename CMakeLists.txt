@@ -141,3 +141,27 @@ if(BUILD_TESTING)
         set_tests_properties(xfa-roundtrip PROPERTIES TIMEOUT 90 LABELS "milestone;independent-reader")
     endif()
 endif()
+
+# Only the real viewer is distributable; the default foundation is a build check.
+if(PDF_EDITOR_BUILD_VIEWER)
+    install(TARGETS pdf-form-editor pdf-render-worker RUNTIME DESTINATION bin)
+    set_target_properties(pdf-form-editor PROPERTIES INSTALL_RPATH "")
+    set_target_properties(pdf-render-worker PROPERTIES
+        INSTALL_RPATH "$ORIGIN/../lib/pdf-form-editor")
+    install(FILES "${pdfium_library}" DESTINATION lib/pdf-form-editor)
+    install(FILES packaging/pdf-form-editor.desktop DESTINATION share/applications)
+    install(FILES packaging/pdf-form-editor.svg DESTINATION share/icons/hicolor/scalable/apps)
+    install(FILES LICENSE README.md docs/RELEASE.md DESTINATION share/doc/pdf-form-editor)
+    install(FILES "${PDFium_DIR}/LICENSE" "${PDFium_DIR}/NOTICE"
+        "${PDFium_DIR}/DISTRIBUTOR-LICENSE" "${PDFium_DIR}/PROJECT-LICENSE"
+        "${PDFium_DIR}/build-info.json" "${PDFium_DIR}/args.gn"
+        DESTINATION share/doc/pdf-form-editor/pdfium)
+    install(DIRECTORY "${PDFium_DIR}/licenses/"
+        DESTINATION share/doc/pdf-form-editor/pdfium/licenses)
+    set(CPACK_GENERATOR TGZ)
+    set(CPACK_PACKAGE_NAME pdf-form-editor)
+    set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+    set(CPACK_PACKAGE_FILE_NAME "pdf-form-editor-${PROJECT_VERSION}-${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
+    set(CPACK_PACKAGING_INSTALL_PREFIX "/")
+    include(CPack)
+endif()

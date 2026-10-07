@@ -41,3 +41,18 @@ jobs:
         run: cmake --build build-xfa --parallel
       - name: Validate regressions, isolation, and independent-reader round trips
         run: ctest --test-dir build-xfa --output-on-failure
+      - name: Build Linux preview archive
+        run: |
+          cpack --config build-xfa/CPackConfig.cmake -B dist
+          sha256sum dist/*.tar.gz > dist/SHA256SUMS
+      - name: Verify relocated package
+        run: |
+          mkdir -p /tmp/pdf-editor-preview
+          tar -xzf dist/*.tar.gz -C /tmp/pdf-editor-preview
+          python3 tools/check_package.py /tmp/pdf-editor-preview/pdf-form-editor-* build-xfa/viewer-tests
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-ubuntu-24.04-preview
+          path: |
+            dist/*.tar.gz
+            dist/SHA256SUMS

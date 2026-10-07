@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=PDF Form Editor
+Comment=Complete PDF forms and add text and signatures offline
+Exec=pdf-form-editor %f
+Icon=pdf-form-editor
+Terminal=false
+Categories=Office;Viewer;
+MimeType=application/pdf;

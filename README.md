@@ -93,3 +93,9 @@ Copyright (c) 2026 PDF Form Editor contributors.
 
 Licensed under the GNU General Public License version 3 only
 (`GPL-3.0-only`); see [LICENSE](LICENSE).
+
+## Linux preview package
+
+Release archive installation, runtime dependencies and validation are documented
+in [RELEASE](docs/RELEASE.md). Step 8 packaging is implemented; the final MVP
+release gate remains open for the documented step 6 compatibility gaps.

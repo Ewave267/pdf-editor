@@ -300,6 +300,11 @@ See [SAFETY](SAFETY.md) for enforced limits, evidence and remaining release work
 
 ## Step 8 — MVP Release
 
+Linux preview packaging is implemented; see [RELEASE](RELEASE.md). Relocated
+package checks cover startup and the synthetic workflows, but this clean-desktop
+release checklist remains open until step 6 compatibility gaps and the full
+real-world workflow are resolved.
+
 Package the application for one primary desktop platform first.
 
 Only expand platform packaging after the complete open → edit → save → reopen workflow is reliable.

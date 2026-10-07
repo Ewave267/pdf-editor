@@ -4,6 +4,7 @@
 #include <QBuffer>
 #include <QClipboard>
 #include <QCoreApplication>
+#include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QGuiApplication>
@@ -180,7 +181,11 @@ void PdfDocument::open(const QUrl& url)
     emit stateChanged();
     const QString bwrap = QStandardPaths::findExecutable("bwrap");
     const QString binary = QCoreApplication::applicationDirPath() + "/pdf-render-worker";
-    if (bwrap.isEmpty() || !QFileInfo::exists(binary) || !QFileInfo::exists(PDFIUM_LIBRARY_PATH))
+    const QString installedLibrary = QDir(QCoreApplication::applicationDirPath())
+                                         .absoluteFilePath("../lib/pdf-form-editor/libpdfium.so");
+    const QString library =
+        QFileInfo::exists(installedLibrary) ? installedLibrary : QString(PDFIUM_LIBRARY_PATH);
+    if (bwrap.isEmpty() || !QFileInfo::exists(binary) || !QFileInfo::exists(library))
     {
         fail("The PDF renderer or sandbox is missing. Check the viewer installation.");
         return;
@@ -205,7 +210,7 @@ void PdfDocument::open(const QUrl& url)
         if (QFileInfo::exists(path))
             args << "--ro-bind" << path << path;
     args << "--ro-bind" << binary << "/probe"
-         << "--ro-bind" << QString(PDFIUM_LIBRARY_PATH) << "/pdfium/libpdfium.so"
+         << "--ro-bind" << library << "/pdfium/libpdfium.so"
          << "--ro-bind" << snapshot_->filePath("input.pdf") << "/input.pdf"
          << "--chdir" << "/tmp" << "/probe";
     sandboxArgs_ = args;
