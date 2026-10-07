@@ -4,6 +4,17 @@ The package is an offline Linux desktop preview, not a completed MVP release.
 It includes the GUI, isolated renderer, patched PDFium, desktop entry, icon and
 PDFium dependency notices. Qt and operating-system libraries come from the host.
 
+## Standalone Docker launcher
+
+The separate Go launcher is distributed as native executables for Linux, Windows
+and macOS; see [LAUNCHER](LAUNCHER.md) for commands and the support matrix. Users
+need Docker and a browser, but no Go or desktop Qt installation. The developer
+archive helper produces binaries, ZIPs with licenses, a launcher-source ZIP and
+checksums; the Launcher workflow produces downloadable artifacts. Linux amd64
+is validated locally. Cross-compilation alone does not validate Docker Desktop
+or ARM editor support, and no launcher release has been published automatically.
+The native Qt preview package below remains a separate option.
+
 ## Build and install
 
 On Fedora/RHEL-family systems, `./compile.sh --package` builds the Release

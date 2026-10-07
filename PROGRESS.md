@@ -381,6 +381,63 @@ clipboard paste, Save As and reopening; four outputs passed independent PDF.js
 checks. Syntax/formatting checks passed. The user's live PDF session was not
 recreated; save edits and use `./docker.sh rebuild` to apply the updated image.
 
+## Docker Hub namespace correction
+
+The confirmed Docker Hub username is `ewave267`. Compose defaults, the environment
+example, publishing workflow and deployment instructions now use
+`ewave267/pdf-form-editor`. The existing local image is retagged for that repository
+without recompilation or changes to the running container. No image was pushed.
+
+## Docker Hub repository name
+
+The deployment repository is now `ewave267/pdf-editor`, reflecting support for
+ordinary PDF additions as well as forms. Compose, the environment example, the
+publishing workflow and documentation use this name. The existing image is
+retagged without rebuilding; the running container is unchanged. No push was
+performed.
+
+## Automatic Docker startup
+
+Compose now uses `restart: unless-stopped`. The existing container can adopt this
+policy through `docker update` without recreation or loss of its current session.
+Docker restarts the app after process exit or daemon restart; explicitly stopping
+the container keeps it stopped. The Docker daemon must itself start at boot.
+All runtime dependencies remain in the image, while the initial host ports,
+mounts and worker-enabling seccomp profile remain creation-time configuration.
+
+## Standalone Go launcher
+
+Implemented a compiled launcher with start/stop/status/logs/url/update/build,
+optional browser opening and automatic host-home sharing. Users need Docker and
+a browser, but no Go, Qt, Python, Compose or source checkout. The launcher embeds
+the existing reviewed seccomp profile and notices, extracts them to its private
+cache, and uses Docker directly. Creation retains non-root/capability/seccomp
+boundaries, a read-only runtime, localhost publishing and automatic restart.
+Linux host-root sharing remains an explicit option; existing Compose sessions are
+preserved on start and not replaced by launcher update. Remote/TCP creation,
+foreign-container replacement and unapproved ARM emulation are refused.
+
+The developer archive helper cross-builds six Linux/Windows/macOS amd64/arm64
+executables with CGO disabled, packages notices, exports launcher source and
+writes ZIP checksums. A Launcher Actions workflow tests and creates artifacts;
+no release, image push or remote workflow run was performed.
+
+Validation: 12 Go tests and go vet passed. All six targets cross-compiled. The
+Linux executable is statically linked and ran with no installed Go. It created
+an isolated healthy container, printed its actual port URL, and passed real
+stop/status/restart/url checks. Saved outputs remained valid after restarting.
+All archive checksums/ZIP contents passed verification, and the standalone source
+ZIP passed Go tests after extraction. Browser editing, checkbox/radio/dropdown selection,
+clipboard paste, saves and reopening passed for AcroForm and XFA; four saved
+outputs passed independent PDF.js checks. The user's original container was not
+recreated or stopped. New docs: [LAUNCHER](docs/LAUNCHER.md).
+
+Docker Desktop, ARM/emulation, OS signing and clean second-machine compatibility
+remain unvalidated. Native ARM PDFium/image support is not implemented; ARM
+launchers require an explicit experimental emulation flag. Cross-built binaries
+are not evidence that those editor runtimes work. Corresponding-source release
+work for the separate editor image remains tracked in deployment/release docs.
+
 ## Remaining MVP steps
 
 | Step | Status | Next milestone |

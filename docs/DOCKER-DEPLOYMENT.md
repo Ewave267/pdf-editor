@@ -3,7 +3,12 @@
 Date: 2026-10-07
 
 Status: Implemented and validated locally. Image repository:
-`ewave/pdf-form-editor`. No image has been published to Docker Hub yet.
+`ewave267/pdf-editor`. No image has been published to Docker Hub yet.
+
+For a single executable with embedded configuration and automatic home-folder
+sharing, see [Standalone launcher](LAUNCHER.md). The launcher uses Docker directly
+and does not require copying Compose files. The existing Compose deployment below
+retains its Linux host-root mode.
 
 ## Start, stop and rebuild
 
@@ -84,14 +89,18 @@ scrolling and clipboard controls operate the virtual desktop. Use the noVNC
 clipboard panel to paste text into the app; native copy-back and direct browser
 system-clipboard integration were inconsistent in repeated local checks.
 
-The container has the fixed name `pdf-editor`. After it has been created, use
+The container has the fixed name `pdf-editor` and restart policy `unless-stopped`.
+It restarts after process exit or Docker daemon restart, unless explicitly stopped
+with `docker stop pdf-editor`. Docker itself must start on boot for boot-time
+launch. An existing container can adopt the policy without recreation using
+`docker update --restart unless-stopped pdf-editor`. After it has been created, use
 `docker start pdf-editor` to start it and `docker stop pdf-editor` to stop it
 from any directory. These commands keep its existing configuration; changes to
 Compose require recreating the container. One container with this name can exist
 per Docker daemon.
 
 Check startup with `docker compose ps` and `docker compose logs`. Closing the Qt
-window ends the session; start again with `docker compose up -d`. Stop with
+window ends the current session; the restart policy launches a fresh one. Stop with
 `docker compose down`. PDFs saved through either host mount remain. Temporary clipboard,
 settings and desktop state are not persisted. This deployment does not autosave
 unsaved native form edits when stopped.
@@ -104,7 +113,7 @@ Docker Desktop and other architectures have not been validated.
 ## Build locally
 
 ```sh
-docker build -t ewave/pdf-form-editor:0.1.0 .
+docker build -t ewave267/pdf-editor:0.1.0 .
 mkdir -p documents
 docker compose up -d --wait
 ```
@@ -129,7 +138,7 @@ can replace the native stage:
 mkdir -p /tmp/pdf-editor-native-context
 cp -a .deps/pdfium-patched /tmp/pdf-editor-native-context/pdfium
 docker build --build-context pdfium=/tmp/pdf-editor-native-context \
-  -t ewave/pdf-form-editor:0.1.0 .
+  -t ewave267/pdf-editor:0.1.0 .
 ```
 
 Use only a compatible Linux amd64 dependency package produced by the pinned
@@ -162,13 +171,13 @@ A separate image target contains verification tools; they are not shipped in the
 runtime image. Build and run it as follows:
 
 ```sh
-docker build --target verification -t ewave/pdf-form-editor:verification .
+docker build --target verification -t ewave267/pdf-editor:verification .
 docker run --rm --user 1000:1000 --cap-drop ALL \
   --security-opt no-new-privileges:true \
   --security-opt seccomp=packaging/docker/seccomp.json --read-only \
   --tmpfs /tmp:rw,nosuid,nodev,size=256m,mode=1777 \
   --tmpfs /home/pdfeditor:rw,nosuid,nodev,size=64m,mode=1777 \
-  ewave/pdf-form-editor:verification
+  ewave267/pdf-editor:verification
 ```
 
 For a real browser walkthrough, start the runtime with the default 1600×1000
@@ -217,8 +226,8 @@ archive of exact patched PDFium/V8 sources, dependency checkouts, build tooling,
 patches and notices. Generated build outputs and checkout metadata are excluded;
 the pinned recipe remains available to reproduce them.
 
-Add repository Actions secrets `DOCKERHUB_USERNAME=ewave` and `DOCKERHUB_TOKEN`
-with permission to push `ewave/pdf-form-editor`. Run the workflow first with
+Add repository Actions secrets `DOCKERHUB_USERNAME=ewave267` and `DOCKERHUB_TOKEN`
+with permission to push `ewave267/pdf-editor`. Run the workflow first with
 `publish=false`. After the image, source artifact and checks are reviewed, run
 with `publish=true` and an explicit version tag. The workflow logs in using
 secrets and pushes only after validation/source export succeed. Credentials are

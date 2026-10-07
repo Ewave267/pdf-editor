@@ -7,7 +7,7 @@ on:
         type: boolean
         default: false
       tag:
-        description: Version tag for ewave/pdf-form-editor
+        description: Version tag for ewave267/pdf-editor
         type: string
         default: '0.1.0'
 permissions:
@@ -37,7 +37,7 @@ jobs:
           target: verification
           load: true
           platforms: linux/amd64
-          tags: ewave/pdf-form-editor:verification
+          tags: ewave267/pdf-editor:verification
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Validate native runtime and worker isolation
@@ -47,14 +47,14 @@ jobs:
             --security-opt seccomp=packaging/docker/seccomp.json --read-only \
             --tmpfs /tmp:rw,nosuid,nodev,size=256m,mode=1777 \
             --tmpfs /home/pdfeditor:rw,nosuid,nodev,size=64m,mode=1777 \
-            ewave/pdf-form-editor:verification
+            ewave267/pdf-editor:verification
       - name: Build runtime image
         uses: docker/build-push-action@v6
         with:
           context: .
           load: true
           platforms: linux/amd64
-          tags: ewave/pdf-form-editor:${{ inputs.tag }}
+          tags: ewave267/pdf-editor:${{ inputs.tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           labels: |
@@ -68,7 +68,7 @@ jobs:
           python3 tools/generate_probe_fixtures.py
       - name: Browser walkthrough
         env:
-          PDF_EDITOR_IMAGE: ewave/pdf-form-editor:${{ inputs.tag }}
+          PDF_EDITOR_IMAGE: ewave267/pdf-editor:${{ inputs.tag }}
           PDF_EDITOR_DOCUMENTS: /tmp/pdf-editor-ci-documents
           PDF_EDITOR_PORT: '18080'
         run: |
@@ -103,4 +103,4 @@ jobs:
         if: inputs.publish
         env:
           IMAGE_TAG: ${{ inputs.tag }}
-        run: docker push "ewave/pdf-form-editor:$IMAGE_TAG"
+        run: docker push "ewave267/pdf-editor:$IMAGE_TAG"

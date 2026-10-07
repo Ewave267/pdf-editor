@@ -20,7 +20,32 @@ The stack is C++20, Qt Quick / QML, PDFium, and CMake. The default build remains
 a dependency-free foundation check. Enable the viewer explicitly with
 `PDF_EDITOR_BUILD_VIEWER=ON` and the source-pinned, patched PDFium package.
 
+## Standalone launcher
+
+A compiled launcher can pull and start the editor with one command, print the
+browser link, and detect the user's shared home folder. Users need Docker and a
+browser; Go, Qt, Python and Compose are not needed. See
+[launcher setup and platform status](docs/LAUNCHER.md). Linux amd64 is the first
+validated target; Docker Desktop and ARM runtime compatibility remain experimental.
+
 ## Docker browser deployment
+
+On another Linux amd64 machine with Docker Engine and the Compose plugin,
+clone this repository and start the published image:
+
+```sh
+git clone <YOUR_GITHUB_REPOSITORY_URL> pdf-editor
+cd pdf-editor
+PDF_EDITOR_UID="$(id -u)" PDF_EDITOR_GID="$(id -g)" ./docker.sh start
+```
+
+This requires `ewave267/pdf-editor:0.1.0` to be available on Docker Hub (or
+already present locally). Cloning does not copy an image or compiled launcher.
+The command prints the browser link; no application compilation is performed.
+Local `.env` settings and PDFs saved in `documents/` are excluded from Git.
+For Windows/macOS, use the separately distributed launcher; runtime support
+remains experimental. Singularity/Apptainer is not currently supported; see
+[runtime compatibility](docs/LAUNCHER.md#singularity-and-apptainer).
 
 ```sh
 ./docker.sh start

@@ -2,7 +2,8 @@
 services:
   pdf-editor:
     container_name: pdf-editor
-    image: ${PDF_EDITOR_IMAGE:-ewave/pdf-form-editor:0.1.0}
+    restart: unless-stopped
+    image: ${PDF_EDITOR_IMAGE:-ewave267/pdf-editor:0.1.0}
     platform: linux/amd64
     user: "${PDF_EDITOR_UID:-1000}:${PDF_EDITOR_GID:-1000}"
     ports:
