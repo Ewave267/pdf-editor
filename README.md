@@ -3,12 +3,15 @@
 An open-source desktop application for completing PDF forms and adding text,
 signatures, and annotations, entirely offline.
 
-The project is in early development. The current executable is a repository
-foundation smoke check; it cannot open or edit PDFs yet. The next milestone is
-proving PDFium's XFA and JavaScript behavior before building the editor UI.
+The project is in early development. The main executable is a repository
+foundation smoke check. A separate isolated PDFium probe now opens, renders,
+and interacts with a synthetic dynamic XFA form and executes its JavaScript.
+Step 2 verifies exact values through repeated saves and reopening in PDFium
+and an independent PDF.js reader. The editor UI has not been started.
 
 The planned stack is C++20, Qt Quick / QML, PDFium, and CMake. Qt and PDFium are
-not dependencies of the foundation build.
+not dependencies of the default foundation build. PDFium is an explicit,
+source-pinned, locally patched opt-in dependency for the Linux x64 XFA probe.
 
 ## Build and verify
 
@@ -35,6 +38,15 @@ clang-format --dry-run --Werror src/app/main.cpp
 ```
 
 GitHub Actions configures, builds, and runs the smoke check on Linux.
+
+## XFA integration probe
+
+See [the probe instructions and persistence fixes](docs/XFA-PROBE.md) for the
+source build, sandbox requirements, and validation commands. The XFA CI workflow
+runs regression, isolation, and strict independent-reader checks on pushes and
+pull requests. Preserve the generated package's upstream and dependency license
+notices when distributing it. Current coverage is synthetic, one-page dynamic
+XFA; broader form compatibility belongs to the later MVP steps.
 
 ## Project layout
 

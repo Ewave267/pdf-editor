@@ -4,10 +4,11 @@ Last updated: 2026-10-06
 
 ## Current state
 
-Step 1 is implemented and verified locally. The application is a C++20
-command-line foundation executable; PDF rendering, forms, and editing are not
-implemented. The existing GOAL, MVP, and ROADMAP documents were read before
-starting implementation.
+Steps 1 and 2 are implemented and verified locally. Step 2's isolated PDFium
+probe preserves exact XFA input and calculated values across two save/reopen
+cycles for both packet-array and single-stream forms. Pinned PDF.js independently
+opens and lays out both saved generations and verifies the values.
+The editor UI has not been started. Step 3 can now begin.
 
 ## Step 1 — Repository Foundation
 
@@ -22,46 +23,76 @@ starting implementation.
 - [x] Add minimal GitHub Actions configure/build/test workflow.
 - [x] Verify local configuration, compilation, smoke test, and formatting.
 
-No external libraries were introduced. Empty future source and PDF corpus
-directories have `.gitkeep` files so they are preserved in version control.
+## Step 2 — Prove XFA First
+
+- [x] Pin PDFium XFA/V8 `157.0.8086.0` and its source-build tooling.
+- [x] Keep PDFium behind a C++ application-facing interface.
+- [x] Initialize PDFium and open a known dynamic XFA fixture.
+- [x] Detect the form type and load XFA with a version-2 form environment.
+- [x] Render the page with form widgets and inspect the result.
+- [x] Read and edit the input field.
+- [x] Verify initial calculation and explicit field-exit JavaScript results.
+- [x] Deny scripted URL actions and verify process isolation/deadlines.
+- [x] Save a new PDF and close original document/form/page handles.
+- [x] Fix generated newlines in datasets and form serialization.
+- [x] Fix silently lost edits in single-stream XFA saving.
+- [x] Verify exact values after reopening and a second edit/save/reopen cycle.
+- [x] Verify spaces and XML-sensitive characters without trimming values.
+- [x] Run upstream XML tests, including embedded newline/tab preservation.
+- [x] Open saved files with independent PDF.js and verify layout/field values.
+- [x] Require the strict milestone gate on CI pushes and pull requests.
+- [x] Record the integration decision and reproducible validation instructions.
+
+Coverage is synthetic one-page dynamic XFA with known coordinates and printable
+ASCII edits. The explicit exit-event calculation is proven. Automatic dependency
+recalculation, real-world/static XFA, Unicode interaction, timers, and multipage
+relayout need later form compatibility work. Independent PDF.js validation
+parses/layouts XFA and reads persisted values; it does not execute JavaScript.
+Adobe Acrobat compatibility has not been tested.
 
 ## Validation
 
-Passed locally with GNU C++ 15.2.1:
+Passed locally:
 
 ```sh
-cmake -S . -B build -DCMAKE_CXX_COMPILER=/usr/bin/c++ -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON
-cmake --build build --parallel
-ctest --test-dir build --output-on-failure
-clang-format --dry-run --Werror src/app/main.cpp
+python3 tools/build_pdfium.py --skip-sync --jobs 8
+npm ci --prefix tests/reader --ignore-scripts
+cmake -S . -B build-xfa-fixed -DCMAKE_CXX_COMPILER=/usr/bin/c++ -DCMAKE_BUILD_TYPE=Debug \
+  -DPDF_EDITOR_BUILD_XFA_PROBE=ON -DPDFium_DIR="$PWD/.deps/pdfium-patched"
+cmake --build build-xfa-fixed --parallel
+ctest --test-dir build-xfa-fixed --output-on-failure
+clang-format --dry-run --Werror src/app/main.cpp src/app/xfa_probe_main.cpp src/pdf/XfaProbe.h src/pdf/XfaProbe.cpp
 ```
 
-CTest: 1/1 smoke checks passed. The explicit compiler path bypasses this
-workspace's default ccache wrapper, which attempted to write to a read-only
-cache. Normal build instructions remain in README.
+The source checkout was synced separately before the `--skip-sync` build. For a
+fresh checkout, omit `--skip-sync`; see [XFA-PROBE](docs/XFA-PROBE.md).
+The patched library was built with Chromium's downloaded Clang toolchain; the
+application uses GNU C++ 15.2.1. All 69 upstream XML tests pass. CTest passes 3/3 entries:
+foundation smoke, eleven regression/isolation tests, and the strict round-trip
+gate with four independent-reader opens. Python syntax, JavaScript syntax, C++
+formatting, workflow YAML, and the default foundation build/smoke test pass.
 
-CI is configured but has not been run remotely. This workspace does not have
-usable Git metadata; no commit or push was performed.
+The explicit compiler path bypasses the workspace's read-only ccache directory.
+Sandbox tests used approved tool escalation because the nested tool sandbox
+blocks Bubblewrap namespaces; the worker retained Bubblewrap isolation. CI is
+configured but has not been run remotely. This workspace lacks usable repository
+Git metadata; no commit or push was performed.
+
+The original unpatched binary failed both persistence encodings. Those failures
+are documented with their source fixes in [XFA-PROBE](docs/XFA-PROBE.md). CMake
+now requires the patched package and rejects the original binary.
 
 ## Remaining MVP steps
 
 | Step | Status | Next milestone |
 | --- | --- | --- |
-| 2 — Prove XFA First | Not started | PDFium XFA/JavaScript open, interact, save, and reopen probe |
-| 3 — Minimal Viewer | Not started | Qt/QML shell behind a C++ PDF abstraction |
+| 2 — Prove XFA First | Complete for committed fixtures | Expand compatibility during forms work |
+| 3 — Minimal Viewer | Not started; ready to begin | Qt/QML shell behind a C++ PDF abstraction |
 | 4 — Forms | Not started | AcroForm and representative XFA field interaction |
 | 5 — Added Content | Not started | Text, signature, and image object model |
-| 6 — Save | Not started | Save As and verify preserved changes on reopen |
-| 7 — Safety | Not started | Untrusted PDF and JavaScript isolation testing |
+| 6 — Save | Not started | Preserve form changes and added content on reopen |
+| 7 — Safety | Not started | Broader untrusted PDF and JavaScript isolation testing |
 | 8 — MVP Release | Not started | Package the verified workflow for one desktop platform |
 
-## Next work
-
-Start step 2 by selecting a reproducible PDFium build with XFA and V8 enabled,
-recording its integration and isolation decisions in `docs/adr/`, and acquiring
-a redistributable XFA fixture with expected field values. The probe must verify
-the complete interaction/save/reopen workflow before UI work begins.
-
-Update this file as milestones land, including the checks actually run and
-any remaining limitations. Do not mark PDF compatibility complete based only
-on the foundation smoke check.
+Update this file as milestones land, including checks actually run and remaining
+limitations. Do not infer broad PDF compatibility from the synthetic probe.

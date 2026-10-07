@@ -1,0 +1,241 @@
+--- a/core/fxcrt/xml/cfx_xmlelement.cpp
++++ b/core/fxcrt/xml/cfx_xmlelement.cpp
+@@ -93,11 +93,11 @@
+   }
+ 
+   if (!GetFirstChild()) {
+-    pXMLStream->WriteString(" />\n");
++    pXMLStream->WriteString(" />");
+     return;
+   }
+ 
+-  pXMLStream->WriteString(">\n");
++  pXMLStream->WriteString(">");
+ 
+   for (CFX_XMLNode* pChild = GetFirstChild(); pChild;
+        pChild = pChild->GetNextSibling()) {
+@@ -105,7 +105,7 @@
+   }
+   pXMLStream->WriteString("</");
+   pXMLStream->WriteString(bsNameEncoded.AsStringView());
+-  pXMLStream->WriteString(">\n");
++  pXMLStream->WriteString(">");
+ }
+ 
+ CFX_XMLElement* CFX_XMLElement::GetFirstChildNamed(WideStringView name) const {
+--- a/xfa/fxfa/parser/xfa_utils.cpp
++++ b/xfa/fxfa/parser/xfa_utils.cpp
+@@ -234,11 +234,11 @@
+           bodyTagName = L"ListBox1";
+         }
+ 
+-        buf << "<" << bodyTagName << " xmlns=\"\">\n";
++        buf << "<" << bodyTagName << " xmlns=\"\">";
+         for (const WideString& text : wsSelTextArray) {
+-          buf << "<value>" << ExportEncodeContent(text) << "</value>\n";
+-        }
+-        buf << "</" << bodyTagName << ">\n";
++          buf << "<value>" << ExportEncodeContent(text) << "</value>";
++        }
++        buf << "</" << bodyTagName << ">";
+         wsChildren += buf.AsStringView();
+         buf.Clear();
+       } else {
+@@ -295,9 +295,9 @@
+     buf << SaveAttribute(pNode, XFA_Attribute::Name, L"name", true);
+     buf << wsAttrs;
+     if (wsChildren.IsEmpty()) {
+-      buf << "/>\n";
++      buf << "/>";
+     } else {
+-      buf << ">\n" << wsChildren << "</" << wsElement << ">\n";
++      buf << ">" << wsChildren << "</" << wsElement << ">";
+     }
+   }
+ }
+@@ -342,18 +342,18 @@
+ 
+   CXFA_Node* pChildNode = pNode->GetFirstChild();
+   if (!pChildNode) {
+-    pStream->WriteString(" />\n");
++    pStream->WriteString(" />");
+     return;
+   }
+ 
+-  pStream->WriteString(">\n");
++  pStream->WriteString(">");
+   while (pChildNode) {
+     RegenerateFormFile_Container(pChildNode, pStream, bSaveXML);
+     pChildNode = pChildNode->GetNextSibling();
+   }
+   pStream->WriteString("</");
+   pStream->WriteString(wsElement.ToUTF8().AsStringView());
+-  pStream->WriteString(">\n");
++  pStream->WriteString(">");
+ }
+ 
+ WideString RecognizeXFAVersionNumber(CXFA_Node* pTemplateRoot) {
+@@ -485,7 +485,7 @@
+       wsVersionNumber = L"2.8";
+     }
+ 
+-    wsVersionNumber += L"/\">\n";
++    wsVersionNumber += L"/\">";
+     pStream->WriteString(wsVersionNumber.ToUTF8().AsStringView());
+ 
+     CXFA_Node* pChildNode = pNode->GetFirstChild();
+@@ -493,7 +493,7 @@
+       RegenerateFormFile_Container(pChildNode, pStream, false);
+       pChildNode = pChildNode->GetNextSibling();
+     }
+-    pStream->WriteString("</form>\n");
++    pStream->WriteString("</form>");
+   } else {
+     RegenerateFormFile_Container(pNode, pStream, bSaveXML);
+   }
+--- a/core/fxcrt/xml/cfx_xmlelement_unittest.cpp
++++ b/core/fxcrt/xml/cfx_xmlelement_unittest.cpp
+@@ -112,7 +112,7 @@
+   CFX_XMLElement node(L"root");
+ 
+   node.Save(stream);
+-  EXPECT_EQ("<root />\n", stream->ToString());
++  EXPECT_EQ("<root />", stream->ToString());
+ }
+ 
+ TEST(CFXXMLElementTest, SaveWithAttributes) {
+@@ -122,7 +122,7 @@
+   node.SetAttribute(L"second", L"two");
+ 
+   node.Save(stream);
+-  EXPECT_EQ("<root first=\"one\" second=\"two\" />\n", stream->ToString());
++  EXPECT_EQ("<root first=\"one\" second=\"two\" />", stream->ToString());
+ }
+ 
+ TEST(CFXXMLElementTest, SaveWithChildren) {
+@@ -143,11 +143,11 @@
+ 
+   node.Save(stream);
+   EXPECT_EQ(
+-      "<node>\n"
++      "<node>"
+       "Text Child 1"
+-      "<node-child>\nText Child 2</node-child>\n"
++      "<node-child>Text Child 2</node-child>"
+       "<![CDATA[Char Data]]>"
+-      "</node>\n",
++      "</node>",
+       stream->ToString());
+ }
+ 
+@@ -157,7 +157,7 @@
+   node.SetAttribute(L"xmlns:test", L"https://example.org/ns1");
+ 
+   node.Save(stream);
+-  EXPECT_EQ("<test:root xmlns:test=\"https://example.org/ns1\" />\n",
++  EXPECT_EQ("<test:root xmlns:test=\"https://example.org/ns1\" />",
+             stream->ToString());
+ }
+ 
+@@ -224,3 +224,13 @@
+ 
+   EXPECT_EQ(L"Text Child 1Char Data", node.GetTextData());
+ }
++
++TEST(CFXXMLElementTest, SavePreservesWhitespaceAndEscapesText) {
++  auto stream = pdfium::MakeRetain<StringWriteStream>();
++  CFX_XMLElement node(L"value");
++  CFX_XMLText text(L"  first\n\t<&> second  ");
++  node.AppendLastChild(&text);
++  node.Save(stream);
++  EXPECT_EQ("<value>  first\n\t&lt;&amp;&gt; second  </value>",
++            stream->ToString());
++}
+--- a/fpdfsdk/fpdfxfa/cpdfxfa_context.h
++++ b/fpdfsdk/fpdfxfa/cpdfxfa_context.h
+@@ -106,6 +106,7 @@
+   FXGC_Heap* GetGCHeap() const override;
+ 
+   bool SaveDatasetsPackage(const RetainPtr<IFX_SeekableStream>& pStream);
++  bool SaveXdpPackage(const RetainPtr<IFX_SeekableStream>& pStream);
+   bool SaveFormPackage(const RetainPtr<IFX_SeekableStream>& pStream);
+   void SendPostSaveToXFADoc();
+   void SendPreSaveToXFADoc(
+--- a/fpdfsdk/fpdfxfa/cpdfxfa_context.cpp
++++ b/fpdfsdk/fpdfxfa/cpdfxfa_context.cpp
+@@ -469,6 +469,12 @@
+   return SavePackage(pStream, XFA_HASHCODE_Datasets);
+ }
+ 
++bool CPDFXFA_Context::SaveXdpPackage(
++    const RetainPtr<IFX_SeekableStream>& stream) {
++  CXFA_FFDocView* view = GetXFADocView();
++  return view && view->GetDoc()->SavePackage(nullptr, stream);
++}
++
+ bool CPDFXFA_Context::SaveFormPackage(
+     const RetainPtr<IFX_SeekableStream>& pStream) {
+   return SavePackage(pStream, XFA_HASHCODE_Form);
+--- a/fpdfsdk/fpdf_save.cpp
++++ b/fpdfsdk/fpdf_save.cpp
+@@ -74,8 +74,20 @@
+     return false;
+   }
+ 
+-  RetainPtr<CPDF_Object> xfa = acro_form->GetMutableObjectFor("XFA");
++  RetainPtr<CPDF_Object> xfa = acro_form->GetMutableDirectObjectFor("XFA");
+   if (!xfa) {
++    return true;
++  }
++
++  // A single XDP stream needs the current datasets and form state just as
++  // a packet array does. Keep the encoding instead of silently saving stale XML.
++  if (CPDF_Stream* xdp_stream = xfa->AsMutableStream()) {
++    auto stream = pdfium::MakeRetain<CFX_MemoryStream>();
++    if (!context->SaveXdpPackage(stream) || stream->GetSize() == 0) {
++      return false;
++    }
++    xdp_stream->InitStreamFromFile(stream);
++    file_list->push_back(std::move(stream));
+     return true;
+   }
+ 
+@@ -187,7 +199,9 @@
+   if (context) {
+     std::vector<RetainPtr<IFX_SeekableStream>> file_list;
+     context->SendPreSaveToXFADoc(&file_list);
+-    SaveXFADocumentData(context, &file_list);
++    if (!SaveXFADocumentData(context, &file_list)) {
++      return false;
++    }
+   }
+ #endif  // PDF_ENABLE_XFA
+ 
+--- a/xfa/fxfa/parser/cxfa_dataexporter.cpp
++++ b/xfa/fxfa/parser/cxfa_dataexporter.cpp
+@@ -29,7 +29,9 @@
+             "<xdp:xdp xmlns:xdp=\"http://ns.adobe.com/xdp/\">");
+         for (CXFA_Node* pChild = pNode->GetFirstChild(); pChild;
+              pChild = pChild->GetNextSibling()) {
+-          Export(pStream, pChild);
++          if (!Export(pStream, pChild)) {
++            return false;
++          }
+         }
+         pStream->WriteString("</xdp:xdp>\n");
+         break;
+diff --git a/core/fxcrt/xml/cfx_xmlinstruction_unittest.cpp b/core/fxcrt/xml/cfx_xmlinstruction_unittest.cpp
+index 838af3c..1a5e61d 100644
+--- a/core/fxcrt/xml/cfx_xmlinstruction_unittest.cpp
++++ b/core/fxcrt/xml/cfx_xmlinstruction_unittest.cpp
+@@ -150,8 +150,8 @@ TEST(CFXXMLInstructionTest, ParseAndReSaveInnerInstruction) {
+   auto out_stream = pdfium::MakeRetain<StringWriteStream>();
+   node->Save(out_stream);
+   EXPECT_EQ(
+-      "<node>\n\n"
++      "<node>\n"
+       "<?acrobat http://www.xfa.org/schema/xfa-template/3.3/ Display:1 ?>\n\n"
+-      "</node>\n",
++      "</node>",
+       out_stream->ToString());
+ }

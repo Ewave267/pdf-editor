@@ -1,0 +1,11 @@
+{
+  "name": "pdf-editor-independent-reader-validation",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "pdfjs-dist": "6.4.299"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

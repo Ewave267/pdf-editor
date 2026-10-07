@@ -1,0 +1,9 @@
+diff --git a/BUILD.gn b/BUILD.gn
+--- a/BUILD.gn
++++ b/BUILD.gn
+@@ -1337,4 +1337,5 @@
+   defines = [
+     "V8_TYPED_ARRAY_MAX_SIZE_IN_HEAP=${v8_typed_array_max_size_in_heap}",
+     "V8_LOGGING_LEVEL=${v8_logging_level}",
++    "V8_TLS_USED_IN_LIBRARY",
+   ]

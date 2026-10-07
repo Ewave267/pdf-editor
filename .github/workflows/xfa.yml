@@ -1,0 +1,38 @@
+name: XFA Probe
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  xfa:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install build and sandbox tools
+        run: sudo apt-get update && sudo apt-get install --yes bubblewrap ninja-build
+      - uses: actions/cache@v4
+        id: pdfium
+        with:
+          path: .deps/pdfium-patched
+          key: pdfium-linux-x64-${{ hashFiles('tools/build_pdfium.py', 'third_party/pdfium/patches/*.patch', 'LICENSE') }}
+      - name: Build and unit-test patched PDFium
+        if: steps.pdfium.outputs.cache-hit != 'true'
+        run: python3 tools/build_pdfium.py --jobs 4
+      - name: Install pinned independent reader
+        run: npm ci --prefix tests/reader --ignore-scripts
+      - name: Configure
+        run: >-
+          cmake -S . -B build-xfa -DCMAKE_BUILD_TYPE=Release
+          -DPDF_EDITOR_BUILD_XFA_PROBE=ON -DPDFium_DIR="$PWD/.deps/pdfium-patched"
+      - name: Build
+        run: cmake --build build-xfa --parallel
+      - name: Validate regressions, isolation, and independent-reader round trips
+        run: ctest --test-dir build-xfa --output-on-failure

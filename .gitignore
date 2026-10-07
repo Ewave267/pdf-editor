@@ -1,6 +1,9 @@
 /build/
 /build-*/
 /out/
+/.deps/
+__pycache__/
+node_modules/
 /CMakeUserPresets.json
 /.cache/
 /compile_commands.json
