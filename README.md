@@ -8,8 +8,9 @@ renders and scrolls pages, zooms, navigates by page number, and shows thumbnails
 PDFium runs in an isolated worker behind a C++ document interface. Step 2 also
 verifies exact XFA values through repeated saves and independent PDF.js reopening.
 The viewer also supports adding, moving, resizing, and deleting text, images,
-and image-based signatures. These additions stay in memory; form editing and
-saving in the viewer are later milestones.
+and image-based signatures. Save As embeds additions in a new PDF, with atomic writes and source-file
+protection. Viewer form editing is pending. Dynamic XFA copies without additions
+are supported; dynamic XFA additions cannot yet be saved.
 
 The stack is C++20, Qt Quick / QML, PDFium, and CMake. The default build remains
 a dependency-free foundation check. Enable the viewer explicitly with
@@ -44,7 +45,8 @@ cmake --build build-viewer --parallel 4
 
 See [VIEWER](docs/VIEWER.md) for complete setup, controls, limits and test
 instructions, including this workspace's local Qt SDK configuration. See
-[ADDED-CONTENT](docs/ADDED-CONTENT.md) for the step 5 tools and limitations.
+[ADDED-CONTENT](docs/ADDED-CONTENT.md) for the step 5 tools and
+[SAVING](docs/SAVING.md) for Save As support and remaining validation gaps.
 
 ## Development
 

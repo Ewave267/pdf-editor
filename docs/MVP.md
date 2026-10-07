@@ -240,18 +240,26 @@ Never overwrite the original PDF by default during early development.
 
 Using documents containing both form changes and added content:
 
-- [ ] `Save As` creates a new PDF.
-- [ ] The source PDF remains unchanged.
-- [ ] The saved PDF can be reopened by the application.
-- [ ] Form values remain correct after reopening.
-- [ ] Added text remains present and correctly positioned.
-- [ ] Added signatures remain present and correctly positioned.
-- [ ] Added images remain present and correctly positioned.
-- [ ] Existing document content remains intact.
+- [x] `Save As` creates a new PDF.
+- [x] The source PDF remains unchanged.
+- [x] The saved PDF can be reopened by the application.
+- [x] Form values remain correct after reopening.
+- [x] Added text remains present and correctly positioned.
+- [x] Added signatures remain present and correctly positioned.
+- [x] Added images remain present and correctly positioned.
+- [x] Existing document content remains intact.
 - [ ] Existing AcroForm behavior still works after saving.
-- [ ] Existing XFA behavior still works after saving where supported.
-- [ ] The resulting PDF opens correctly in at least one independent PDF reader.
-- [ ] A save failure produces an error instead of silently losing changes.
+- [x] Existing XFA behavior still works after saving where supported.
+- [x] The resulting PDF opens correctly in at least one independent PDF reader.
+- [x] A save failure produces an error instead of silently losing changes.
+
+Implementation status: Save As works for ordinary PDFs and retains existing
+AcroForm values, widgets, and script actions. Dynamic XFA copies preserve
+values and pass the native calculation/edit/save probe, but additions on full
+XFA are refused safely. New form changes through the viewer depend on pending
+step 4. The checks above cover existing persisted form values; interactive
+AcroForm validation and representative foreground XFA remain outstanding.
+See [SAVING](SAVING.md).
 
 ## Step 7 — Safety
 

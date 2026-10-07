@@ -12,7 +12,9 @@ The Linux Qt/QML viewer opens and scrolls PDFs, zooms, fits pages, navigates by
 page number, and shows thumbnails. Rendering runs in an isolated asynchronous
 worker behind a C++ interface. Added text, images, and image-based signatures
 can be placed, selected, moved, resized, edited, and deleted. Step 4 form editing
-and step 6 saving remain pending. Additions are held in memory only.
+remains pending. Save As now embeds additions in new PDFs and preserves existing
+form structures. Step 6 still has validation gaps for interactive AcroForm edits
+and dynamic XFA additions; see [SAVING](docs/SAVING.md).
 
 ## Step 1 — Repository Foundation
 
@@ -109,11 +111,40 @@ remotely. GPL-3.0-only licensing remains in place.
 
 See [ADDED-CONTENT](docs/ADDED-CONTENT.md) for controls and limitations. Step 5
 was implemented independently of pending step 4. It supports image-based
-signatures; drawing signatures, saving, and recovery are not implemented.
+signatures; drawing signatures and recovery are not implemented. Saving was
+subsequently added in step 6.
 The two new viewer cases pass alongside the existing four viewer cases.
 The combined CTest suite passes 4/4 entries, including eleven XFA regressions
 and four independent-reader opens. Formatting and whitespace checks pass.
 No PDFium rebuild was needed. GPL-3.0-only licensing remains unchanged.
+
+## Step 6 — Save As
+
+- [x] Add Save As and Ctrl+Shift+S through the QML file dialog.
+- [x] Preserve a private source snapshot and reject original-file save targets.
+- [x] Export text with embedded fonts and lossless images/signatures.
+- [x] Insert additions in an isolated worker; atomically commit a new PDF.
+- [x] Verify additions after reopen on mixed-size, rotated, and cropped pages.
+- [x] Keep document content and source PDF bytes intact.
+- [x] Verify existing AcroForm values, editable widgets, defaults, and script actions.
+- [x] Verify native XFA values and calculation/round trips after saving a copy.
+- [x] Independently verify added content, AcroForm, and XFA output with PDF.js.
+- [x] Retain changes on failed save; track edits made while saving separately.
+- [ ] Validate newly edited forms through the viewer after step 4 is implemented.
+- [ ] Validate interactive AcroForm behavior after saving.
+- [ ] Support additions on dynamic full XFA while preserving its behavior.
+- [ ] Validate representative foreground/static XFA documents with additions.
+
+Implementation and limits are in [SAVING](docs/SAVING.md). Step 6 is implemented
+for ordinary PDFs and existing AcroForm content, with the validation gaps above.
+The combined suite passes 4/4 CTest entries, including eleven viewer cases,
+eleven XFA regressions, and seven independent PDF.js output checks. The final
+interface screenshot, C++ formatting, Python/JavaScript syntax, and whitespace
+checks pass. CI is configured but was not run remotely.
+
+Dynamic XFA copies without additions are supported; requests with additions fail
+with an error and retain the additions. Saved additions become PDF content on
+reopen. No PDFium rebuild was needed, and GPL-3.0-only remains unchanged.
 
 ## Validation
 
@@ -154,7 +185,7 @@ now requires the patched package and rejects the original binary.
 | 3 — Minimal Viewer | Complete for committed fixtures | Extend form interaction in step 4 |
 | 4 — Forms | Not started | AcroForm and representative XFA field interaction |
 | 5 — Added Content | Complete for synthetic fixtures | Save additions in step 6 |
-| 6 — Save | Not started | Preserve form changes and added content on reopen |
+| 6 — Save | Implemented; validation partial | Viewer form edits and dynamic XFA additions |
 | 7 — Safety | Not started | Broader untrusted PDF and JavaScript isolation testing |
 | 8 — MVP Release | Not started | Package the verified workflow for one desktop platform |
 

@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "PdfiumRuntime.h"
+#include <fpdf_edit.h>
+#include <fpdf_ppo.h>
+#include <fpdf_save.h>
 
 #include <QBuffer>
 #include <QCoreApplication>
@@ -75,6 +78,87 @@ class PdfDocument
         return {{"pages", pages}, {"formType", type_}};
     }
 
+    QByteArray save(const QByteArray& overlayBytes)
+    {
+        require(type_ != FORMTYPE_XFA_FULL || overlayBytes.isEmpty(),
+                "Dynamic XFA additions cannot be saved safely yet.");
+        FPDF_DOCUMENT overlay = nullptr;
+        struct OverlayGuard
+        {
+            FPDF_DOCUMENT& document;
+            ~OverlayGuard()
+            {
+                if (document)
+                    FPDF_CloseDocument(document);
+            }
+        } overlayGuard{overlay};
+        if (!overlayBytes.isEmpty())
+        {
+            overlay =
+                FPDF_LoadMemDocument64(overlayBytes.constData(), overlayBytes.size(), nullptr);
+            require(overlay, "Cannot open the added-content PDF.");
+            require(FPDF_GetPageCount(overlay) == FPDF_GetPageCount(document_),
+                    "Added-content page count mismatch.");
+            for (int index = 0; index < FPDF_GetPageCount(document_); ++index)
+            {
+                FPDF_PAGE page = FPDF_LoadPage(document_, index);
+                require(page, "Cannot load a page for saving.");
+                struct PageGuard
+                {
+                    FPDF_PAGE page;
+                    ~PageGuard() { FPDF_ClosePage(page); }
+                } guard{page};
+                FPDF_PAGE overlayPage = FPDF_LoadPage(overlay, index);
+                require(overlayPage, "Cannot load an added-content page.");
+                const double ow = FPDF_GetPageWidth(overlayPage),
+                             oh = FPDF_GetPageHeight(overlayPage);
+                FPDF_ClosePage(overlayPage);
+                double x0, y0, x1, y1, x2, y2;
+                require(
+                    FPDF_DeviceToPage(page, 0, 0, 10000, 10000, 0, 0, 10000, &x0, &y0) &&
+                        FPDF_DeviceToPage(page, 0, 0, 10000, 10000, 0, 10000, 10000, &x1, &y1) &&
+                        FPDF_DeviceToPage(page, 0, 0, 10000, 10000, 0, 0, 0, &x2, &y2),
+                    "Cannot map added-content coordinates.");
+                FPDF_XOBJECT xobject = FPDF_NewXObjectFromPage(document_, overlay, index);
+                require(xobject, "Cannot import added content.");
+                FPDF_PAGEOBJECT object = FPDF_NewFormObjectFromXObject(xobject);
+                FPDF_CloseXObject(xobject);
+                require(object, "Cannot create the added-content object.");
+                FPDFPageObj_Transform(object, (x1 - x0) / ow, (y1 - y0) / ow, (x2 - x0) / oh,
+                                      (y2 - y0) / oh, x0, y0);
+                require(FPDFPage_InsertObject(page, object), "Cannot insert added content.");
+                require(FPDFPage_GenerateContent(page), "Cannot update page content.");
+            }
+        }
+        struct Writer : FPDF_FILEWRITE
+        {
+            QByteArray bytes;
+            Writer()
+            {
+                version = 1;
+                WriteBlock = [](FPDF_FILEWRITE* base, const void* data, unsigned long size)
+                {
+                    auto& writer = *static_cast<Writer*>(base);
+                    if (size > 64 * 1024 * 1024 - static_cast<unsigned long>(writer.bytes.size()))
+                        return 0;
+                    try
+                    {
+                        writer.bytes.append(static_cast<const char*>(data), size);
+                        return 1;
+                    }
+                    catch (...)
+                    {
+                        return 0;
+                    }
+                };
+            }
+        } writer;
+        FORM_DoDocumentAAction(form_, FPDFDOC_AACTION_WS);
+        require(FPDF_SaveAsCopy(document_, &writer, FPDF_NO_INCREMENTAL), "PDF save failed.");
+        FORM_DoDocumentAAction(form_, FPDFDOC_AACTION_DS);
+        return writer.bytes;
+    }
+
     QJsonObject render(int index, int width)
     {
         require(index >= 0 && index < FPDF_GetPageCount(document_), "Invalid page number.");
@@ -136,6 +220,24 @@ int main(int argc, char** argv)
     {
         pdf::detail::Library library;
         PdfDocument document;
+        if (argc == 2 && QString::fromLocal8Bit(argv[1]) == "--save")
+        {
+            document.initialize();
+            QByteArray overlay;
+            char block[65536];
+            while (std::cin)
+            {
+                std::cin.read(block, sizeof(block));
+                overlay.append(block, std::cin.gcount());
+                require(overlay.size() <= 32 * 1024 * 1024,
+                        "Added content exceeds the save limit.");
+            }
+            const QByteArray saved = document.save(overlay);
+            std::cout.write(saved.constData(), saved.size());
+            std::cout.flush();
+            require(static_cast<bool>(std::cout), "Cannot return the saved PDF.");
+            return 0;
+        }
         reply(document.initialize());
         std::string line;
         while (std::getline(std::cin, line))
@@ -159,7 +261,10 @@ int main(int argc, char** argv)
     }
     catch (const std::exception& error)
     {
-        reply({{"error", error.what()}});
+        if (argc == 2)
+            std::cerr << error.what() << '\n';
+        else
+            reply({{"error", error.what()}});
         return 1;
     }
 }

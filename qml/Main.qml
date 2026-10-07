@@ -30,13 +30,15 @@ ApplicationWindow {
     property var selectedObject: ({})
     property var discardAction
     function guarded(action) {
-        if (pdfDocument.additions.count > 0) { discardAction = action; discardDialog.open() }
+        if (pdfDocument.saving) return
+        if (pdfDocument.dirty) { discardAction = action; discardDialog.open() }
         else action()
     }
     function closeDocument() { guarded(function() { pdfDocument.close() }) }
     function openFile(url) { guarded(function() { pdfDocument.open(url) }) }
     onClosing: function(close) {
-        if (pdfDocument.additions.count > 0) {
+        if (pdfDocument.saving) { close.accepted = false; return }
+        if (pdfDocument.dirty) {
             close.accepted = false
             guarded(function() { pdfDocument.close(); root.close() })
         }
@@ -101,6 +103,29 @@ ApplicationWindow {
         nameFilters: ["PDF documents (*.pdf)", "All files (*)"]
         onAccepted: root.openFile(selectedFile)
     }
+    FileDialog {
+        id: saveDialog
+        objectName: "saveDialog"
+        title: "Save a new PDF"
+        fileMode: FileDialog.SaveFile
+        nameFilters: ["PDF documents (*.pdf)"]
+        defaultSuffix: "pdf"
+        onAccepted: pdfDocument.saveAs(selectedFile)
+    }
+    Dialog {
+        id: saveFailure
+        title: "Couldn't save the PDF"
+        anchors.centerIn: parent
+        modal: true
+        width: Math.min(480, root.width - 40)
+        standardButtons: Dialog.Ok
+        Label { width: parent.width; text: pdfDocument.saveError; wrapMode: Text.WordWrap }
+    }
+    Connections {
+        target: pdfDocument
+        function onSaveFinished(success) { if (!success && pdfDocument.saveError) saveFailure.open() }
+    }
+    Shortcut { sequence: "Ctrl+Shift+S"; enabled: pdfDocument.ready && !pdfDocument.saving; onActivated: saveDialog.open() }
     Shortcut { sequences: [StandardKey.Open]; onActivated: fileDialog.open() }
     Shortcut { sequences: [StandardKey.Close]; onActivated: root.closeDocument() }
     Shortcut { sequence: "Ctrl++"; onActivated: pdfDocument.zoom *= 1.2 }
@@ -115,8 +140,9 @@ ApplicationWindow {
             anchors.margins: 10
             spacing: 10
             Label { text: "PDF FORM EDITOR"; font.pixelSize: 13; font.bold: true; color: "#354a60"; Layout.rightMargin: 12 }
-            Button { objectName: "openButton"; text: "Open PDF"; onClicked: fileDialog.open(); Accessible.name: "Open PDF" }
-            Button { objectName: "closeButton"; text: "Close"; enabled: pdfDocument.ready || pdfDocument.loading; onClicked: root.closeDocument() }
+            Button { objectName: "openButton"; text: "Open PDF"; enabled: !pdfDocument.saving; onClicked: fileDialog.open(); Accessible.name: "Open PDF" }
+            Button { objectName: "saveButton"; text: pdfDocument.saving ? "Saving…" : "Save As"; enabled: pdfDocument.ready && !pdfDocument.saving; onClicked: saveDialog.open() }
+            Button { objectName: "closeButton"; text: "Close"; enabled: !pdfDocument.saving && (pdfDocument.ready || pdfDocument.loading); onClicked: root.closeDocument() }
             Item { Layout.fillWidth: true }
             Button { objectName: "zoomOutButton"; text: "−"; enabled: pdfDocument.ready && pdfDocument.zoom > 0.25; onClicked: pdfDocument.zoom /= 1.2; Accessible.name: "Zoom out" }
             Label { objectName: "zoomLabel"; text: Math.round(pdfDocument.zoom * 100) + "%"; horizontalAlignment: Text.AlignHCenter; Layout.preferredWidth: 48; visible: pdfDocument.ready }
@@ -206,7 +232,7 @@ ApplicationWindow {
                 Button { objectName: "addSignatureButton"; text: "Signature"; onClicked: { imageDialog.signature = true; imageDialog.open() } }
                 Button { objectName: "editTextButton"; text: "Edit text"; visible: root.selectedObject.type === "text"; onClicked: { textDialog.editing = true; textInput.text = root.selectedObject.text; textDialog.open() } }
                 Button { objectName: "deleteObjectButton"; text: "Delete"; enabled: pdfDocument.additions.selected >= 0; onClicked: pdfDocument.additions.removeSelected() }
-                Label { Layout.fillWidth: true; elide: Text.ElideRight; text: root.placement ? "Click a page to place " + root.placement + " · Esc cancels" : pdfDocument.additions.error || (pdfDocument.additions.count ? "Unsaved additions · Drag to move; corner to resize" : "Add content to a page"); color: "#596878" }
+                Label { Layout.fillWidth: true; elide: Text.ElideRight; text: root.placement ? "Click a page to place " + root.placement + " · Esc cancels" : pdfDocument.additions.error || (pdfDocument.dirty ? "Unsaved additions · Drag to move; corner to resize" : pdfDocument.savedPath ? "Saved · " + pdfDocument.savedPath : "Add content to a page"); color: "#596878" }
             }
             ListView {
                 id: pageView

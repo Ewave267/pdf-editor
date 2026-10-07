@@ -3,6 +3,7 @@
 
 #include <QBuffer>
 #include <QCoreApplication>
+#include <QFile>
 #include <QFileInfo>
 #include <QImageReader>
 #include <QJsonArray>
@@ -14,11 +15,21 @@
 
 PdfDocument::PdfDocument(QObject* parent) : QObject(parent), additions_(new AddedContent(this))
 {
+    savedRevision_ = additions_->revision();
+    connect(additions_, &AddedContent::changed, this, &PdfDocument::saveStateChanged);
+    saveDeadline_.setSingleShot(true);
+    connect(&saveDeadline_, &QTimer::timeout, this,
+            [this] { finishSave("Saving took too long. Your changes are retained."); });
     deadline_.setSingleShot(true);
     connect(&deadline_, &QTimer::timeout, this, [this]
             { fail("The document took too long to respond. Close it and try another PDF."); });
 }
-PdfDocument::~PdfDocument() { stopWorker(); }
+PdfDocument::~PdfDocument()
+{
+    if (saveWorker_)
+        finishSave("Save cancelled.");
+    stopWorker();
+}
 
 qint64 PdfDocument::workerPid() const { return worker_ ? worker_->processId() : 0; }
 
@@ -55,7 +66,15 @@ void PdfDocument::stopWorker()
 
 void PdfDocument::close()
 {
+    if (saveWorker_)
+        finishSave("Save cancelled.");
     additions_->clear();
+    savedRevision_ = additions_->revision();
+    saveError_.clear();
+    savedPath_.clear();
+    snapshot_.reset();
+    sourcePath_.clear();
+    emit saveStateChanged();
     stopWorker();
     ready_ = loading_ = false;
     pages_.clear();
@@ -83,6 +102,18 @@ void PdfDocument::open(const QUrl& url)
         return;
     }
     close();
+    sourcePath_ = input.canonicalFilePath();
+    if (input.size() <= 0 || input.size() > 64 * 1024 * 1024)
+    {
+        fail("The viewer supports PDF files up to 64 MiB.");
+        return;
+    }
+    snapshot_ = std::make_unique<QTemporaryDir>();
+    if (!snapshot_->isValid() || !QFile::copy(sourcePath_, snapshot_->filePath("input.pdf")))
+    {
+        fail("Cannot create a private document snapshot.");
+        return;
+    }
     fileName_ = input.fileName();
     loading_ = true;
     fitting_ = true;
@@ -114,8 +145,9 @@ void PdfDocument::open(const QUrl& url)
             args << "--ro-bind" << path << path;
     args << "--ro-bind" << binary << "/probe"
          << "--ro-bind" << QString(PDFIUM_LIBRARY_PATH) << "/pdfium/libpdfium.so"
-         << "--ro-bind" << input.canonicalFilePath() << "/input.pdf"
+         << "--ro-bind" << snapshot_->filePath("input.pdf") << "/input.pdf"
          << "--chdir" << "/tmp" << "/probe";
+    sandboxArgs_ = args;
     worker_ = new QProcess(this);
     worker_->setProcessChannelMode(QProcess::SeparateChannels);
     connect(worker_, &QProcess::readyReadStandardOutput, this, &PdfDocument::receive);
@@ -189,6 +221,7 @@ void PdfDocument::receive()
             pages_.append(page.toVariantMap());
         }
         const int type = response.value("formType").toInt();
+        xfaFull_ = type == 2;
         formType_ = type == 0 ? "PDF" : type == 1 ? "AcroForm" : "XFA";
         loading_ = false;
         ready_ = true;

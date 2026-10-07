@@ -21,6 +21,7 @@ class AddedContent : public QObject
         QImage image;
     };
     explicit AddedContent(PdfDocument* document);
+    quint64 revision() const { return revision_; }
     int count() const { return objects_.size(); }
     int selected() const { return selected_; }
     QString error() const { return error_; }
@@ -47,4 +48,5 @@ class AddedContent : public QObject
     QList<Object> objects_;
     int selected_ = -1, nextId_ = 0;
     QString error_;
+    quint64 revision_ = 0;
 };

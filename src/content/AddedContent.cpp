@@ -25,6 +25,7 @@ int AddedContent::insert(int page, double x, double y, const QString& type, cons
     const QRectF rect = bounded(page, {x, y, w, h});
     if (rect.isEmpty())
         return -1;
+    ++revision_;
     objects_.append({++nextId_, page, type, text, rect, image});
     selected_ = nextId_;
     error_.clear();
@@ -92,6 +93,7 @@ bool AddedContent::geometry(int id, double x, double y, double w, double h)
             const auto r = bounded(o.page, {x, y, w, h});
             if (r.isEmpty())
                 return false;
+            ++revision_;
             o.rect = r;
             emit changed();
             return true;
@@ -105,6 +107,7 @@ bool AddedContent::setText(int id, const QString& text)
     for (auto& o : objects_)
         if (o.id == id && o.type == "text")
         {
+            ++revision_;
             o.text = text;
             emit changed();
             return true;
@@ -118,12 +121,15 @@ void AddedContent::select(int id)
 }
 void AddedContent::removeSelected()
 {
+    if (selected_ >= 0)
+        ++revision_;
     objects_.removeIf([this](const Object& o) { return o.id == selected_; });
     selected_ = -1;
     emit changed();
 }
 void AddedContent::clear()
 {
+    ++revision_;
     objects_.clear();
     selected_ = -1;
     error_.clear();

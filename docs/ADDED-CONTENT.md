@@ -23,10 +23,12 @@ rectangle. Text is limited to 10,000 characters and imported images to 16 millio
 pixels. Images are copied into memory, so deleting or changing the original image
 file does not change an imported object.
 
-**Additions are held in memory only.** Opening another PDF, closing the document,
-or closing the window asks before discarding them. The source PDF stays
-unchanged. Saving and reopening additions belongs to step 6; recovery, undo/redo,
-font controls, aspect locking, and keyboard manipulation are later work.
+**Use Save As to persist additions in a new PDF.** Opening another PDF,
+closing the document, or closing the window asks before discarding unsaved
+changes. The source PDF stays unchanged. Reopening saved additions shows them
+as ordinary PDF content. Dynamic XFA additions cannot yet be saved safely;
+see [SAVING](SAVING.md). Recovery, undo/redo, font controls, aspect locking,
+and keyboard manipulation are later work.
 
 ## Model and rendering
 

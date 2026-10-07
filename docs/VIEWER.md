@@ -5,7 +5,8 @@ horizontally, zooms, fits pages to the viewport, and navigates by page number,
 Previous/Next, or thumbnails. The sidebar uses the same renderer as the main
 pages. The default dependency-free foundation build remains available.
 Step 5 adds [text, images and image-based signatures](ADDED-CONTENT.md) in a
-separate overlay; additions are in memory until step 6 implements saving.
+separate overlay; step 6 adds [Save As](SAVING.md) with remaining form/XFA
+validation gaps.
 
 ## Build and run
 
@@ -53,7 +54,8 @@ the viewer never runs the renderer unconfined.
 
 Opening a second document clears the old page model, cached images and pending
 requests before starting a new renderer. Password-protected documents currently
-produce an error; password entry, form editing and saving are later milestones.
+produce an error; password entry and viewer form editing are later milestones.
+Save As or Ctrl+Shift+S saves a new PDF; see [SAVING](SAVING.md).
 With additions present, open and close require confirmation before discarding.
 
 ## Architecture and limits
@@ -88,7 +90,7 @@ and real-world XFA compatibility remain later milestones.
 ## Validation
 
 `viewer-integration` uses QtTest and the actual QML scene on Qt's offscreen,
-software-rendered platform. Six integration cases verify:
+software-rendered platform. The original six integration cases verify:
 
 - All three mixed-size fixture pages render at the correct dimensions and
   colors; full-size and thumbnail center pixels match for each page.
@@ -101,6 +103,10 @@ software-rendered platform. Six integration cases verify:
 Two additional cases validate the added-content model, rendering, file pickers,
 placement, dragging, resizing, deletion, and discard protection; see
 [ADDED-CONTENT](ADDED-CONTENT.md).
+
+Five additional save cases cover export, reopen, rotated/cropped coordinates,
+save failures, revision tracking, existing forms, and the Save As file dialog.
+The combined build invokes PDF.js and the native XFA probe on saved outputs.
 
 The screenshot was visually inspected. Source fixtures are original synthetic
 GPL-3.0-only documents, not evidence of arbitrary PDF compatibility. The complete

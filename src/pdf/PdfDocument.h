@@ -6,14 +6,20 @@
 #include <QImage>
 #include <QObject>
 #include <QProcess>
+#include <QTemporaryDir>
 #include <QTimer>
 #include <QUrl>
 #include <QVariantList>
+#include <memory>
 
 // Application-facing document state. Only the worker includes PDFium headers.
 class PdfDocument : public QObject
 {
     Q_OBJECT
+    Q_PROPERTY(bool saving READ saving NOTIFY saveStateChanged)
+    Q_PROPERTY(bool dirty READ dirty NOTIFY saveStateChanged)
+    Q_PROPERTY(QString saveError READ saveError NOTIFY saveStateChanged)
+    Q_PROPERTY(QString savedPath READ savedPath NOTIFY saveStateChanged)
     Q_PROPERTY(AddedContent* additions READ additions CONSTANT)
     Q_PROPERTY(bool ready READ ready NOTIFY stateChanged)
     Q_PROPERTY(bool loading READ loading NOTIFY stateChanged)
@@ -30,6 +36,11 @@ class PdfDocument : public QObject
     explicit PdfDocument(QObject* parent = nullptr);
     ~PdfDocument() override;
     AddedContent* additions() const { return additions_; }
+    bool saving() const { return saving_; }
+    bool dirty() const { return additions_->revision() != savedRevision_; }
+    QString saveError() const { return saveError_; }
+    QString savedPath() const { return savedPath_; }
+    Q_INVOKABLE void saveAs(const QUrl& url);
     bool ready() const { return ready_; }
     bool loading() const { return loading_; }
     QString error() const { return error_; }
@@ -51,6 +62,8 @@ class PdfDocument : public QObject
     void cancelRender(quint64 id);
     qint64 workerPid() const;
   signals:
+    void saveStateChanged();
+    void saveFinished(bool success);
     void stateChanged();
     void currentPageChanged();
     void zoomChanged();
@@ -70,7 +83,16 @@ class PdfDocument : public QObject
     void receive();
     void nextRequest();
     void updateFit();
+    void finishSave(const QString& error);
     AddedContent* additions_;
+    QProcess* saveWorker_ = nullptr;
+    QTimer saveDeadline_;
+    QByteArray saveBytes_;
+    QString sourcePath_, saveDestination_, saveError_, savedPath_;
+    QStringList sandboxArgs_;
+    std::unique_ptr<QTemporaryDir> snapshot_;
+    quint64 savedRevision_ = 0, saveRevision_ = 0;
+    bool saving_ = false, xfaFull_ = false;
     QProcess* worker_ = nullptr;
     QTimer deadline_;
     QByteArray incoming_, diagnostics_;

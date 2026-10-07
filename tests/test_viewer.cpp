@@ -2,7 +2,9 @@
 #include "pdf/PdfDocument.h"
 #include "ui/AddedOverlay.h"
 #include "ui/PdfPageItem.h"
+#include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QGuiApplication>
 #include <QJsonDocument>
 #include <QPainter>
@@ -15,6 +17,7 @@
 #include <QtTest>
 #include <cmath>
 #include <csignal>
+#include <unistd.h>
 
 namespace
 {
@@ -36,7 +39,291 @@ QQuickItem* item(QQuickItem* root, const QString& name)
 class ViewerTests : public QObject
 {
     Q_OBJECT
+  private:
+    void checkIndependent(const QString& path, const QString& kind)
+    {
+#ifdef SAVE_NODE
+        QProcess reader;
+        const QString script =
+            QString(TEST_ROOT) +
+            (kind == "xfa" ? "/tools/check_xfa_with_pdfjs.mjs" : "/tools/check_saved_content.mjs");
+        reader.start(QString(SAVE_NODE), {script, QString(SAVE_PDFJS), path,
+                                          kind == "xfa" ? QString("original") : kind});
+        QVERIFY(reader.waitForFinished(20000));
+        const QByteArray diagnostics =
+            reader.readAllStandardOutput() + reader.readAllStandardError();
+        QVERIFY2(reader.exitCode() == 0 && reader.exitStatus() == QProcess::NormalExit,
+                 diagnostics.constData());
+#else
+        Q_UNUSED(path);
+        Q_UNUSED(kind);
+#endif
+    }
   private slots:
+    void saveAdditionsAndReopen()
+    {
+        PdfDocument document;
+        document.open(fixture("normal/multi-page.pdf"));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        QImage image(80, 40, QImage::Format_ARGB32);
+        image.fill(Qt::magenta);
+        const QString imagePath = dir.filePath("image.png");
+        QVERIFY(image.save(imagePath));
+        auto* content = document.additions();
+        content->addText(0, 50, 150, QString::fromUtf8("Saved résumé <literal>"));
+        content->addImage(1, 50, 150, QUrl::fromLocalFile(imagePath));
+        QImage signature(80, 40, QImage::Format_ARGB32);
+        signature.fill(Qt::transparent);
+        {
+            QPainter painter(&signature);
+            painter.fillRect(QRect(10, 8, 60, 24), Qt::magenta);
+        }
+        const QString signaturePath = dir.filePath("signature.png");
+        QVERIFY(signature.save(signaturePath));
+        content->addImage(2, 50, 150, QUrl::fromLocalFile(signaturePath), true);
+        QVERIFY(document.dirty());
+        QFile source(fixture("normal/multi-page.pdf").toLocalFile());
+        QVERIFY(source.open(QIODevice::ReadOnly));
+        const auto original = source.readAll();
+        document.saveAs(fixture("normal/multi-page.pdf"));
+        QVERIFY(!document.saveError().isEmpty());
+        QVERIFY(document.dirty());
+        document.saveAs(QUrl::fromLocalFile(dir.filePath("missing/output.pdf")));
+        QTRY_VERIFY_WITH_TIMEOUT(!document.saving(), 30000);
+        QVERIFY(!document.saveError().isEmpty());
+        QCOMPARE(content->count(), 3);
+        QVERIFY(document.ready());
+        QVERIFY(document.dirty());
+        const auto output = QUrl::fromLocalFile(dir.filePath("saved.pdf"));
+        document.saveAs(output);
+        QVERIFY(document.saving());
+        QTRY_VERIFY_WITH_TIMEOUT(!document.saving(), 30000);
+        QVERIFY2(document.saveError().isEmpty(), qPrintable(document.saveError()));
+        QVERIFY(!document.dirty());
+        QCOMPARE(content->count(), 3);
+        QVERIFY(QFileInfo::exists(output.toLocalFile()));
+        // Repeated Save As starts from the snapshot, without duplicating additions.
+        const auto second = QUrl::fromLocalFile(dir.filePath("second.pdf"));
+        document.saveAs(second);
+        QTRY_VERIFY_WITH_TIMEOUT(!document.saving(), 30000);
+        QVERIFY(document.saveError().isEmpty());
+        source.seek(0);
+        QCOMPARE(source.readAll(), original);
+        checkIndependent(second.toLocalFile(), "content");
+        if (qEnvironmentVariableIsSet("PDF_SAVE_ARTIFACT_DIR"))
+        {
+            QDir artifacts(qEnvironmentVariable("PDF_SAVE_ARTIFACT_DIR"));
+            QVERIFY(artifacts.mkpath("."));
+            QVERIFY(QFile::copy(output.toLocalFile(), artifacts.filePath("saved.pdf")));
+        }
+        document.close();
+        document.open(second);
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        QCOMPARE(content->count(), 0);
+        for (int page = 0; page < 3; ++page)
+        {
+            QSignalSpy images(&document, &PdfDocument::rendered);
+            document.requestRender(page, 600);
+            QTRY_VERIFY_WITH_TIMEOUT(!images.isEmpty(), 10000);
+            const auto rendered = qvariant_cast<QImage>(images.first()[1]);
+            const auto info = document.pages()[page].toMap();
+            const double scale = 600 / info["width"].toDouble();
+            if (page > 0)
+                QCOMPARE(rendered.pixelColor(qRound(80 * scale), qRound(170 * scale)),
+                         QColor(Qt::magenta));
+            // Existing panel remains intact outside the added object.
+            const QColor expected = page == 0   ? QColor::fromRgbF(.2, .45, .8)
+                                    : page == 1 ? QColor::fromRgbF(.2, .65, .4)
+                                                : QColor::fromRgbF(.9, .5, .16);
+            if (page == 2)
+            {
+                const auto transparent =
+                    rendered.pixelColor(qRound(55 * scale), qRound(155 * scale));
+                QVERIFY(std::abs(transparent.red() - expected.red()) <= 1);
+                QVERIFY(std::abs(transparent.green() - expected.green()) <= 1);
+                QVERIFY(std::abs(transparent.blue() - expected.blue()) <= 1);
+            }
+            const auto pixel = rendered.pixelColor(rendered.width() / 2, rendered.height() * 3 / 4);
+            QVERIFY(std::abs(pixel.red() - expected.red()) <= 1);
+            QVERIFY(std::abs(pixel.green() - expected.green()) <= 1);
+            QVERIFY(std::abs(pixel.blue() - expected.blue()) <= 1);
+        }
+        document.close();
+    }
+    void saveRotatedAndCroppedPages()
+    {
+        PdfDocument document;
+        document.open(fixture("normal/rotated-cropped.pdf"));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        QTemporaryDir dir;
+        QImage image(80, 40, QImage::Format_ARGB32);
+        image.fill(Qt::magenta);
+        const QString path = dir.filePath("image.png");
+        QVERIFY(image.save(path));
+        for (int page = 0; page < 3; ++page)
+            document.additions()->addImage(page, 35, 75, QUrl::fromLocalFile(path));
+        const auto dimensions = document.pages();
+        const QUrl output = QUrl::fromLocalFile(dir.filePath("rotated.pdf"));
+        document.saveAs(output);
+        QTRY_VERIFY_WITH_TIMEOUT(!document.saving(), 30000);
+        QVERIFY2(document.saveError().isEmpty(), qPrintable(document.saveError()));
+        document.close();
+        document.open(output);
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        QCOMPARE(document.pages(), dimensions);
+        for (int page = 0; page < 3; ++page)
+        {
+            QSignalSpy images(&document, &PdfDocument::rendered);
+            document.requestRender(page, 600);
+            QTRY_VERIFY_WITH_TIMEOUT(!images.isEmpty(), 10000);
+            const QImage rendered = qvariant_cast<QImage>(images.first()[1]);
+            const double scale = 600 / dimensions[page].toMap()["width"].toDouble();
+            QCOMPARE(rendered.pixelColor(qRound(50 * scale), qRound(90 * scale)),
+                     QColor(Qt::magenta));
+            QCOMPARE(rendered.pixelColor(qRound(20 * scale), qRound(20 * scale)),
+                     QColor(Qt::white));
+        }
+        document.close();
+    }
+    void saveSnapshotFailureAndConcurrentEdits()
+    {
+        QTemporaryDir dir;
+        const QString input = dir.filePath("input.pdf");
+        QVERIFY(QFile::copy(fixture("normal/single-page.pdf").toLocalFile(), input));
+        PdfDocument document;
+        document.open(QUrl::fromLocalFile(input));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        const QString alias = dir.filePath("alias.pdf"), hardlink = dir.filePath("hardlink.pdf");
+        QVERIFY(QFile::link(input, alias));
+        QCOMPARE(::link(input.toLocal8Bit().constData(), hardlink.toLocal8Bit().constData()), 0);
+        for (const QString& target : {alias, hardlink})
+        {
+            document.saveAs(QUrl::fromLocalFile(target));
+            QVERIFY(!document.saving());
+            QVERIFY(!document.saveError().isEmpty());
+        }
+        document.additions()->addText(0, 40, 120, "snapshot text");
+        // Replacement on disk must not change the open document's save baseline.
+        QFile changed(input);
+        QVERIFY(changed.open(QIODevice::WriteOnly | QIODevice::Truncate));
+        changed.write("externally replaced");
+        changed.close();
+        document.saveAs(QUrl::fromLocalFile(dir.filePath("copy.pdf")));
+        document.additions()->addText(0, 40, 220, "later edit");
+        QTRY_VERIFY_WITH_TIMEOUT(!document.saving(), 30000);
+        QVERIFY(document.saveError().isEmpty());
+        QVERIFY(document.dirty());
+        QCOMPARE(document.additions()->count(), 2);
+        const auto pathBefore = document.savedPath();
+        const QByteArray previousPath = qgetenv("PATH");
+        qputenv("PATH", "/nonexistent");
+        document.saveAs(QUrl::fromLocalFile(dir.filePath("failed.pdf")));
+        QTRY_VERIFY_WITH_TIMEOUT(!document.saving(), 30000);
+        qputenv("PATH", previousPath);
+        QVERIFY(!document.saveError().isEmpty());
+        QVERIFY(document.ready());
+        QCOMPARE(document.additions()->count(), 2);
+        QCOMPARE(document.savedPath(), pathBefore);
+        document.close();
+        document.open(QUrl::fromLocalFile(dir.filePath("copy.pdf")));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+    }
+    void saveExistingForms()
+    {
+        QTemporaryDir dir;
+        for (const auto& name :
+             {QString("xfa-javascript/calculation.pdf"), QString("acroform/text.pdf")})
+        {
+            PdfDocument document;
+            document.open(fixture(name));
+            QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+            if (name.startsWith("acroform"))
+                document.additions()->addText(0, 40, 220, "Added beside form");
+            const auto output = QUrl::fromLocalFile(
+                dir.filePath(name.startsWith("acroform") ? "acroform.pdf" : "xfa.pdf"));
+            document.saveAs(output);
+            QTRY_VERIFY_WITH_TIMEOUT(!document.saving(), 30000);
+            QVERIFY2(document.saveError().isEmpty(), qPrintable(document.saveError()));
+            checkIndependent(output.toLocalFile(), name.startsWith("xfa") ? "xfa" : "acroform");
+#ifdef SAVE_NODE
+            if (name.startsWith("xfa"))
+            {
+                QProcess probe;
+                probe.start(QString(SAVE_PYTHON),
+                            {QString(TEST_ROOT) + "/tools/run_xfa_probe.py", "--worker",
+                             QCoreApplication::applicationDirPath() + "/xfa-probe-worker",
+                             "--pdfium", QString(SAVE_PDFIUM), "--input", output.toLocalFile(),
+                             "--output", dir.filePath("native-roundtrip")});
+                QVERIFY(probe.waitForFinished(30000));
+                const QByteArray diagnostics =
+                    probe.readAllStandardOutput() + probe.readAllStandardError();
+                QVERIFY2(probe.exitCode() == 0 && probe.exitStatus() == QProcess::NormalExit,
+                         diagnostics.constData());
+            }
+#endif
+            const auto type = document.formType();
+            document.close();
+            document.open(output);
+            QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+            QCOMPARE(document.formType(), type);
+            QSignalSpy images(&document, &PdfDocument::rendered);
+            document.requestRender(0, 612);
+            QTRY_VERIFY_WITH_TIMEOUT(!images.isEmpty(), 10000);
+            if (name.startsWith("xfa"))
+            {
+                document.additions()->addText(0, 20, 400, "retained");
+                document.saveAs(QUrl::fromLocalFile(dir.filePath("unsupported.pdf")));
+                QVERIFY(!document.saving());
+                QVERIFY(!document.saveError().isEmpty());
+                QCOMPARE(document.additions()->count(), 1);
+                QVERIFY(document.ready());
+            }
+            if (qEnvironmentVariableIsSet("PDF_SAVE_ARTIFACT_DIR"))
+            {
+                QDir artifacts(qEnvironmentVariable("PDF_SAVE_ARTIFACT_DIR"));
+                QVERIFY(
+                    QFile::copy(output.toLocalFile(),
+                                artifacts.filePath(QFileInfo(output.toLocalFile()).fileName())));
+            }
+            document.close();
+        }
+    }
+
+    void saveDialogInteraction()
+    {
+        PdfDocument document;
+        QQmlApplicationEngine engine;
+        engine.rootContext()->setContextProperty("pdfDocument", &document);
+        engine.load(QUrl("qrc:/qml/Main.qml"));
+        QVERIFY(!engine.rootObjects().isEmpty());
+        auto* window = qobject_cast<QQuickWindow*>(engine.rootObjects().first());
+        QVERIFY(QTest::qWaitForWindowExposed(window));
+        document.open(fixture("normal/single-page.pdf"));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        document.additions()->addText(0, 50, 150, "Saved through the dialog");
+        QTemporaryDir dir;
+        auto* dialog = engine.rootObjects().first()->findChild<QObject*>("saveDialog");
+        QVERIFY(dialog);
+        dialog->setProperty("currentFolder", QUrl::fromLocalFile(dir.path()));
+        dialog->setProperty("selectedFile", QUrl::fromLocalFile(dir.filePath("saved.pdf")));
+        auto* button = item(window->contentItem(), "saveButton");
+        QVERIFY(button);
+        QTest::mouseClick(
+            window, Qt::LeftButton, Qt::NoModifier,
+            button->mapToScene({button->width() / 2, button->height() / 2}).toPoint());
+        QTRY_VERIFY(dialog->property("visible").toBool());
+        QTest::qWait(100);
+        QVERIFY(QMetaObject::invokeMethod(dialog, "accept"));
+        QTRY_VERIFY_WITH_TIMEOUT(!document.savedPath().isEmpty() || !document.saveError().isEmpty(),
+                                 30000);
+        QVERIFY2(document.saveError().isEmpty(), qPrintable(document.saveError()));
+        QVERIFY(!document.dirty());
+        QVERIFY(QFileInfo::exists(document.savedPath()));
+        QVERIFY(window->close());
+        document.close();
+    }
     void addedContentLifecycleAndRendering()
     {
         PdfDocument document;

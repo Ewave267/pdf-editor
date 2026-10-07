@@ -69,7 +69,7 @@ endif()
 
 if(PDF_EDITOR_BUILD_VIEWER)
     find_program(BWRAP_EXECUTABLE bwrap REQUIRED)
-    add_library(pdf-viewer STATIC src/pdf/PdfDocument.cpp src/pdf/PdfDocument.h
+    add_library(pdf-viewer STATIC src/pdf/PdfSave.cpp src/pdf/PdfDocument.cpp src/pdf/PdfDocument.h
         src/ui/PdfPageItem.cpp src/ui/PdfPageItem.h
         src/content/AddedContent.cpp src/content/AddedContent.h
         src/ui/AddedOverlay.cpp src/ui/AddedOverlay.h)
@@ -97,6 +97,12 @@ if(BUILD_TESTING)
         add_executable(viewer-tests tests/test_viewer.cpp qml/viewer.qrc)
         target_link_libraries(viewer-tests PRIVATE pdf-viewer Qt6::Test Qt6::QuickControls2)
         target_compile_definitions(viewer-tests PRIVATE TEST_ROOT="${CMAKE_CURRENT_SOURCE_DIR}")
+        if(PDF_EDITOR_BUILD_XFA_PROBE)
+            target_compile_definitions(viewer-tests PRIVATE
+                SAVE_NODE="${NODE_EXECUTABLE}" SAVE_PDFJS="${PDF_EDITOR_PDFJS_DIR}"
+                SAVE_PDFIUM="${PDFium_DIR}" SAVE_PYTHON="${Python3_EXECUTABLE}")
+            add_dependencies(viewer-tests xfa-probe-worker)
+        endif()
         add_dependencies(viewer-tests pdf-render-worker)
         add_test(NAME viewer-integration COMMAND viewer-tests)
         set_tests_properties(viewer-integration PROPERTIES TIMEOUT 90
