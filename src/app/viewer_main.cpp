@@ -32,8 +32,7 @@ int main(int argc, char** argv)
     PdfDocument document;
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("pdfDocument", &document);
-    const QString initialFolder =
-        qEnvironmentVariable("PDF_EDITOR_INITIAL_FOLDER", QDir::homePath());
+    const QString initialFolder = QDir::homePath();
     engine.rootContext()->setContextProperty("startupFolder", QUrl::fromLocalFile(initialFolder));
     engine.load(QUrl("qrc:/qml/Main.qml"));
     if (engine.rootObjects().isEmpty())

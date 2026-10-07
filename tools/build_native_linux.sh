@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-only
-# Run inside the RHEL 9-compatible CI build image, as the checkout's owner.
+# Run on the RHEL 9-compatible build baseline as a regular user.
 set -Eeuo pipefail
 mkdir -p -- "$HOME"
 python3 - <<'PY'

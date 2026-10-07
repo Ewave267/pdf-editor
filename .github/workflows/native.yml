@@ -21,10 +21,51 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  linux:
-    name: Linux x86_64 (RHEL 9 baseline)
+  linux-build:
+    name: Linux x86_64 build (RHEL 9 baseline)
     runs-on: ubuntu-22.04
+    container: rockylinux:9
     timeout-minutes: 180
+    steps:
+      - name: Install checkout prerequisites
+        run: dnf -y install git tar gzip ca-certificates
+      - uses: actions/checkout@v4
+      - name: Install baseline SDK and packaging dependencies
+        run: bash tools/setup_native_linux.sh
+      - uses: actions/cache@v4
+        with:
+          path: .deps/pdfium-patched
+          key: pdfium-native-rhel9-x64-${{ hashFiles('tools/build_pdfium.py', 'third_party/pdfium/patches/*.patch', 'tools/setup_native_linux.sh', 'LICENSE') }}
+      - name: Build native binaries and portable bundles against glibc 2.34
+        shell: bash
+        run: |
+          useradd --create-home native-builder
+          chown -R native-builder:native-builder "$GITHUB_WORKSPACE"
+          runuser -u native-builder -- env HOME=/home/native-builder bash tools/build_native_linux.sh
+          mkdir -p ci-linux
+          cp build-native/native-smoke ci-linux/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-validation-inputs
+          compression-level: 0
+          retention-days: 1
+          path: |
+            dist/native/*.tar.gz
+            dist/native/*.AppImage
+            dist/native/SHA256SUMS
+            ci-linux/native-smoke
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: linux-build-diagnostics
+          path: .deps/logs/
+
+  linux:
+    name: Linux x86_64 validate and package
+    needs: linux-build
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -33,26 +74,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Free build space on the ephemeral runner
-        run: |
-          sudo rm -rf /usr/local/lib/android /opt/ghc /usr/share/dotnet
-          df -h "$GITHUB_WORKSPACE"
-      - uses: actions/cache@v4
+      - uses: actions/download-artifact@v4
         with:
-          path: .deps/pdfium-patched
-          key: pdfium-native-rhel9-x64-${{ hashFiles('tools/build_pdfium.py', 'third_party/pdfium/patches/*.patch', 'packaging/native/linux-build.Dockerfile', 'LICENSE') }}
-      - name: Build native binaries and portable bundles against glibc 2.34
+          name: linux-validation-inputs
+          path: .
+      - name: Restore executable permissions
+        run: chmod +x ci-linux/native-smoke dist/native/*.AppImage
+      - name: Check relocated tarball and AppImage
         run: |
-          docker build --file packaging/native/linux-build.Dockerfile --tag pdf-editor-native-builder:ci .
-          docker run --rm --user "$(id -u):$(id -g)" \
-            --mount "type=bind,source=$PWD,target=/source" \
-            --env HOME=/tmp/pdf-editor-build-home \
-            pdf-editor-native-builder:ci bash tools/build_native_linux.sh
-      - name: Check tarball and AppImage outside the build container
-        run: |
-          python3 tools/check_native.py dist/native/*.tar.gz --smoke build-native/native-smoke \
+          python3 tools/check_native.py dist/native/*.tar.gz --smoke ci-linux/native-smoke \
             --max-glibc 2.34 --results dist/native/validation-tar
-          python3 tools/check_native.py dist/native/*.AppImage --smoke build-native/native-smoke \
+          python3 tools/check_native.py dist/native/*.AppImage --smoke ci-linux/native-smoke \
             --max-glibc 2.34 --results dist/native/validation-appimage
           dist/native/*.AppImage --appimage-extract-and-run --version
           cd dist/native
@@ -78,8 +110,8 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: linux-build-diagnostics
-          path: .deps/logs/
+          name: linux-validation-diagnostics
+          path: dist/native/validation-*/
 
   desktop:
     name: ${{ matrix.target }} ${{ matrix.cpu }}

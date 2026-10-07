@@ -4,8 +4,7 @@ Last updated: 2026-10-07
 
 ## Current state
 
-Native release work is on `native-releases`; `archive/docker-go` preserves the
-previous Docker/Go implementation at `06fa38e`. The active distribution goal is
+The distribution goal is
 a Windows executable ZIP, Linux portable tarball/AppImage, and macOS app bundle.
 Linux targets are RHEL 9, Fedora and Ubuntu 22.04/24.04+ on x86_64, using a glibc
 2.34 build baseline. This compatibility matrix is not yet validated.
@@ -13,7 +12,7 @@ Linux targets are RHEL 9, Fedora and Ubuntu 22.04/24.04+ on x86_64, using a glib
 Linux native bundling includes Qt libraries, QML/plugins, patched PDFium,
 Bubblewrap and Liberation fonts. Both formats build locally. Installed workers
 explicitly mount bundled dependency libraries and fonts read-only inside their
-existing sandbox, including Save As workers. No Go/Docker runtime is used.
+existing sandbox, including Save As workers.
 All six existing CTest suites passed. Both original tarball/AppImage payloads
 passed relocation under paths containing spaces and all 21 viewer integration
 checks, including form saves and independent reopening. Tests require running
@@ -23,14 +22,13 @@ The local Fedora previews in `dist/native-local/` require glibc 2.39 and cannot
 run on RHEL 9. Package generation defaults to refusing dependencies newer than
 glibc 2.34. The GitHub-hosted `native.yml` workflow now builds Linux inside a
 Rocky Linux 9 environment and validates the tarball and AppImage outside the
-build container. The build image was constructed and its Python 3.12, Qt 6.6.2,
+build environment. Its Python 3.12, Qt 6.6.2,
 fonts and glibc 2.34 were checked locally. The full baseline build passed all
 69 upstream XML tests. Its tarball/AppImage passed the strict glibc 2.34 gate,
 relocated GUI startup, normal-text and AcroForm/XFA edit/save/reopen checks,
 malformed-document recovery, and independent PDF.js verification of both saved
 generations. The GUI also starts with its bundled fonts in a minimal Ubuntu
-22.04 container with no Qt installed; PDF workers were tested outside Docker
-on Fedora. Clean RHEL/Fedora/Ubuntu desktop walkthroughs remain pending.
+22.04 environment with no Qt installed; PDF workers were tested on Fedora. Clean RHEL/Fedora/Ubuntu desktop walkthroughs remain pending.
 
 Windows and macOS native worker launch paths, input handling and patched PDFium
 recipes are implemented. Windows uses a zero-capability AppContainer and a
@@ -39,8 +37,7 @@ limits. Native GitHub jobs deploy Qt, run the real GUI offscreen, edit/save/reop
 normal PDFs and AcroForm/XFA fixtures twice, independently check saved fields
 with PDF.js, and upload ZIPs only after these checks pass. Windows/macOS execution
 is not locally verified and awaits the first native CI runs. Mac candidates are
-ad-hoc signed, not notarized; Windows candidates are unsigned. No GitHub release
-or image is published automatically. See [NATIVE-RELEASES](docs/NATIVE-RELEASES.md).
+ad-hoc signed, not notarized; Windows candidates are unsigned. No GitHub release is published automatically. See [NATIVE-RELEASES](docs/NATIVE-RELEASES.md).
 
 Steps 1, 2, 3, 4, 5 and 7 are implemented and verified locally. Step 2's isolated PDFium
 probe preserves exact XFA input and calculated values across two save/reopen
@@ -341,160 +338,6 @@ The original unpatched binary failed both persistence encodings. Those failures
 are documented with their source fixes in [XFA-PROBE](docs/XFA-PROBE.md). CMake
 now requires the patched package and rejects the original binary.
 
-## Native build helper — compile.sh
-
-Added an executable Fedora/RHEL-family Linux x86-64 build helper. It detects
-missing dependencies, confirms DNF installation (or accepts `--yes`), honors
-`--no-install`, and checks Qt 6.4+, CMake/C++20 and Bubblewrap before native work.
-It validates the cached PDFium manifest, patch/library hashes and runtime library
-compatibility; matching builds reuse PDFium. `--rebuild-pdfium` forces a rebuild.
-The script builds the Release desktop viewer and optionally creates the existing
-portable archive with `--package`. Repositories and security settings are not
-modified. RHEL package availability and modern toolchain requirements are reported
-as errors rather than assumed; no clean RHEL-machine test has been performed.
-
-Validation: Bash syntax and invalid-argument checks passed. Mocked dependency
-checks verified refusal in noninteractive mode, `--no-install`, and the explicit
-`--yes` DNF command/failure path without installing system packages. Local Fedora
-`--no-install --package` built the application and produced the approximately
-14 MiB archive. A subsequent `--no-install` run completed successfully and
-reported PDFium reuse. Fresh PDFium rebuilding was not repeated for this helper.
-
-## Docker host filesystem and initial file-picker folder
-
-Prepared a writable bind mount of the local host root at
-`/home/pdfeditor/host_fs`. Startup identifies the configured UID's host home from
-host `/etc/passwd` (with a unique owned `/home` directory fallback), without a
-`HOST_HOME` setting, and initializes Open, Save As and image pickers there.
-Native desktop startup defaults to the user's ordinary home. Host UID/GID still
-need to match the existing Compose configuration.
-
-The prepared Compose configuration disables SELinux labeling for this container
-instead of relabeling the host root. This gives the trusted GUI broad host-file
-access under its UID; PDF workers retain their own isolated filesystems and
-syscall restrictions. The Docker-compatible empty `/proc` and essential-device
-configuration is applied consistently to workers and the development probe.
-
-Host-home detection checks passed (spaces, invalid paths, directory-service
-fallback and ambiguous accounts); the file-picker regression passed. Native and
-Ubuntu Docker application builds succeeded; the full host CTest suite passed
-6/6 in 109.73 seconds. Automatic approval review rejected
-starting the writable host-root/SELinux-disabled deployment due to broad host
-exposure; explicit approval has been requested. At that point the existing container had not
-been replaced. A later user-launched deployment now has the requested root mount
-and was verified by read-only Docker inspection; browser scaling checks passed.
-
-## Docker container name
-
-Compose now names the container `pdf-editor`, allowing `docker start pdf-editor`
-and `docker stop pdf-editor`. The existing running container was renamed without
-recreation, preserving its mounts and security configuration. A later user-launched
-recreation applied the host-root mount.
-
-## Docker browser scaling
-
-Changed the noVNC landing-page default from remote resizing to local scaling.
-The fixed Xvfb desktop now fits the browser viewport while preserving its aspect
-ratio. Existing deployments can use
-`http://localhost:8080/vnc.html?autoconnect=true&resize=scale` immediately without
-recreation. Double-clicking the app title bar maximizes the Qt window, and the
-noVNC fullscreen button / Firefox F11 removes browser chrome.
-
-Headless browser checks passed against the running container at 1280x720 and
-1920x1080: the rendered desktop fits without overflow and adjusts when the
-browser viewport changes. The updated image uses this setting by default on
-future creation; the running container was not replaced for this change.
-
-## Docker lifecycle helper — docker.sh
-
-Added executable start/stop/rebuild commands, plus build/status/logs/url and help.
-The helper works from any directory, prints the scaling-enabled URL with the
-published port, preserves existing configuration on start, and waits for health.
-Rebuild validates cached native package hashes/version, builds the configured
-image, then recreates the desktop session. A source-build option is available.
-Build alone keeps the running session intact. Host files persist, but unsaved
-edits must be saved before rebuilding.
-
-Validation: Bash syntax and mocked lifecycle/error checks passed, including
-first creation, stop, cached/source rebuild selection, cache integrity mismatch,
-paths with spaces, custom ports, unhealthy startup and missing Docker access.
-Live status and already-running start passed without disrupting the user session.
-The real `build` path also passed, reused the native package, built the image and
-printed the expected browser URL. No live stop/recreation was performed for this
-helper validation, preserving the user's active document session.
-
-## Fullscreen application startup
-
-The desktop viewer now calls `showFullScreen()` on startup, filling the virtual
-Docker desktop automatically. noVNC continues scaling the desktop to the browser;
-Firefox F11 or the noVNC fullscreen button can also fill the physical screen.
-The browser walkthrough now maps clicks through the fullscreen canvas and fitted
-PDF page instead of the old window's fixed position.
-
-Validation: the Ubuntu image compiled successfully and an isolated test container
-showed a 1600x1000 application at desktop origin (0,0). The complete browser
-walkthrough passed for AcroForm and XFA editing, checkbox/radio/dropdown selection,
-clipboard paste, Save As and reopening; four outputs passed independent PDF.js
-checks. Syntax/formatting checks passed. The user's live PDF session was not
-recreated; save edits and use `./docker.sh rebuild` to apply the updated image.
-
-## Docker Hub namespace correction
-
-The confirmed Docker Hub username is `ewave267`. Compose defaults, the environment
-example, publishing workflow and deployment instructions now use
-`ewave267/pdf-form-editor`. The existing local image is retagged for that repository
-without recompilation or changes to the running container. No image was pushed.
-
-## Docker Hub repository name
-
-The deployment repository is now `ewave267/pdf-editor`, reflecting support for
-ordinary PDF additions as well as forms. Compose, the environment example, the
-publishing workflow and documentation use this name. The existing image is
-retagged without rebuilding; the running container is unchanged. No push was
-performed.
-
-## Automatic Docker startup
-
-Compose now uses `restart: unless-stopped`. The existing container can adopt this
-policy through `docker update` without recreation or loss of its current session.
-Docker restarts the app after process exit or daemon restart; explicitly stopping
-the container keeps it stopped. The Docker daemon must itself start at boot.
-All runtime dependencies remain in the image, while the initial host ports,
-mounts and worker-enabling seccomp profile remain creation-time configuration.
-
-## Standalone Go launcher
-
-Implemented a compiled launcher with start/stop/status/logs/url/update/build,
-optional browser opening and automatic host-home sharing. Users need Docker and
-a browser, but no Go, Qt, Python, Compose or source checkout. The launcher embeds
-the existing reviewed seccomp profile and notices, extracts them to its private
-cache, and uses Docker directly. Creation retains non-root/capability/seccomp
-boundaries, a read-only runtime, localhost publishing and automatic restart.
-Linux host-root sharing remains an explicit option; existing Compose sessions are
-preserved on start and not replaced by launcher update. Remote/TCP creation,
-foreign-container replacement and unapproved ARM emulation are refused.
-
-The developer archive helper cross-builds six Linux/Windows/macOS amd64/arm64
-executables with CGO disabled, packages notices, exports launcher source and
-writes ZIP checksums. A Launcher Actions workflow tests and creates artifacts;
-no release, image push or remote workflow run was performed.
-
-Validation: 12 Go tests and go vet passed. All six targets cross-compiled. The
-Linux executable is statically linked and ran with no installed Go. It created
-an isolated healthy container, printed its actual port URL, and passed real
-stop/status/restart/url checks. Saved outputs remained valid after restarting.
-All archive checksums/ZIP contents passed verification, and the standalone source
-ZIP passed Go tests after extraction. Browser editing, checkbox/radio/dropdown selection,
-clipboard paste, saves and reopening passed for AcroForm and XFA; four saved
-outputs passed independent PDF.js checks. The user's original container was not
-recreated or stopped. New docs: [LAUNCHER](docs/LAUNCHER.md).
-
-Docker Desktop, ARM/emulation, OS signing and clean second-machine compatibility
-remain unvalidated. Native ARM PDFium/image support is not implemented; ARM
-launchers require an explicit experimental emulation flag. Cross-built binaries
-are not evidence that those editor runtimes work. Corresponding-source release
-work for the separate editor image remains tracked in deployment/release docs.
-
 ## Remaining MVP steps
 
 | Step | Status | Next milestone |
@@ -509,3 +352,13 @@ work for the separate editor image remains tracked in deployment/release docs.
 
 Update this file as milestones land, including checks actually run and remaining
 limitations. Do not infer broad PDF compatibility from the synthetic probe.
+
+## Repository cleanup — 2026-10-07
+
+Removed obsolete deployment files, launcher sources, browser tests and their
+workflows. Native artifact builds use a Rocky Linux 9 GitHub Actions build job
+and a separate Ubuntu validation job. Editor code, native packaging, dependency
+pins, regression tests and development documentation remain. The file picker
+starts in the current user's home directory. The editor rebuild, Actionlint
+checks for all three workflows, shell syntax and whitespace checks passed.
+The updated workflow awaits its first GitHub run.

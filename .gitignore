@@ -14,8 +14,7 @@ Thumbs.db
 
 /dist/
 
-# Local deployment settings and user documents
+# Local settings and user documents
 .env
 .env.*
-!.env.docker.example
 /documents/

@@ -1,9 +1,7 @@
 # Native release candidates
 
-These packages run the Qt desktop editor directly. End users do not need Go,
-Docker, a browser, a compiler or a separate Qt installation. The earlier
-Docker/Go implementation is preserved on `archive/docker-go`; native work is
-on `native-releases`.
+These packages run the Qt desktop editor directly, with bundled runtime
+dependencies. End users do not need a compiler or a separate Qt installation.
 
 ## Build and download on GitHub
 
@@ -11,10 +9,11 @@ Push the repository, including `.github/workflows/native.yml`, to GitHub on
 `native-releases`, `main` or `master`. Relevant code changes trigger **Native
 release candidates** automatically. You can also select **Actions → Native
 release candidates → Run workflow**, choose the branch and start it manually.
-No self-hosted runner, Docker Hub account or signing secrets are required.
+No self-hosted runner or signing secrets are required.
 
 Wait for the jobs to finish, then open the workflow run and download its
-**Artifacts**. GitHub wraps each artifact in an extra ZIP; extract that first
+**Artifacts**. Choose a `pdf-editor-*` artifact; `linux-validation-inputs`
+is temporary tooling for the validation job. GitHub wraps each artifact in an extra ZIP; extract that first
 to find the actual application archive and `SHA256SUMS`.
 
 | GitHub artifact | Application package | Start |
@@ -34,8 +33,8 @@ runs before their runtime behavior can be confirmed.
 ## Linux compatibility and usage
 
 Linux binaries and bundled dependencies are built in a Rocky Linux 9 builder
-with glibc 2.34. The builder runs on GitHub's Ubuntu runner; Docker is used only
-to build, never to run the downloaded application. Packaging rejects ELF
+with glibc 2.34 in a GitHub Actions build job. A separate Ubuntu job validates
+the resulting native packages. Packaging rejects ELF
 dependencies requiring a newer glibc and records the minimum in
 `release-info.json`.
 
@@ -112,15 +111,15 @@ source PDF stays unchanged, and checks malformed-document recovery. Pinned
 PDF.js independently checks both saved form generations. The helper is removed
 from Windows/Mac ZIPs and is not included in Linux archives.
 
-Linux tarball and AppImage are extracted and validated separately, outside
-the build container. Checksums and the glibc baseline are checked. Windows/Mac
+Linux tarball and AppImage are transferred to the Ubuntu validation job and
+extracted and checked separately. Checksums and the glibc baseline are checked. Windows/Mac
 packaging also rejects direct worker execution outside its sandbox. Existing
 Linux hostile-document/regression suites remain available via CTest.
 
 Local validation built the glibc 2.34 candidates, passed all 69 PDFium XML tests,
 and passed both relocated formats with independent PDF.js checks. GUI startup
 with bundled libraries/fonts also passed on minimal Ubuntu 22.04 without Qt.
-Worker tests ran outside Docker on Fedora; Windows/Mac native CI and the full
+Worker tests ran on Fedora; Windows/Mac native CI and the full
 clean-desktop compatibility matrix are still pending.
 
 Offscreen checks do not establish usability on a clean desktop. Download the
@@ -130,20 +129,13 @@ dynamic XFA documents with added content cannot yet be saved.
 
 ## Reproduce Linux packaging locally
 
-On a developer machine with Docker, the same baseline build can be run with:
+On a Rocky Linux 9 development machine or VM, install the baseline build
+requirements, then build as a regular user:
 
 ```sh
-docker build -f packaging/native/linux-build.Dockerfile -t pdf-editor-native-builder .
-docker run --rm --user "$(id -u):$(id -g)" \
-  --mount "type=bind,source=$PWD,target=/source" \
-  --env HOME=/tmp/pdf-editor-build-home \
-pdf-editor-native-builder bash tools/build_native_linux.sh
+sudo bash tools/setup_native_linux.sh
+bash tools/build_native_linux.sh
 ```
-
-For a local SELinux host such as Fedora, use
-`-v "$PWD:/source:Z"` instead of `--mount` in a dedicated build checkout to
-give that checkout a private container label. This is unnecessary on GitHub's
-Ubuntu runner.
 
 This writes `build-native/`, `.deps/` and `dist/native/` in the checkout. Start
 with a clean checkout or remove incompatible local build products first; do

@@ -1,4 +1,4 @@
-# PDF Form Editor
+# PDF Editor
 
 An open-source desktop application for completing PDF forms and adding text,
 signatures, and annotations, entirely offline.
@@ -30,16 +30,11 @@ Linux runners, then uploads downloadable artifacts. Push this branch to GitHub
 and open **Actions → Native release candidates**. See the linked instructions
 for downloading and running each package. Windows and macOS are new ports; their
 first native CI runs are still pending.
-The previous Docker/Go implementation is preserved on `archive/docker-go`.
 
 Linux release targets are RHEL 9, Fedora, and Ubuntu 22.04/24.04 or newer.
 The builder must bundle dependencies compiled against glibc 2.34 or older;
 the packaging tool enforces this baseline. Local Fedora previews require newer
 glibc and do not establish RHEL compatibility.
-
-The earlier [Docker deployment](docs/DOCKER-DEPLOYMENT.md) and
-[Go launcher](docs/LAUNCHER.md) remain available on the archive branch. Neither
-is required for the native packages.
 
 ## Build the native desktop app (developers)
 
@@ -117,7 +112,6 @@ XFA; broader form compatibility belongs to the later MVP steps.
 - `src/app/`: application entry point and lifecycle.
 - `src/pdf/`: document interface, isolated renderer and XFA probe.
 - `src/content/`: application-owned text, image, and signature objects.
-- `src/document/`: reserved for future document workflow models.
 - `src/ui/` and `qml/`: page painting and the Qt Quick viewer shell.
 - `tests/pdfs/`: compatibility corpus, organized by document type.
 - `docs/adr/`: architecture decision records.
