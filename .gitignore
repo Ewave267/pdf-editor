@@ -1,0 +1,10 @@
+/build/
+/build-*/
+/out/
+/CMakeUserPresets.json
+/.cache/
+/compile_commands.json
+*.user
+*.swp
+.DS_Store
+Thumbs.db
