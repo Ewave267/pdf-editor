@@ -63,6 +63,23 @@ def apply_patch(patch, directory, environment):
             raise RuntimeError(f"patch does not match the pinned source: {patch}\n{details}")
 
 
+def setup_windows_git(environment):
+    # Pinned depot_tools' git_cache invokes git.bat even when Git for Windows
+    # already provides git.exe. DEPOT_TOOLS_UPDATE=0 skips the bootstrap that
+    # normally creates that wrapper. Keep our shim outside the pinned checkout.
+    git_exe = shutil.which("git.exe", path=environment["PATH"])
+    if git_exe is None:
+        raise RuntimeError("Windows dependency sync requires Git for Windows (git.exe)")
+    wrappers = DEPS / "windows-tools"
+    wrappers.mkdir(parents=True, exist_ok=True)
+    git_wrapper = wrappers / "git.bat"
+    # The final quoted line also lets depot_tools' git_common resolve git.exe
+    # directly, avoiding a batch process for each normal Git operation.
+    git_wrapper.write_bytes(f'@echo off\r\n"{git_exe}" %*\r\n'.encode("utf-8"))
+    environment["PATH"] = str(wrappers) + os.pathsep + environment["PATH"]
+    run([str(git_wrapper), "--version"], ROOT, environment, "windows-git-preflight")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--jobs", type=int, default=4)
@@ -95,6 +112,8 @@ def main():
     checkout("https://github.com/bblanchon/pdfium-binaries.git",
              DISTRIBUTOR_REVISION, distributor, environment)
     environment["PATH"] = str(depot) + os.pathsep + environment["PATH"]
+    if target_os == "win":
+        setup_windows_git(environment)
     gclient = [str(depot / "gclient")]
     if target_os == "win":
         gclient = ["cmd.exe", "/d", "/c", str(depot / "gclient.bat")]

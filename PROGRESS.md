@@ -362,3 +362,15 @@ pins, regression tests and development documentation remain. The file picker
 starts in the current user's home directory. The editor rebuild, Actionlint
 checks for all three workflows, shell syntax and whitespace checks passed.
 The updated workflow awaits its first GitHub run.
+
+## Windows dependency sync fix — 2026-10-07
+
+The first Windows job failed before compilation because pinned depot_tools
+invokes `git.bat`, while the runner supplies `git.exe`. Disabling depot_tools
+auto-updates skips its normal Git wrapper bootstrap. The build recipe now
+generates a quoted wrapper under `.deps/windows-tools`, adds it to the build
+PATH, and runs a logged Git preflight before dependency sync. The pinned
+upstream checkout is unchanged. Local checks passed Python compilation, wrapper
+resolution through the pinned depot_tools parser (including a Git path with
+spaces), missing-Git rejection, and whitespace validation. Windows execution
+awaits the next GitHub run.
