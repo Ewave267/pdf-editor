@@ -91,7 +91,7 @@ int main(int argc, char** argv)
         return 1;
     }
     if (auto* window = qobject_cast<QQuickWindow*>(engine.rootObjects().first()))
-        window->showFullScreen();
+        window->showNormal();
     const auto arguments = app.arguments();
     if (arguments.size() == 2)
         document.open(QUrl::fromLocalFile(arguments[1]));

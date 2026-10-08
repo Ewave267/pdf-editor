@@ -2,6 +2,10 @@
 
 Last updated: 2026-10-08
 
+Desktop startup now opens a normal window instead of full screen. The window
+explicitly requests the native title bar, minimize/maximize and close controls;
+closing continues to use the existing unsaved-change confirmation.
+
 Windows desktop follow-up: a user reports that Explorer launch exits while
 PowerShell launch works. Added early Qt startup logging under
 `%LOCALAPPDATA%\PDF Editor` and desktop error dialogs for Qt fatal/interface

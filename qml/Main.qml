@@ -13,6 +13,8 @@ ApplicationWindow {
     minimumWidth: 700
     minimumHeight: 480
     visible: true
+    flags: Qt.Window | Qt.WindowTitleHint | Qt.WindowSystemMenuHint
+           | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint | Qt.WindowCloseButtonHint
     title: pdfDocument.fileName ? pdfDocument.fileName + " — PDF Form Editor" : "PDF Form Editor"
     color: "#e9edf2"
     font.family: "Sans Serif"
