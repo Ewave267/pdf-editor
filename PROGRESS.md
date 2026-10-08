@@ -6,8 +6,9 @@ Last updated: 2026-10-08
 
 The distribution goal is
 a Windows executable ZIP, Linux portable tarball/AppImage, and macOS app bundle.
-Linux targets are RHEL 9, Fedora and Ubuntu 22.04/24.04+ on x86_64, using a glibc
-2.34 build baseline. This compatibility matrix is not yet validated.
+Linux targets are RHEL 9, Fedora and Ubuntu 22.04/24.04+ on x86_64 and aarch64,
+using a glibc 2.34 build baseline. ARM is newly added and its first native CI
+validation is pending. Clean-desktop compatibility walkthroughs remain pending.
 
 Linux native bundling includes Qt libraries, QML/plugins, patched PDFium,
 Bubblewrap and Liberation fonts. Both formats build locally. Installed workers
@@ -535,3 +536,11 @@ First ARM run 37785849699 reached sysroot provisioning but Rocky mirrorlist
 resolution failed because `$rltype` was undefined in the empty install root.
 Copy the baseline repository variable directories into the ARM sysroot before
 installing packages. Retry pending.
+
+ARM retry 37787302766 compiled 4,802 steps but failed at the final link because
+GCC startup objects and link libraries were absent from the sysroot. Install
+ARM gcc/gcc-c++ and check the required startup/runtime files before compiling.
+A local link test with the pinned compiler produced a valid AArch64 ELF.
+Added architecture selection and desktop opt-out for manual workflow runs;
+`[linux-aarch64]` commits retry ARM without canceling or repeating other targets.
+Mac ARM and integration passed in the preceding run. ARM validation pending.

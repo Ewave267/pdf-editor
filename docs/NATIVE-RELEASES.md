@@ -9,7 +9,10 @@ Push the repository, including `.github/workflows/native.yml`, to GitHub on
 `native-releases`, `main` or `master`. Relevant code changes trigger **Native
 release candidates** automatically. You can also select **Actions → Native
 release candidates → Run workflow**, choose the branch and start it manually.
-No self-hosted runner or signing secrets are required.
+Manual runs can select `all`, `x86_64` or `aarch64` Linux architectures and
+turn Windows/macOS builds off. A commit marked `[linux-aarch64]` runs only ARM
+Linux, preserving other architecture runs already in progress. No self-hosted
+runner or signing secrets are required.
 
 Wait for the jobs to finish, then open the workflow run and download its
 **Artifacts**. Choose a `pdf-editor-*` artifact; `linux-validation-inputs-*` and `pdfium-linux-arm64-build-inputs`
@@ -63,6 +66,9 @@ The targets are x86_64 and aarch64 (64-bit ARM) RHEL 9, Fedora and Ubuntu 22.04/
 graphical desktop session. This baseline improves portability; it does not
 replace testing on those desktops. Older glibc systems, 32-bit ARM and musl
 systems such as Alpine are outside this candidate's target.
+
+Check `uname -m` to choose the matching Linux artifact. The examples below use
+`x86_64`; replace that filename suffix with `aarch64` on 64-bit ARM Linux.
 
 ```sh
 tar -xzf pdf-editor-0.1.0-rc.1-linux-x86_64.tar.gz
@@ -163,6 +169,19 @@ requirements, then build as a regular user:
 ```sh
 sudo bash tools/setup_native_linux.sh
 bash tools/build_native_linux.sh
+```
+
+On aarch64, first provide the ARM PDFium dependency from the workflow's
+`pdfium-linux-arm64-build-inputs` artifact in `.deps/pdfium-patched/`.
+The workflow handles this automatically. Bootstrapping PDFium uses the
+x86_64 cross-builder because Chromium's pinned Linux compiler is x86_64;
+the editor itself builds and runs on native ARM.
+Before building locally with those intermediate inputs, run their XML tests
+on the ARM machine:
+
+```sh
+chmod +x .deps/pdfium-patched/build-tests/pdfium_unittests
+.deps/pdfium-patched/build-tests/pdfium_unittests --gtest_filter='CFXXML*'
 ```
 
 This writes `build-native/`, `.deps/` and `dist/native/` in the checkout. Start

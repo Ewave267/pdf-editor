@@ -16,7 +16,20 @@ done
 dnf -y --forcearch=aarch64 --installroot="$sysroot" --releasever=9 \
     --setopt=reposdir=/etc/yum.repos.d --setopt=module_platform_id=platform:el9 \
     --setopt=install_weak_deps=False --setopt=tsflags=noscripts \
-    install glibc-devel libstdc++-devel
+    install gcc gcc-c++ glibc-devel libstdc++-devel
+# Clang discovers the target GCC installation through these files. Catch an
+# incomplete sysroot before the lengthy PDFium/V8 compilation reaches its link.
+compiler_dirs=("$sysroot"/usr/lib/gcc/aarch64-redhat-linux/*)
+if (( ${#compiler_dirs[@]} != 1 )); then
+    echo 'Cannot locate the ARM GCC startup/runtime directory.' >&2
+    exit 1
+fi
+for file in crtbeginS.o crtendS.o libgcc.a libgcc_s.so; do
+    [[ -e "${compiler_dirs[0]}/$file" ]] || {
+        echo "ARM sysroot is missing $file" >&2
+        exit 1
+    }
+done
 useradd --create-home native-builder
 chown -R native-builder:native-builder "$PWD"
 runuser -u native-builder -- env HOME=/home/native-builder \

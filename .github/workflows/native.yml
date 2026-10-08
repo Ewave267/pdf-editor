@@ -2,6 +2,16 @@ name: Native release candidates
 
 on:
   workflow_dispatch:
+    inputs:
+      linux_arch:
+        description: Linux architectures to build
+        type: choice
+        options: [all, x86_64, aarch64]
+        default: all
+      build_desktop:
+        description: Also build Windows and macOS
+        type: boolean
+        default: true
   push:
     branches: [native-releases, main, master]
     paths:
@@ -17,12 +27,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: native-${{ github.ref }}
+  group: native-${{ github.ref }}-${{ inputs.linux_arch || (contains(github.event.head_commit.message, '[linux-aarch64]') && 'aarch64' || 'all') }}
   cancel-in-progress: true
 
 jobs:
   pdfium-arm64:
     name: Cross-build ARM64 PDFium for native validation
+    if: inputs.linux_arch != 'x86_64'
     runs-on: ubuntu-22.04
     container: rockylinux:9
     timeout-minutes: 360
@@ -60,13 +71,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - arch: x86_64
-            cpu: x64
-            runner: ubuntu-22.04
-          - arch: aarch64
-            cpu: arm64
-            runner: ubuntu-22.04-arm
+        include: ${{ fromJSON((inputs.linux_arch == 'aarch64' || contains(github.event.head_commit.message, '[linux-aarch64]')) && '[{"arch":"aarch64","cpu":"arm64","runner":"ubuntu-22.04-arm"}]' || inputs.linux_arch == 'x86_64' && '[{"arch":"x86_64","cpu":"x64","runner":"ubuntu-22.04"}]' || '[{"arch":"x86_64","cpu":"x64","runner":"ubuntu-22.04"},{"arch":"aarch64","cpu":"arm64","runner":"ubuntu-22.04-arm"}]') }}
     runs-on: ${{ matrix.runner }}
     container: rockylinux:9
     timeout-minutes: 180
@@ -135,11 +140,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - arch: x86_64
-            runner: ubuntu-22.04
-          - arch: aarch64
-            runner: ubuntu-22.04-arm
+        include: ${{ fromJSON((inputs.linux_arch == 'aarch64' || contains(github.event.head_commit.message, '[linux-aarch64]')) && '[{"arch":"aarch64","runner":"ubuntu-22.04-arm"}]' || inputs.linux_arch == 'x86_64' && '[{"arch":"x86_64","runner":"ubuntu-22.04"}]' || '[{"arch":"x86_64","runner":"ubuntu-22.04"},{"arch":"aarch64","runner":"ubuntu-22.04-arm"}]') }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     steps:
@@ -191,6 +192,7 @@ jobs:
 
   desktop:
     name: ${{ matrix.target }} ${{ matrix.cpu }}
+    if: (github.event_name != 'workflow_dispatch' || inputs.build_desktop) && !contains(github.event.head_commit.message, '[linux-aarch64]')
     strategy:
       fail-fast: false
       matrix:
