@@ -232,6 +232,14 @@ def main():
             verify_worker_loader(worker, env, smoke_results)
             verify_gui(binary, env)
             run_smoke(test, args.fixtures.resolve(), smoke_results, env)
+            if args.target == "windows":
+                # Hosted runners are administrators. Also exercise the logon
+                # station route used by standard desktop accounts, including
+                # repeated opens and the existing-station case.
+                standard_results = smoke_results / "logon-station"
+                standard_results.mkdir(exist_ok=True)
+                standard_env = dict(env, PDF_EDITOR_TEST_LOGON_STATION="1")
+                run_smoke(test, args.fixtures.resolve(), standard_results, standard_env)
         except Exception:
             if args.target == "macos":
                 for _ in range(5):

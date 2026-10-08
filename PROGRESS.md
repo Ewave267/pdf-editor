@@ -4,6 +4,15 @@ Last updated: 2026-10-08
 
 ## Windows portable startup and artifact layout
 
+User diagnostics identified renderer startup failure with Windows error 183.
+The standard-user automatic window station name is shared per logon session;
+`CWF_CREATE_ONLY` incorrectly rejected an existing station. The fallback now
+opens that station, preserves its ACL while granting the AppContainer only
+inspection rights, and creates a unique secured desktop per worker. Windows
+packaging repeats native smoke validation using the logon-station route because
+hosted runners normally exercise the administrator route. Native verification
+is pending; the Linux host cannot execute the Windows broker.
+
 Inspected the Windows artifact from successful run 37811582049: both missing
 modules actually exist under its bundled `qml` directory. Added an explicit
 executable-relative Windows QML import path and portable `qt.conf` so startup

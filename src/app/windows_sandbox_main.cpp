@@ -168,12 +168,43 @@ struct PrivateDesktop
         LocalMemory security{descriptor};
         SECURITY_ATTRIBUTES access{sizeof(SECURITY_ATTRIBUTES), descriptor, FALSE};
         const std::wstring requested = std::wstring(L"PdfEditor-") + identity;
-        station.value =
-            CreateWindowStationW(requested.c_str(), CWF_CREATE_ONLY, WINSTA_ALL_ACCESS, &access);
+        wchar_t testLogonStation[2]{};
+        const bool useLogonStation =
+            GetEnvironmentVariableW(L"PDF_EDITOR_TEST_LOGON_STATION", testLogonStation, 2) > 0;
+        if (!useLogonStation)
+            station.value = CreateWindowStationW(requested.c_str(), CWF_CREATE_ONLY,
+                                                 WINSTA_ALL_ACCESS, &access);
         // Unprivileged users may only request an automatically named station.
-        if (!station.value && GetLastError() == ERROR_ACCESS_DENIED)
-            station.value =
-                CreateWindowStationW(nullptr, CWF_CREATE_ONLY, WINSTA_ALL_ACCESS, &access);
+        if (useLogonStation || (!station.value && GetLastError() == ERROR_ACCESS_DENIED))
+        {
+            trace("using standard-user logon window station");
+            station.value = CreateWindowStationW(nullptr, 0, WINSTA_ALL_ACCESS, &access);
+            require(station.value != nullptr, "Cannot open logon window station");
+            // The automatic name is shared by this logon session. Its supplied
+            // security descriptor is ignored when it already exists. Preserve
+            // its ACL and grant only station inspection, never desktop creation
+            // or clipboard access. The worker gets a unique, low-integrity
+            // desktop below with its own explicit security descriptor.
+            PACL oldAcl = nullptr, newAcl = nullptr;
+            PSECURITY_DESCRIPTOR existing = nullptr;
+            DWORD result =
+                GetSecurityInfo(station.value, SE_WINDOW_OBJECT, DACL_SECURITY_INFORMATION, nullptr,
+                                nullptr, &oldAcl, nullptr, &existing);
+            require(result == ERROR_SUCCESS, "Cannot inspect logon station permissions");
+            LocalMemory existingSecurity{existing};
+            EXPLICIT_ACCESSW grant{};
+            grant.grfAccessPermissions = WINSTA_READATTRIBUTES | WINSTA_ENUMDESKTOPS;
+            grant.grfAccessMode = GRANT_ACCESS;
+            grant.grfInheritance = NO_INHERITANCE;
+            grant.Trustee.TrusteeForm = TRUSTEE_IS_SID;
+            grant.Trustee.ptstrName = static_cast<LPWSTR>(appSid);
+            result = SetEntriesInAclW(1, &grant, oldAcl, &newAcl);
+            LocalMemory mergedSecurity{newAcl};
+            require(result == ERROR_SUCCESS, "Cannot merge logon station permissions");
+            result = SetSecurityInfo(station.value, SE_WINDOW_OBJECT, DACL_SECURITY_INFORMATION,
+                                     nullptr, nullptr, newAcl, nullptr);
+            require(result == ERROR_SUCCESS, "Cannot grant logon station inspection");
+        }
         require(station.value != nullptr, "Cannot create private window station");
         const auto original = GetProcessWindowStation();
         struct Restore
@@ -182,8 +213,9 @@ struct PrivateDesktop
             ~Restore() { SetProcessWindowStation(original); }
         } restore{original};
         require(SetProcessWindowStation(station.value), "Cannot select private window station");
+        const std::wstring desktopName = std::wstring(L"Renderer-") + identity;
         desktop.value =
-            CreateDesktopW(L"Renderer", nullptr, nullptr, 0,
+            CreateDesktopW(desktopName.c_str(), nullptr, nullptr, 0,
                            STANDARD_RIGHTS_REQUIRED | DESKTOP_READOBJECTS | DESKTOP_CREATEWINDOW |
                                DESKTOP_CREATEMENU | DESKTOP_HOOKCONTROL | DESKTOP_JOURNALRECORD |
                                DESKTOP_JOURNALPLAYBACK | DESKTOP_ENUMERATE | DESKTOP_WRITEOBJECTS |
@@ -194,7 +226,7 @@ struct PrivateDesktop
         require(GetUserObjectInformationW(station.value, UOI_NAME, stationName, sizeof(stationName),
                                           &size),
                 "Cannot read private window station name");
-        name = std::wstring(stationName) + L"\\Renderer";
+        name = std::wstring(stationName) + L"\\" + desktopName;
     }
 };
 struct Attributes
