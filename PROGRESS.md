@@ -2,6 +2,20 @@
 
 Last updated: 2026-10-08
 
+## Windows portable startup and artifact layout
+
+Inspected the Windows artifact from successful run 37811582049: both missing
+modules actually exist under its bundled `qml` directory. Added an explicit
+executable-relative Windows QML import path and portable `qt.conf` so startup
+does not depend on a terminal's directory or installed Qt environment. Packaging
+checks required module manifests and starts the GUI from outside its directory.
+
+Windows Actions artifacts now upload the application contents directly, with
+`pdf-editor.exe` at the archive root. The standalone Windows ZIP also omits the
+extra version directory. Linux/macOS archive handling is unchanged. Local build
+and archive-layout inspection passed; native Windows runtime verification remains
+the responsibility of the next Windows CI run.
+
 ## Roadmap Phase 3 — form experience
 
 Implemented the form toolbar, native field highlighting and AcroForm outlines

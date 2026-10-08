@@ -297,6 +297,13 @@ jobs:
             node tools/check_form_controls.mjs tests/reader/node_modules/pdfjs-dist "dist/native/validation/xfa-$generation.pdf" xfa
           done
       - uses: actions/upload-artifact@v6
+        if: matrix.target == 'windows'
+        with:
+          name: pdf-editor-${{ matrix.target }}-${{ matrix.cpu }}
+          path: dist/native/windows/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v6
+        if: matrix.target != 'windows'
         with:
           name: pdf-editor-${{ matrix.target }}-${{ matrix.cpu }}
           path: |

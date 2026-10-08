@@ -77,6 +77,11 @@ int main(int argc, char** argv)
                                             "Provided by the application");
     PdfDocument document;
     QQmlApplicationEngine engine;
+#ifdef Q_OS_WIN
+    // Portable deployment must not depend on Explorer's working directory
+    // or a terminal's Qt SDK environment.
+    engine.addImportPath(QCoreApplication::applicationDirPath() + "/qml");
+#endif
     engine.rootContext()->setContextProperty("pdfDocument", &document);
     const QString initialFolder = QDir::homePath();
     engine.rootContext()->setContextProperty("startupFolder", QUrl::fromLocalFile(initialFolder));

@@ -24,7 +24,8 @@ def run(arguments, **kwargs):
 def verify_gui(binary, environment):
     # A real QML window must survive startup, even when rendered offscreen.
     with tempfile.TemporaryFile() as diagnostics:
-        process = subprocess.Popen([str(binary)], env=environment, stdout=diagnostics, stderr=diagnostics)
+        process = subprocess.Popen([str(binary)], cwd=binary.parent.parent, env=environment,
+                                   stdout=diagnostics, stderr=diagnostics)
         exited = None
         try:
             exited = process.wait(timeout=4)
@@ -134,6 +135,12 @@ def main():
             for executable in (binary, worker):
                 run([deploy, "--release", "--no-compiler-runtime", "--qmldir", ROOT / "qml",
                      "--dir", root, executable])
+            # Anchor Qt's deployment paths beside the executable rather than
+            # allowing a runner's installed SDK to satisfy missing imports.
+            (root / "qt.conf").write_text("[Paths]\nPrefix=.\nPlugins=.\nQmlImports=qml\n")
+            for module in ("QtQuick", "QtQuick/Controls", "QtQuick/Layouts", "QtQuick/Dialogs"):
+                if not (root / "qml" / module / "qmldir").is_file():
+                    raise RuntimeError(f"Missing deployed QML module: {module}")
             # Qt otherwise deploys a VC redistributable installer. A portable
             # ZIP needs the redistributable CRT DLLs beside its executables.
             redist = os.environ.get("VCToolsRedistDir")
@@ -249,7 +256,10 @@ def main():
             with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as output:
                 for file in sorted(root.rglob("*")):
                     if file.is_file():
-                        output.write(file, Path(name) / file.relative_to(root))
+                        output.write(file, file.relative_to(root))
+            # Actions creates its own ZIP. Upload these contents directly so
+            # users extract once and immediately see pdf-editor.exe.
+            shutil.copytree(root, args.output / "windows", dirs_exist_ok=True)
         (args.output / "SHA256SUMS").write_text(f"{hashlib.sha256(archive.read_bytes()).hexdigest()}  {archive.name}\n")
     print(f"Validated {args.target} native artifact: {archive}")
 

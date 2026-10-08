@@ -16,8 +16,9 @@ runner or signing secrets are required.
 
 Wait for the jobs to finish, then open the workflow run and download its
 **Artifacts**. Choose a `pdf-editor-*` artifact; `linux-validation-inputs-*` and `pdfium-linux-arm64-build-inputs`
-is temporary tooling for the validation job. GitHub wraps each artifact in an extra ZIP; extract that first
-to find the actual application archive and `SHA256SUMS`.
+is temporary tooling for the validation job. Extract the Windows artifact once:
+`pdf-editor.exe`, DLLs and the `qml` folder are directly inside. Keep them together.
+For Linux/macOS, GitHub wraps the application archives and `SHA256SUMS` in an extra ZIP.
 
 | GitHub artifact | Application package | Start |
 | --- | --- | --- |
