@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <objbase.h>
 #include <stdexcept>
 #include <string>
@@ -233,16 +234,30 @@ int wmain(int argc, wchar_t** argv)
         wchar_t systemRoot[32768]{};
         require(GetEnvironmentVariableW(L"SystemRoot", systemRoot, 32768) > 0,
                 "Cannot locate Windows system libraries");
-        std::wstring environment = L"PATH=" + std::wstring(systemRoot) + L"\\System32";
-        environment.push_back(L'\0');
+        // AppContainer creation needs the user profile environment so Windows
+        // can redirect LOCALAPPDATA/TEMP into the container's own profile.
+        // These path values confer no access: the zero-capability token and
+        // file ACLs still govern every read/write. Never inherit the full env.
+        std::map<std::wstring, std::wstring> variables{
+            {L"PATH", std::wstring(systemRoot) + L"\\System32"},
+            {L"SystemRoot", systemRoot},
+            {L"windir", systemRoot}};
+        for (const auto* name : {L"LOCALAPPDATA", L"USERPROFILE", L"SystemDrive"})
+        {
+            wchar_t value[32768]{};
+            const DWORD size = GetEnvironmentVariableW(name, value, 32768);
+            require(size > 0 && size < 32768, "Missing Windows profile environment");
+            variables.emplace(name, value);
+        }
         wchar_t diagnostics[2]{};
         if (GetEnvironmentVariableW(L"PDF_EDITOR_WORKER_DIAGNOSTICS", diagnostics, 2) > 0)
+            variables.emplace(L"PDF_EDITOR_WORKER_DIAGNOSTICS", L"1");
+        std::wstring environment;
+        for (const auto& [name, value] : variables)
         {
-            environment += L"PDF_EDITOR_WORKER_DIAGNOSTICS=1";
+            environment += name + L"=" + value;
             environment.push_back(L'\0');
         }
-        environment += L"SystemRoot=" + std::wstring(systemRoot);
-        environment.push_back(L'\0');
         environment.push_back(L'\0');
         PROCESS_INFORMATION process{};
         require(CreateProcessW(worker.c_str(), command.data(), nullptr, nullptr, TRUE,

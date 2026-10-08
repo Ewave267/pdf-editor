@@ -91,7 +91,9 @@ Python 3.12. `windeployqt` collects Qt/QML/plugins; the redistributable MSVC CRT
 are copied beside the EXE so no redistributable installer is needed. The PDF
 worker runs through `pdf-sandbox.exe` in a capability-free AppContainer with
 CPU, memory, lifetime and child-process limits. No administrator installation
-is required. Keep its helper, worker and DLLs beside the editor EXE.
+is required. The broker supplies the Windows profile environment paths needed
+for AppContainer startup while keeping the executable search path restricted
+to system libraries. Keep its helper, worker and DLLs beside the editor EXE.
 
 Mac builds target macOS 13 or newer, separately for Intel and Apple Silicon.
 `macdeployqt` bundles the Qt frameworks, QML/plugins and PDFium worker.
@@ -99,7 +101,7 @@ Only the editor's platform, image, icon and style plugins are selected; unused
 SQL drivers and their external database clients are excluded. The worker
 applies a deny-default Seatbelt profile inside the worker after trusted
 dynamic loading, before Qt startup, PDFium initialization or document reads.
-The worker also enforces resource limits;
+Resource limits are installed before Seatbelt, then verified inside the sandbox;
 no network, child-process or host file-write access is granted. The worker
 verifies its sandbox before parsing a document. This uses Darwin sandbox SPI;
 unsupported hosts fail closed rather than silently disabling isolation.

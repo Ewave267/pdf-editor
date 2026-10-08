@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "WorkerPolicy.h"
+#include <cerrno>
+#include <cstring>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -29,6 +31,23 @@ void applyMacWorkerSandbox(const char* profile)
         library ? reinterpret_cast<FreeError>(dlsym(library, "sandbox_free_error")) : nullptr;
     if (!initialize || !freeError || !profile || !*profile)
         throw std::runtime_error("Cannot initialize the macOS sandbox policy.");
+    // Seatbelt denies resource-control changes; bound resources first.
+    auto limit = [](int resource, rlim_t maximum)
+    {
+        rlimit current{};
+        if (getrlimit(resource, &current) != 0)
+            throw std::runtime_error("Cannot inspect worker resource limits.");
+        const auto ceiling = std::min(current.rlim_max, maximum);
+        const rlimit restricted{ceiling, ceiling};
+        if (setrlimit(resource, &restricted) != 0)
+            throw std::runtime_error("Cannot restrict worker resource " + std::to_string(resource) +
+                                     ": " + std::strerror(errno));
+    };
+    limit(RLIMIT_CPU, 300);
+    limit(RLIMIT_CORE, 0);
+    limit(RLIMIT_NOFILE, 128);
+    limit(RLIMIT_FSIZE, 64 * 1024 * 1024);
+    limit(RLIMIT_DATA, 768 * 1024 * 1024);
     char* error = nullptr;
     const int result = initialize(profile, 0, &error);
     const std::string message = error ? error : "Seatbelt rejected the profile";
@@ -83,21 +102,19 @@ void installWorkerPolicy(bool allowArtifactFiles)
         check(getpid(), "process-fork", noFilter) <= 0 ||
         check(getpid(), "file-write-data", pathFilter, "/private/tmp/pdf-editor-policy-probe") <= 0)
         throw std::runtime_error("Worker requires the macOS sandbox policy.");
-    auto limit = [](int resource, rlim_t maximum)
+    auto verifyLimit = [](int resource, rlim_t maximum)
     {
         rlimit current{};
-        if (getrlimit(resource, &current) != 0)
-            throw std::runtime_error("Cannot inspect worker resource limits.");
-        const auto ceiling = std::min(current.rlim_max, maximum);
-        const rlimit restricted{ceiling, ceiling};
-        if (setrlimit(resource, &restricted) != 0)
-            throw std::runtime_error("Cannot restrict worker resources.");
+        if (getrlimit(resource, &current) != 0 || current.rlim_cur > maximum ||
+            current.rlim_max > maximum)
+            throw std::runtime_error(
+                "Worker resource limits were not installed before sandboxing.");
     };
-    limit(RLIMIT_CPU, 300);
-    limit(RLIMIT_CORE, 0);
-    limit(RLIMIT_NOFILE, 128);
-    limit(RLIMIT_FSIZE, 64 * 1024 * 1024);
-    limit(RLIMIT_DATA, 768 * 1024 * 1024);
+    verifyLimit(RLIMIT_CPU, 300);
+    verifyLimit(RLIMIT_CORE, 0);
+    verifyLimit(RLIMIT_NOFILE, 128);
+    verifyLimit(RLIMIT_FSIZE, 64 * 1024 * 1024);
+    verifyLimit(RLIMIT_DATA, 768 * 1024 * 1024);
 #endif
 }
 } // namespace pdf::detail

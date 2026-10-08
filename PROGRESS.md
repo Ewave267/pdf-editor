@@ -438,3 +438,21 @@ Actionlint, Python compilation, whitespace checks and a filtered crash-report
 collection check passed. The Mac policy branch also passed a portable POSIX
 compile check; this is not a macOS SDK/runtime test. Native platform confirmation
 and the Windows broker cause still depend on the next GitHub run.
+
+## Native startup fixes from the second diagnostics — 2026-10-08
+
+The new Mac logs progress past loader startup and fail setting resource limits
+inside Seatbelt. Resource limits are now installed before sandbox application
+and verified afterward; no resource-control permission is added to the profile.
+A POSIX test with stubbed Darwin sandbox APIs confirmed ordering, refusal outside
+the sandbox, and rejection of an excessive CPU limit. This is not native Mac
+runtime confirmation.
+
+The Windows broker log identifies CreateProcessW error 203 (missing environment
+variable). Its custom environment supplied only system-library paths; it now
+also supplies LOCALAPPDATA, USERPROFILE and SystemDrive, needed for Windows
+profile setup and AppContainer environment redirection. Qt/tool/plugin settings
+and unrelated host environment variables remain excluded. The zero-capability
+AppContainer, read-only input/runtime ACLs and bounded job remain unchanged.
+Native Windows/Mac runs are required to confirm both fixes. PDFium source and
+its build recipe are unchanged, so existing dependency caches remain reusable.
