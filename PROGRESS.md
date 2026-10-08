@@ -492,3 +492,8 @@ validation. Integration run 37775905657 passed all regressions and relocated
 package checks. Windows still exits before main with `0xC0000142`, despite a
 private desktop. Its pipe-based worker now uses the Windows GUI subsystem
 with the normal main CRT entry point to avoid console initialization; CI pending.
+
+Integration CI now cancels superseded runs on the same branch and saves the
+PDFium dependency cache immediately after its own tests pass. A later application
+test failure will no longer force the long dependency compilation on retry.
+Workflow syntax validated with actionlint.
