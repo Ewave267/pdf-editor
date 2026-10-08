@@ -7,6 +7,12 @@ set -Eeuo pipefail
 sysroot="$PWD/.deps/arm64-sysroot"
 mkdir -p "$sysroot/etc/pki/rpm-gpg"
 cp /etc/pki/rpm-gpg/* "$sysroot/etc/pki/rpm-gpg/"
+for variables in /etc/dnf/vars /etc/yum/vars; do
+    if [[ -d "$variables" ]]; then
+        mkdir -p "$sysroot${variables%/*}"
+        cp -a "$variables" "$sysroot${variables%/*}/"
+    fi
+done
 dnf -y --forcearch=aarch64 --installroot="$sysroot" --releasever=9 \
     --setopt=reposdir=/etc/yum.repos.d --setopt=module_platform_id=platform:el9 \
     --setopt=install_weak_deps=False --setopt=tsflags=noscripts \

@@ -530,3 +530,8 @@ native ARM XML tests pass. Runtime inputs are separately checksum-pinned and
 architecture-specific caches/artifact names prevent mixing payloads. Existing
 Linux seccomp already supports AArch64. Python compilation, shell syntax and
 actionlint pass. First ARM CI validation pending.
+
+First ARM run 37785849699 reached sysroot provisioning but Rocky mirrorlist
+resolution failed because `$rltype` was undefined in the empty install root.
+Copy the baseline repository variable directories into the ARM sysroot before
+installing packages. Retry pending.
