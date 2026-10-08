@@ -102,8 +102,9 @@ SQL drivers and their external database clients are excluded. The worker
 applies a deny-default Seatbelt profile inside the worker after trusted
 dynamic loading, before Qt startup, PDFium initialization or document reads.
 Resource limits are installed before Seatbelt, then verified inside the sandbox;
-no network, child-process or host file-write access is granted. The worker
-verifies its sandbox before parsing a document. This uses Darwin sandbox SPI;
+no network, child-process or host file-write access is granted. The Mac data limit accounts for its trusted startup VM mappings and bounds
+additional growth to 768 MiB; this is not a 768 MiB resident-memory limit.
+The worker verifies its sandbox before parsing a document. This uses Darwin sandbox SPI;
 unsupported hosts fail closed rather than silently disabling isolation.
 Native workers receive a minimal environment rather than the GUI's host environment.
 

@@ -13,6 +13,7 @@
 #else
 #include <algorithm>
 #include <dlfcn.h>
+#include <mach/mach.h>
 #include <sys/resource.h>
 #include <unistd.h>
 #endif
@@ -20,6 +21,10 @@
 namespace pdf::detail
 {
 #if defined(__APPLE__)
+namespace
+{
+rlim_t macDataCeiling = 0;
+}
 void applyMacWorkerSandbox(const char* profile)
 {
     const auto library = dlopen("/usr/lib/libsandbox.dylib", RTLD_NOW | RTLD_LOCAL);
@@ -47,7 +52,17 @@ void applyMacWorkerSandbox(const char* profile)
     limit(RLIMIT_CORE, 0);
     limit(RLIMIT_NOFILE, 128);
     limit(RLIMIT_FSIZE, 64 * 1024 * 1024);
-    limit(RLIMIT_DATA, 768 * 1024 * 1024);
+    // Darwin validates RLIMIT_DATA against the whole VM map, including
+    // trusted loader/shared-cache reservations already present at entry.
+    // Bound additional growth rather than requesting a ceiling below that map.
+    mach_task_basic_info_data_t memory{};
+    mach_msg_type_number_t count = MACH_TASK_BASIC_INFO_COUNT;
+    if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO, reinterpret_cast<task_info_t>(&memory),
+                  &count) != KERN_SUCCESS ||
+        memory.virtual_size > RLIM_INFINITY - 768ULL * 1024 * 1024)
+        throw std::runtime_error("Cannot inspect the Mac startup memory baseline.");
+    macDataCeiling = memory.virtual_size + 768ULL * 1024 * 1024;
+    limit(RLIMIT_DATA, macDataCeiling);
     char* error = nullptr;
     const int result = initialize(profile, 0, &error);
     const std::string message = error ? error : "Seatbelt rejected the profile";
@@ -114,7 +129,9 @@ void installWorkerPolicy(bool allowArtifactFiles)
     verifyLimit(RLIMIT_CORE, 0);
     verifyLimit(RLIMIT_NOFILE, 128);
     verifyLimit(RLIMIT_FSIZE, 64 * 1024 * 1024);
-    verifyLimit(RLIMIT_DATA, 768 * 1024 * 1024);
+    if (!macDataCeiling)
+        throw std::runtime_error("Worker startup memory bound was not installed.");
+    verifyLimit(RLIMIT_DATA, macDataCeiling);
 #endif
 }
 } // namespace pdf::detail

@@ -456,3 +456,13 @@ and unrelated host environment variables remain excluded. The zero-capability
 AppContainer, read-only input/runtime ACLs and bounded job remain unchanged.
 Native Windows/Mac runs are required to confirm both fixes. PDFium source and
 its build recipe are unchanged, so existing dependency caches remain reusable.
+
+## GitHub monitoring and Darwin data-limit fix — 2026-10-08
+
+GitHub CLI authentication is available; current jobs and completed-job logs can
+be read directly. Run 37777568560 identified Darwin resource 2 (RLIMIT_DATA)
+returning EINVAL. Apple XNU rejects a data ceiling below the existing VM map,
+which includes trusted loader/shared-cache mappings. Mac policy now measures
+that startup map and installs a hard ceiling with 768 MiB growth headroom,
+verified after sandbox entry. This does not claim a 768 MiB resident-memory
+limit. Native CI confirmation is pending.
