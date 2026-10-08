@@ -7,6 +7,7 @@
 #include <QJsonObject>
 #include <QObject>
 #include <QProcess>
+#include <QSet>
 #include <QTemporaryDir>
 #include <QTimer>
 #include <QUrl>
@@ -124,6 +125,7 @@ class PdfDocument : public QObject
     QList<Request> queue_;
     Request active_{};
     QCache<QString, QImage> cache_{64 * 1024}; // Cost in KiB; maximum 64 MiB.
+    QSet<quint64> cachedRequests_;
     QVariantList pages_;
     quint64 nextId_ = 0;
     quint64 generation_ = 0;

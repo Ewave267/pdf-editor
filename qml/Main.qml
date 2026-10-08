@@ -238,7 +238,7 @@ ApplicationWindow {
                 Button { objectName: "addSignatureButton"; text: "Signature"; onClicked: { imageDialog.signature = true; imageDialog.open() } }
                 Button { objectName: "editTextButton"; text: "Edit text"; visible: root.selectedObject.type === "text"; onClicked: { textDialog.editing = true; textInput.text = root.selectedObject.text; textDialog.open() } }
                 Button { objectName: "deleteObjectButton"; text: "Delete"; enabled: pdfDocument.additions.selected >= 0; onClicked: pdfDocument.additions.removeSelected() }
-                Label { Layout.fillWidth: true; elide: Text.ElideRight; textFormat: Text.PlainText; text: pdfDocument.formError || (root.placement ? "Click a page to place " + root.placement + " · Esc cancels" : pdfDocument.additions.error || (pdfDocument.dirty ? "Unsaved changes · Save As keeps edits" : pdfDocument.savedPath ? "Saved · " + pdfDocument.savedPath : pdfDocument.formType !== "PDF" ? "Click a field · Tab moves focus · Save As keeps edits" : "Add content to a page")); color: "#596878" }
+                Label { Layout.fillWidth: true; elide: Text.ElideRight; textFormat: Text.PlainText; text: pdfDocument.error || pdfDocument.formError || (root.placement ? "Click a page to place " + root.placement + " · Esc cancels" : pdfDocument.additions.error || (pdfDocument.dirty ? "Unsaved changes · Save As keeps edits" : pdfDocument.savedPath ? "Saved · " + pdfDocument.savedPath : pdfDocument.formType !== "PDF" ? "Click a field · Tab moves focus · Save As keeps edits" : "Add content to a page")); color: "#596878" }
             }
             ListView {
                 id: pageView

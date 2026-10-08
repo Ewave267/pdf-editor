@@ -82,6 +82,97 @@ class ViewerTests : public QObject
 #endif
     }
   private slots:
+    void rejectedOpenRetainsUnsavedDocument_data()
+    {
+        QTest::addColumn<QString>("path");
+        QTest::newRow("pdf") << QString("normal/single-page.pdf");
+        QTest::newRow("acroform") << QString("acroform/controls.pdf");
+    }
+    void rejectedOpenRetainsUnsavedDocument()
+    {
+        QFETCH(QString, path);
+        PdfDocument document;
+        document.open(fixture(path));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        const auto pid = document.workerPid();
+        const auto editField = [&document](const QString& action, const QString& text = QString())
+        {
+            QSignalSpy done(&document, &PdfDocument::formEventFinished);
+            QVERIFY(document.formEvent(0, action, 100, 87, 0, text));
+            QTRY_VERIFY_WITH_TIMEOUT(!done.isEmpty(), 10000);
+        };
+        if (path.startsWith("acroform"))
+        {
+            editField("click");
+            editField("selectAll");
+            editField("text", "retained form edit");
+            QCOMPARE(document.formText(), QString("retained form edit"));
+        }
+        document.additions()->addText(0, 40, 40, "Keep this edit");
+        QVERIFY(document.dirty());
+        QTemporaryDir temporary;
+        QVERIFY(temporary.isValid());
+        QFile oversized(temporary.filePath("oversized.pdf"));
+        QVERIFY(oversized.open(QIODevice::WriteOnly));
+        QVERIFY(oversized.resize(64 * 1024 * 1024 + 1));
+        oversized.close();
+        const QList<QUrl> rejected{QUrl("https://example.invalid/test.pdf"),
+                                   QUrl::fromLocalFile(temporary.filePath("missing.pdf")),
+                                   QUrl::fromLocalFile(temporary.path()),
+                                   QUrl::fromLocalFile(oversized.fileName())};
+        for (const auto& url : rejected)
+        {
+            document.open(url);
+            QVERIFY(!document.error().isEmpty());
+            QVERIFY(document.ready());
+            QCOMPARE(document.workerPid(), pid);
+            QCOMPARE(document.fileName(), QFileInfo(path).fileName());
+            QCOMPARE(document.additions()->count(), 1);
+            QVERIFY(document.dirty());
+            if (path.startsWith("acroform"))
+                QCOMPARE(document.formText(), QString("retained form edit"));
+        }
+        QSignalSpy images(&document, &PdfDocument::rendered);
+        document.requestRender(0, 612);
+        QTRY_VERIFY_WITH_TIMEOUT(!images.isEmpty(), 10000);
+        const QString destination = temporary.filePath("retained.pdf");
+        QSignalSpy saved(&document, &PdfDocument::saveFinished);
+        document.saveAs(QUrl::fromLocalFile(destination));
+        QTRY_VERIFY_WITH_TIMEOUT(!saved.isEmpty(), 30000);
+        QVERIFY2(saved.first()[0].toBool(), qPrintable(document.saveError()));
+        document.open(QUrl::fromLocalFile(destination));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        QVERIFY(document.error().isEmpty());
+        if (path.startsWith("acroform"))
+        {
+            editField("click");
+            QCOMPARE(document.formText(), QString("retained form edit"));
+        }
+    }
+
+    void cancelledCachedRenderIsNotDelivered()
+    {
+        PdfDocument document;
+        document.open(fixture("normal/single-page.pdf"));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        QSignalSpy images(&document, &PdfDocument::rendered);
+        document.requestRender(0, 612);
+        QTRY_VERIFY_WITH_TIMEOUT(!images.isEmpty(), 10000);
+        images.clear();
+        const auto cancelled = document.requestRender(0, 612);
+        const auto retained = document.requestRender(0, 612);
+        document.cancelRender(cancelled);
+        QTRY_COMPARE_WITH_TIMEOUT(images.size(), 1, 10000);
+        QCOMPARE(images.first()[0].toULongLong(), retained);
+        QCoreApplication::processEvents();
+        QCOMPARE(images.size(), 1);
+        images.clear();
+        document.requestRender(0, 612);
+        document.close();
+        QCoreApplication::processEvents();
+        QVERIFY(images.isEmpty());
+    }
+
     void arialCaptionUsesMetricCompatibleFont()
     {
         PdfDocument document;
@@ -834,11 +925,11 @@ class ViewerTests : public QObject
         QVERIFY(image.pixelColor(72, 72) != Qt::white);
         const auto pid = document.workerPid();
         document.open(QUrl("https://example.invalid/no.pdf"));
-        QVERIFY(!document.ready());
+        QVERIFY(document.ready());
         QVERIFY(document.error().contains("readable PDF"));
-        QCOMPARE(document.workerPid(), 0);
-        QCOMPARE(kill(pid, 0), -1);
+        QCOMPARE(document.workerPid(), pid);
         document.close();
+        QCOMPARE(kill(pid, 0), -1);
     }
     void closeDuringRenderAndMissingSandbox()
     {

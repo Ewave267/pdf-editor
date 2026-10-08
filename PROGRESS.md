@@ -2,6 +2,28 @@
 
 Last updated: 2026-10-08
 
+## Roadmap Phase 1 — first reliability batch
+
+- Opening preflight now prepares and validates the replacement snapshot before
+  closing the current document. Missing/nonlocal/unreadable/oversized input or
+  snapshot failure reports an error without discarding existing edits.
+- Cached render deliveries honour cancellation, document replacement and native
+  form cache invalidation.
+- Added regressions for retained additions and AcroForm text, subsequent
+  rendering/save/reopen, and cancellation/close before a cache-hit delivery.
+- Local combined CTest: all six suites passed (105 seconds), including security,
+  persistence and independent PDF.js checks. The 1000-page test measured 41 MiB
+  peak worker RSS. Expanded AcroForm retention coverage also passed separately.
+- Fresh local tarball and AppImage previews each passed all 24 QtTest results
+  after relocation to a path containing spaces, including saved-output reader
+  checks. These Fedora-built previews require glibc 2.39; they do not establish
+  the RHEL 9 release baseline or validate Windows/macOS desktop behaviour.
+- Roadmap Phase 1 remains open; broader compatibility, the AcroForm JavaScript
+  dependency fix and the reported Windows desktop startup exit remain pending.
+
+This batch reuses the installed patched PDFium dependency and is validated
+locally before any further native artifact workflow is requested.
+
 Desktop startup now opens a normal window instead of full screen. The window
 explicitly requests the native title bar, minimize/maximize and close controls;
 closing continues to use the existing unsaved-change confirmation.

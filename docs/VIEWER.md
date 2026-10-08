@@ -69,7 +69,15 @@ metadata, navigation, zoom, an asynchronous request queue and a 64 MiB image
 cache. `PdfPageItem` paints received images and cancels obsolete requests;
 ListView delegates keep only nearby pages and thumbnails instantiated. Resizing
 and zooming debounce new raster requests while displaying the existing image.
+Cancellation also suppresses queued cache-hit deliveries, and native form input
+invalidates pending cached deliveries along with the raster cache.
 QML contains no PDFium headers, handles or API calls.
+
+Opening a missing, unreadable, nonlocal or oversized file, or failing to create
+its private snapshot, leaves the current document and unsaved changes usable.
+The error appears in the document toolbar. Once a new snapshot is accepted, the
+current document is replaced; a later parser failure does not restore its native
+form state. The UI still asks before discarding unsaved changes on replacement.
 
 A persistent `pdf-render-worker` owns all PDFium resources on one thread. It
 opens only `/input.pdf`, initializes XFA when necessary, reads page geometry,

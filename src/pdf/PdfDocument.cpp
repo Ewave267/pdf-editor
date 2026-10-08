@@ -67,6 +67,7 @@ void PdfDocument::stopWorker()
     queue_.clear();
     active_ = {};
     cache_.clear();
+    cachedRequests_.clear();
     ++generation_;
 }
 
@@ -125,29 +126,34 @@ void PdfDocument::fail(const QString& message)
 
 void PdfDocument::open(const QUrl& url)
 {
+    const auto reject = [this](const QString& message)
+    {
+        // Preflight failures must not destroy the document or its unsaved edits.
+        error_ = message;
+        emit stateChanged();
+    };
     const QFileInfo input(url.toLocalFile());
     if (!url.isLocalFile() || !input.isFile() || !input.isReadable())
     {
-        fail("Select a readable PDF on this computer.");
+        reject("Select a readable PDF on this computer.");
         return;
     }
-    close();
-    sourcePath_ = input.canonicalFilePath();
+    const QString sourcePath = input.canonicalFilePath();
     if (input.size() <= 0 || input.size() > 64 * 1024 * 1024)
     {
-        fail("The viewer supports PDF files up to 64 MiB.");
+        reject("The viewer supports PDF files up to 64 MiB.");
         return;
     }
-    snapshot_ = std::make_unique<QTemporaryDir>();
-    QFile source, copy(snapshot_->filePath("input.pdf"));
-    if (!pdf::detail::openRegularInput(source, sourcePath_))
+    auto snapshot = std::make_unique<QTemporaryDir>();
+    QFile source, copy(snapshot->filePath("input.pdf"));
+    if (!pdf::detail::openRegularInput(source, sourcePath))
     {
-        fail("Select a regular PDF file of at most 64 MiB.");
+        reject("Select a regular PDF file of at most 64 MiB.");
         return;
     }
-    if (!snapshot_->isValid() || !copy.open(QIODevice::WriteOnly | QIODevice::NewOnly))
+    if (!snapshot->isValid() || !copy.open(QIODevice::WriteOnly | QIODevice::NewOnly))
     {
-        fail("Cannot create a private document snapshot.");
+        reject("Cannot create a private document snapshot.");
         return;
     }
     qint64 copied = 0;
@@ -158,11 +164,15 @@ void PdfDocument::open(const QUrl& url)
         if (block.isEmpty() || copied > 64 * 1024 * 1024 || copy.write(block) != block.size())
         {
             copy.close();
-            fail("Cannot snapshot this PDF within the 64 MiB input limit.");
+            reject("Cannot snapshot this PDF within the 64 MiB input limit.");
             return;
         }
     }
     copy.close();
+    source.close();
+    close();
+    snapshot_ = std::move(snapshot);
+    sourcePath_ = sourcePath;
     fileName_ = input.fileName();
     loading_ = true;
     fitting_ = true;
@@ -427,6 +437,7 @@ void PdfDocument::receive()
             if (response["changed"].toBool())
                 ++formRevision_;
             cache_.clear();
+            cachedRequests_.clear();
             emit formsChanged();
             emit saveStateChanged();
             emit formRepaint();
@@ -474,13 +485,14 @@ quint64 PdfDocument::requestRender(int page, int width)
     const QString key = QString::number(page) + "/" + QString::number(width);
     if (const auto* cached = cache_.object(key))
     {
+        cachedRequests_.insert(id);
         const QImage image = *cached;
         const auto generation = generation_;
         QMetaObject::invokeMethod(
             this,
             [this, generation, id, image]
             {
-                if (generation == generation_)
+                if (generation == generation_ && cachedRequests_.remove(id))
                     emit rendered(id, image);
             },
             Qt::QueuedConnection);
@@ -503,6 +515,7 @@ quint64 PdfDocument::requestRender(int page, int width)
 
 void PdfDocument::cancelRender(quint64 id)
 {
+    cachedRequests_.remove(id);
     active_.listeners.removeAll(id);
     for (auto it = queue_.begin(); it != queue_.end();)
     {

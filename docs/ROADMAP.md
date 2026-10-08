@@ -21,6 +21,31 @@ Improve:
 
 Build a growing regression corpus from real documents.
 
+### First reliability milestone (2026-10-08)
+
+- [x] Preserve the current document, worker and unsaved additions when opening
+  another file fails local validation or snapshot creation.
+- [x] Show that opening error while keeping the current document usable.
+- [x] Honour cancellation of cached render deliveries and invalidate pending
+  cached deliveries after native form input.
+- [x] Cover rejected opens, continued rendering/saving and render cancellation
+  with local integration regressions.
+- [ ] Diagnose the reported Windows Explorer startup exit using startup logs;
+  verify a native desktop launch, beyond the offscreen CI check.
+- [ ] Add redistributable real-document fixtures and broader static/dynamic XFA
+  coverage, including layout changes and representative Unicode fonts.
+- [ ] Fix and verify the documented AcroForm JavaScript keystroke conversion
+  limitation in the pinned dependency.
+- [ ] Establish rendering/interaction latency baselines on large documents and
+  clean-desktop walkthroughs on each supported operating system.
+
+Phase 1 remains in progress. Passing synthetic tests does not establish arbitrary
+PDF compatibility or complete production readiness. Later phases remain ordered
+as below; signing, crash recovery and the security release gates must also be
+resolved before a production release. Batch locally validated changes before
+running the native artifact workflow; reuse the existing patched PDFium build
+unless a dependency change requires rebuilding it.
+
 ## Phase 2 — Everyday Editing
 
 Expand added-content tools.
