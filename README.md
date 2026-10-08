@@ -29,7 +29,7 @@ GitHub Actions builds and tests the real editor on native Windows, macOS and
 Linux runners, then uploads downloadable artifacts. Push this branch to GitHub
 and open **Actions → Native release candidates**. See the linked instructions
 for downloading and running each package. Windows and macOS are new ports; their
-first native CI runs are still pending.
+native builds reach packaging but worker startup validation is not yet passing.
 
 Linux release targets are RHEL 9, Fedora, and Ubuntu 22.04/24.04 or newer.
 The builder must bundle dependencies compiled against glibc 2.34 or older;

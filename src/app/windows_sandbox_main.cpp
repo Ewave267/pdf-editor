@@ -7,6 +7,7 @@
 #include <aclapi.h>
 #include <cwctype>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <objbase.h>
 #include <stdexcept>
@@ -18,6 +19,16 @@
 namespace fs = std::filesystem;
 namespace
 {
+void trace(const char* message)
+{
+    // Trusted broker only: the AppContainer worker never receives this path.
+    wchar_t path[32768]{};
+    const DWORD size = GetEnvironmentVariableW(L"PDF_EDITOR_SANDBOX_LOG", path, 32768);
+    if (size == 0 || size >= 32768)
+        return;
+    std::ofstream log(fs::path(path), std::ios::app);
+    log << GetCurrentProcessId() << ": " << message << '\n';
+}
 struct Handle
 {
     HANDLE value = nullptr;
@@ -122,6 +133,7 @@ int wmain(int argc, wchar_t** argv)
 {
     try
     {
+        trace("broker entered");
         require((argc == 3 || argc == 4) && std::wstring(argv[1]) == L"--input" &&
                     (argc == 3 || std::wstring(argv[3]) == L"--save"),
                 "Invalid sandbox launch arguments");
@@ -141,6 +153,7 @@ int wmain(int argc, wchar_t** argv)
         if (result == HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS))
             result = DeriveAppContainerSidFromAppContainerName(L"PdfEditor.Renderer", &sid.value);
         require(SUCCEEDED(result), "Cannot create worker AppContainer");
+        trace("AppContainer profile ready");
         GUID guid{};
         require(SUCCEEDED(CoCreateGuid(&guid)), "Cannot create private runtime identity");
         wchar_t identity[40]{};
@@ -166,6 +179,7 @@ int wmain(int argc, wchar_t** argv)
         }
         fs::copy_file(input, runtime.path / L"input.pdf");
         grantRead(runtime.path / L"input.pdf", sid.value);
+        trace("private runtime and read permissions ready");
         Handle job(CreateJobObjectW(nullptr, nullptr));
         require(job.value != nullptr, "Cannot create worker job");
         JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};
@@ -221,6 +235,12 @@ int wmain(int argc, wchar_t** argv)
                 "Cannot locate Windows system libraries");
         std::wstring environment = L"PATH=" + std::wstring(systemRoot) + L"\\System32";
         environment.push_back(L'\0');
+        wchar_t diagnostics[2]{};
+        if (GetEnvironmentVariableW(L"PDF_EDITOR_WORKER_DIAGNOSTICS", diagnostics, 2) > 0)
+        {
+            environment += L"PDF_EDITOR_WORKER_DIAGNOSTICS=1";
+            environment.push_back(L'\0');
+        }
         environment += L"SystemRoot=" + std::wstring(systemRoot);
         environment.push_back(L'\0');
         environment.push_back(L'\0');
@@ -231,6 +251,7 @@ int wmain(int argc, wchar_t** argv)
                                environment.data(), runtime.path.c_str(), &startup.StartupInfo,
                                &process),
                 "Cannot launch AppContainer worker");
+        trace("suspended worker created");
         Handle child(process.hProcess), thread(process.hThread);
         if (!AssignProcessToJobObject(job.value, child.value))
         {
@@ -238,12 +259,14 @@ int wmain(int argc, wchar_t** argv)
             WaitForSingleObject(child.value, INFINITE);
             throw std::runtime_error("Cannot assign worker to its bounded job.");
         }
+        trace("worker assigned to bounded job");
         if (ResumeThread(thread.value) == static_cast<DWORD>(-1))
             throw std::runtime_error("Cannot resume isolated worker.");
         require(WaitForSingleObject(child.value, INFINITE) == WAIT_OBJECT_0,
                 "Cannot wait for worker completion");
         DWORD exitCode = 1;
         require(GetExitCodeProcess(child.value, &exitCode), "Cannot read worker exit status");
+        trace(("worker exit " + std::to_string(exitCode)).c_str());
         if (exitCode != 0)
             std::cerr << "Native PDF sandbox: worker exit " << exitCode << " (0x" << std::hex
                       << exitCode << ")\n";
@@ -251,6 +274,7 @@ int wmain(int argc, wchar_t** argv)
     }
     catch (const std::exception& error)
     {
+        trace(error.what());
         std::cerr << "Native PDF sandbox: " << error.what() << '\n';
         return 1;
     }

@@ -30,8 +30,8 @@ patched PDFium library. Linux builds have a three-hour limit; Windows/Mac builds
 have a six-hour limit. XML-tested PDFium is cached before desktop deployment,
 so a later smoke failure does not require recompiling it. Jobs provide separate
 diagnostics on failure, including `worker-loader.log` and `native-smoke.log`
-for desktop startup failures. Windows and macOS are new ports and require their first native CI
-runs before their runtime behavior can be confirmed.
+for desktop startup failures. Windows and macOS builds now reach packaging,
+but their worker startup checks have not yet passed.
 
 ## Linux compatibility and usage
 
@@ -97,7 +97,9 @@ Mac builds target macOS 13 or newer, separately for Intel and Apple Silicon.
 `macdeployqt` bundles the Qt frameworks, QML/plugins and PDFium worker.
 Only the editor's platform, image, icon and style plugins are selected; unused
 SQL drivers and their external database clients are excluded. The worker
-uses `/usr/bin/sandbox-exec` with a deny-default profile and resource limits;
+applies a deny-default Seatbelt profile inside the worker after trusted
+dynamic loading, before Qt startup, PDFium initialization or document reads.
+The worker also enforces resource limits;
 no network, child-process or host file-write access is granted. The worker
 verifies its sandbox before parsing a document. This uses Darwin sandbox SPI;
 unsupported hosts fail closed rather than silently disabling isolation.
@@ -126,8 +128,9 @@ Linux hostile-document/regression suites remain available via CTest.
 Local validation built the glibc 2.34 candidates, passed all 69 PDFium XML tests,
 and passed both relocated formats with independent PDF.js checks. GUI startup
 with bundled libraries/fonts also passed on minimal Ubuntu 22.04 without Qt.
-Worker tests ran on Fedora; Windows/Mac native CI and the full
-clean-desktop compatibility matrix are still pending.
+Worker tests ran on Fedora. Windows/Mac native CI reaches deployment but fails
+worker startup; successful runs and the clean-desktop compatibility matrix
+remain pending.
 
 Offscreen checks do not establish usability on a clean desktop. Download the
 matching artifact and test opening your PDFs, editing, Save As and reopening.

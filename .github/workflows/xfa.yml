@@ -29,6 +29,15 @@ jobs:
           python3 tools/build_bubblewrap.py
           # Keep the distro's existing executable path and user-namespace profile.
           sudo install -m 0755 .deps/bubblewrap-build/bwrap /usr/bin/bwrap
+      - name: Permit namespaces on the ephemeral CI runner and check isolation
+        run: |
+          # Ubuntu's runner-level AppArmor restriction blocks Bubblewrap's
+          # network setup. This only changes the disposable CI host; workers
+          # still use all namespaces, seccomp and the same read-only mounts.
+          if sysctl kernel.apparmor_restrict_unprivileged_userns >/dev/null 2>&1; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+          bwrap --unshare-all --die-with-parent --ro-bind / / /usr/bin/true
       - uses: actions/cache@v5
         id: pdfium
         with:

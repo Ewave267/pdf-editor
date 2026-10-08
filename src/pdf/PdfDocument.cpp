@@ -229,7 +229,7 @@ void PdfDocument::open(const QUrl& url)
     QStringList args{"--input", snapshot_->filePath("input.pdf")};
 #elif defined(Q_OS_MACOS)
     const QString binary = QCoreApplication::applicationDirPath() + "/pdf-render-worker";
-    sandboxProgram_ = "/usr/bin/sandbox-exec";
+    sandboxProgram_ = binary;
     if (!QFileInfo::exists(binary) || !QFileInfo::exists(sandboxProgram_))
     {
         fail("The native PDF worker or macOS sandbox is missing.");
@@ -260,7 +260,7 @@ void PdfDocument::open(const QUrl& url)
         "))"
         "(allow process-exec (literal " +
         quoted(QFileInfo(binary).canonicalFilePath()) + "))";
-    QStringList args{"-p", profile, binary, "--input", snapshot_->filePath("input.pdf")};
+    QStringList args{"--sandbox-profile", profile, "--input", snapshot_->filePath("input.pdf")};
 #else
 #error "No native worker sandbox for this platform"
 #endif
@@ -310,6 +310,8 @@ void PdfDocument::open(const QUrl& url)
     environment.insert("PATH", "/usr/bin:/bin");
     environment.insert("HOME", "/tmp");
     environment.insert("LANG", "en_US.UTF-8");
+    if (qEnvironmentVariableIsSet("PDF_EDITOR_WORKER_DIAGNOSTICS"))
+        environment.insert("PDF_EDITOR_WORKER_DIAGNOSTICS", "1");
     environment.insert("QT_PLUGIN_PATH", QCoreApplication::applicationDirPath() + "/../PlugIns");
     worker_->setProcessEnvironment(environment);
 #endif

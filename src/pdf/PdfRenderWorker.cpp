@@ -15,6 +15,7 @@
 #include <QJsonObject>
 #include <QMap>
 #include <cmath>
+#include <cstdlib>
 #include <iostream>
 #include <stdexcept>
 #ifdef Q_OS_WIN
@@ -383,11 +384,34 @@ int main(int argc, char** argv)
 {
     try
     {
+        auto stage = [](const char* message)
+        {
+            if (std::getenv("PDF_EDITOR_WORKER_DIAGNOSTICS"))
+                std::cerr << "Native worker startup: " << message << std::endl;
+        };
+        stage("entered main");
 #ifdef Q_OS_WIN
         _setmode(_fileno(stdin), _O_BINARY);
         _setmode(_fileno(stdout), _O_BINARY);
 #endif
+#ifdef Q_OS_MACOS
+        // Let the trusted runtime finish dynamic loading before applying
+        // Seatbelt. No document reads or PDFium initialization precede this.
+        for (int index = 1; index < argc; ++index)
+        {
+            if (std::string(argv[index]) == "--sandbox-profile")
+            {
+                if (++index >= argc)
+                    throw std::runtime_error("Missing macOS sandbox profile.");
+                stage("applying Seatbelt");
+                pdf::detail::applyMacWorkerSandbox(argv[index]);
+                break;
+            }
+        }
+#endif
+        stage("verifying isolation and resource limits");
         pdf::detail::installWorkerPolicy();
+        stage("starting Qt Core");
         QCoreApplication app(argc, argv);
         const auto arguments = app.arguments();
         QString inputPath = "/input.pdf";
@@ -395,6 +419,13 @@ int main(int argc, char** argv)
         for (int index = 1; index < arguments.size(); ++index)
         {
             const QString argument = arguments[index];
+#ifdef Q_OS_MACOS
+            if (argument == "--sandbox-profile" && index + 1 < arguments.size())
+            {
+                ++index;
+                continue;
+            }
+#endif
             if (argument == "--save")
                 save = true;
 #if !defined(Q_OS_LINUX)
@@ -404,7 +435,9 @@ int main(int argc, char** argv)
             else
                 throw std::runtime_error("Unknown worker argument.");
         }
+        stage("initializing PDFium and V8");
         pdf::detail::Library library;
+        stage("opening document snapshot");
         PdfDocument document(inputPath);
         if (save)
         {

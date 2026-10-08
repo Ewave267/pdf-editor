@@ -230,6 +230,8 @@ void PdfDocument::startSaveWorker(const QByteArray& baseline)
     environment.insert("PATH", "/usr/bin:/bin");
     environment.insert("HOME", "/tmp");
     environment.insert("LANG", "en_US.UTF-8");
+    if (qEnvironmentVariableIsSet("PDF_EDITOR_WORKER_DIAGNOSTICS"))
+        environment.insert("PDF_EDITOR_WORKER_DIAGNOSTICS", "1");
     environment.insert("QT_PLUGIN_PATH", QCoreApplication::applicationDirPath() + "/../PlugIns");
     saveWorker_->setProcessEnvironment(environment);
 #endif

@@ -11,6 +11,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import time
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -68,6 +69,22 @@ def run_smoke(test, fixtures, results, environment):
     print(transcript, flush=True)
     if result.returncode:
         raise RuntimeError(f"Native smoke failed: exit {result.returncode}; diagnostics: {log}")
+
+
+def collect_mac_crashes(results, started):
+    # Darwin can abort before stderr is initialized. Keep the OS crash report.
+    destinations = results / "mac-crashes"
+    for directory in (Path.home() / "Library/Logs/DiagnosticReports",
+                      Path("/Library/Logs/DiagnosticReports")):
+        if not directory.is_dir():
+            continue
+        for report in directory.glob("pdf-render-worker*"):
+            try:
+                if report.is_file() and report.stat().st_mtime >= started and report.stat().st_size < 5 * 1024 * 1024:
+                    destinations.mkdir(exist_ok=True)
+                    shutil.copy2(report, destinations / report.name)
+            except OSError:
+                pass
 
 
 def main():
@@ -193,9 +210,20 @@ def main():
         shutil.copytree(args.qt_notices, notices, dirs_exist_ok=True)
         shutil.copy2(ROOT / "LICENSE", root / "LICENSE")
         shutil.copy2(ROOT / "docs/NATIVE-RELEASES.md", root / "README.md")
-        verify_worker_loader(worker, env, smoke_results)
-        verify_gui(binary, env)
-        run_smoke(test, args.fixtures.resolve(), smoke_results, env)
+        env["PDF_EDITOR_WORKER_DIAGNOSTICS"] = "1"
+        if args.target == "windows":
+            env["PDF_EDITOR_SANDBOX_LOG"] = str(smoke_results / "windows-broker.log")
+        started = time.time()
+        try:
+            verify_worker_loader(worker, env, smoke_results)
+            verify_gui(binary, env)
+            run_smoke(test, args.fixtures.resolve(), smoke_results, env)
+        except Exception:
+            if args.target == "macos":
+                for _ in range(5):
+                    collect_mac_crashes(smoke_results, started)
+                    time.sleep(1)
+            raise
         test.unlink()
         if args.target == "macos":
             run(["codesign", "--force", "--deep", "--preserve-metadata=entitlements", "--sign", "-",

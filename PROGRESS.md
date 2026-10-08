@@ -1,6 +1,6 @@
 # MVP Progress
 
-Last updated: 2026-10-07
+Last updated: 2026-10-08
 
 ## Current state
 
@@ -408,3 +408,33 @@ Python helper checks verified intentional policy rejection, rejection of loader
 failures, and preservation of failing smoke transcripts. Python compilation,
 Actionlint and whitespace checks passed. Windows/macOS native execution remains
 pending; no sandbox permissions were broadened based on these incomplete logs.
+
+## Native diagnostics and Ubuntu CI namespace fix — 2026-10-08
+
+Read all three supplied diagnostic archives and the integration test output.
+Both Mac worker loader checks pass, followed by SIGABRT (signal 6) during
+sandboxed startup. This does not yet identify the aborting library. Windows
+also passes the loader check but exits without a broker/worker error trace.
+The Ubuntu 24.04 integration job cannot configure Bubblewrap loopback and
+reports `RTM_NEWADDR: Operation not permitted`; the subsequent test timeouts
+are consequences of this failed sandbox startup.
+
+Mac workers now apply the same Seatbelt profile internally after trusted
+dynamic loading, before Qt/PDFium initialization and any document reads.
+The sandbox is still verified and missing/invalid isolation fails closed.
+This avoids imposing the document policy on trusted loader initializers;
+confirmation of the SIGABRT fix still requires the next native run. Startup
+phase diagnostics, Darwin crash-report capture and a separate trusted Windows
+broker trace now survive failure.
+
+The integration workflow permits unprivileged namespaces on its disposable
+Ubuntu runner by changing the runner's AppArmor user-namespace sysctl, then
+checks an isolated Bubblewrap launch before running tests. No installed-user
+system policy is changed; worker namespaces, seccomp and read-only mounts
+remain enforced.
+
+Validation: local editor rebuild and all six Linux regression suites passed.
+Actionlint, Python compilation, whitespace checks and a filtered crash-report
+collection check passed. The Mac policy branch also passed a portable POSIX
+compile check; this is not a macOS SDK/runtime test. Native platform confirmation
+and the Windows broker cause still depend on the next GitHub run.

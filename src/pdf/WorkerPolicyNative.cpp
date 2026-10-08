@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "WorkerPolicy.h"
 #include <stdexcept>
+#include <string>
 #include <vector>
 #if defined(_WIN32)
 #ifndef NOMINMAX
@@ -16,6 +17,28 @@
 
 namespace pdf::detail
 {
+#if defined(__APPLE__)
+void applyMacWorkerSandbox(const char* profile)
+{
+    const auto library = dlopen("/usr/lib/libsandbox.dylib", RTLD_NOW | RTLD_LOCAL);
+    using SandboxInit = int (*)(const char*, unsigned long long, char**);
+    using FreeError = void (*)(char*);
+    const auto initialize =
+        library ? reinterpret_cast<SandboxInit>(dlsym(library, "sandbox_init")) : nullptr;
+    const auto freeError =
+        library ? reinterpret_cast<FreeError>(dlsym(library, "sandbox_free_error")) : nullptr;
+    if (!initialize || !freeError || !profile || !*profile)
+        throw std::runtime_error("Cannot initialize the macOS sandbox policy.");
+    char* error = nullptr;
+    const int result = initialize(profile, 0, &error);
+    const std::string message = error ? error : "Seatbelt rejected the profile";
+    if (error)
+        freeError(error);
+    if (result != 0)
+        throw std::runtime_error("Cannot apply macOS sandbox: " + message);
+}
+#endif
+
 void installWorkerPolicy(bool allowArtifactFiles)
 {
     if (allowArtifactFiles)
