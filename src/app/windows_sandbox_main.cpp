@@ -178,7 +178,8 @@ struct PrivateDesktop
         if (useLogonStation || (!station.value && GetLastError() == ERROR_ACCESS_DENIED))
         {
             trace("using standard-user logon window station");
-            station.value = CreateWindowStationW(nullptr, 0, WINSTA_ALL_ACCESS, &access);
+            station.value = CreateWindowStationW(
+                nullptr, 0, WINSTA_ALL_ACCESS | READ_CONTROL | WRITE_DAC, &access);
             require(station.value != nullptr, "Cannot open logon window station");
             // The automatic name is shared by this logon session. Its supplied
             // security descriptor is ignored when it already exists. Preserve

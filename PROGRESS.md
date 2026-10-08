@@ -13,6 +13,11 @@ packaging repeats native smoke validation using the logon-station route because
 hosted runners normally exercise the administrator route. Native verification
 is pending; the Linux host cannot execute the Windows broker.
 
+Run 37835394324 passed normal Windows smoke and every other platform, but the
+new logon-station test rejected ACL inspection. `WINSTA_ALL_ACCESS` covers
+station-specific rights, not `READ_CONTROL`/`WRITE_DAC`. The fallback now
+explicitly requests those standard rights before preserving/updating the ACL.
+
 Inspected the Windows artifact from successful run 37811582049: both missing
 modules actually exist under its bundled `qml` directory. Added an explicit
 executable-relative Windows QML import path and portable `qt.conf` so startup
