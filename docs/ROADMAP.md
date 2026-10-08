@@ -50,7 +50,10 @@ unless a dependency change requires rebuilding it.
 
 Text formatting is the first Phase 2 increment: added text boxes support font
 family, size, bold, italic and underline, including thumbnail and PDF export.
-The remaining tools and undo/redo below are still pending; Phase 2 is not complete.
+Added-content undo/redo now covers creation, deletion, movement, resizing, text
+and formatting, with grouped gestures and saved-state tracking. The remaining
+tools, copy/paste, multi-select and alignment below are still pending; Phase 2
+is not complete.
 
 Expand added-content tools.
 

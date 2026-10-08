@@ -126,9 +126,11 @@ ApplicationWindow {
             const style = { family: fontFamily.currentText, size: fontSize.value,
                             bold: boldText.checked, italic: italicText.checked, underline: underlineText.checked }
             if (editing) {
+                pdfDocument.additions.beginEdit()
                 pdfDocument.additions.setText(pdfDocument.additions.selected, textInput.text)
                 pdfDocument.additions.setTextStyle(pdfDocument.additions.selected,
                     style.family, style.size, style.bold, style.italic, style.underline)
+                pdfDocument.additions.endEdit()
             }
             else if (textInput.text.trim().length > 0 && textInput.text.length <= 10000) {
                 root.pendingText = textInput.text; root.pendingTextStyle = style; root.placement = "text"
@@ -188,6 +190,12 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl++"; onActivated: pdfDocument.zoom *= 1.2 }
     Shortcut { sequence: "Ctrl+-"; onActivated: pdfDocument.zoom /= 1.2 }
     Shortcut { sequence: "Ctrl+0"; onActivated: pdfDocument.fitToPage() }
+    property bool additionHistoryShortcuts: pdfDocument.ready && !pdfDocument.saving
+        && !textDialog.visible && !imageDialog.visible && !saveDialog.visible && !discardDialog.visible
+        && !(root.activeFocusItem instanceof FormInput)
+        && !(root.activeFocusItem && typeof root.activeFocusItem.undo === "function")
+    Shortcut { sequences: [StandardKey.Undo]; enabled: root.additionHistoryShortcuts && pdfDocument.additions.canUndo; onActivated: pdfDocument.additions.undo() }
+    Shortcut { sequences: [StandardKey.Redo]; enabled: root.additionHistoryShortcuts && pdfDocument.additions.canRedo; onActivated: pdfDocument.additions.redo() }
 
     header: ToolBar {
         implicitHeight: 56
@@ -215,6 +223,8 @@ ApplicationWindow {
             anchors.margins: 8
             Label { textFormat: Text.PlainText; text: pdfDocument.loading ? "Opening PDF…" : pdfDocument.ready ? pdfDocument.fileName : "Ready"; color: "#596878"; elide: Text.ElideMiddle; Layout.fillWidth: true }
             Label { text: pdfDocument.formType; visible: pdfDocument.ready; color: "#596878" }
+            ToolButton { objectName: "undoAdditionsButton"; text: "Undo"; enabled: pdfDocument.ready && !pdfDocument.saving && pdfDocument.additions.canUndo; Accessible.name: "Undo added content"; onClicked: pdfDocument.additions.undo() }
+            ToolButton { objectName: "redoAdditionsButton"; text: "Redo"; enabled: pdfDocument.ready && !pdfDocument.saving && pdfDocument.additions.canRedo; Accessible.name: "Redo added content"; onClicked: pdfDocument.additions.redo() }
             Button { objectName: "previousButton"; text: "Previous"; enabled: pdfDocument.ready && pdfDocument.currentPage > 1; onClicked: root.goToPage(pdfDocument.currentPage - 1) }
             SpinBox { objectName: "pageNumber"; from: 1; to: Math.max(1, pdfDocument.pageCount); value: pdfDocument.currentPage; editable: true; enabled: pdfDocument.ready; onValueModified: root.goToPage(value); Accessible.name: "Page number" }
             Label { text: "of " + pdfDocument.pageCount; color: "#596878" }
@@ -341,10 +351,12 @@ ApplicationWindow {
                                 if (root.placement) {
                                     pdfDocument.commitForm()
                                     if (root.placement === "text") {
+                                        pdfDocument.additions.beginEdit()
                                         const id = pdfDocument.additions.addText(index, x, y, root.pendingText)
                                         const style = root.pendingTextStyle
                                         pdfDocument.additions.setTextStyle(id, style.family, style.size,
                                             style.bold, style.italic, style.underline)
+                                        pdfDocument.additions.endEdit()
                                     }
                                     else pdfDocument.additions.addImage(index, x, y, root.pendingImage, root.placement === "signature")
                                     root.placement = ""
@@ -355,6 +367,7 @@ ApplicationWindow {
                                 if (id >= 0) pdfDocument.commitForm()
                                 pdfDocument.additions.select(id)
                                 original = pdfDocument.additions.object(id)
+                                if (id >= 0) pdfDocument.additions.beginEdit()
                                 startX = x; startY = y
                                 resizing = id >= 0 && Math.abs(mouse.x - (original.x + original.width) * pdfDocument.zoom) < 12 && Math.abs(mouse.y - (original.y + original.height) * pdfDocument.zoom) < 12
                                 if (id < 0) mouse.accepted = false
@@ -364,6 +377,8 @@ ApplicationWindow {
                                 const dx = mouse.x / pdfDocument.zoom - startX, dy = mouse.y / pdfDocument.zoom - startY
                                 pdfDocument.additions.geometry(original.id, original.x + (resizing ? 0 : dx), original.y + (resizing ? 0 : dy), original.width + (resizing ? dx : 0), original.height + (resizing ? dy : 0))
                             }
+                            onReleased: { pdfDocument.additions.endEdit(); original = ({}) }
+                            onCanceled: { pdfDocument.additions.endEdit(); original = ({}) }
                         }
                     }
                 }

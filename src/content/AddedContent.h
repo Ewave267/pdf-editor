@@ -14,6 +14,8 @@ class AddedContent : public QObject
     Q_PROPERTY(int selected READ selected WRITE select NOTIFY changed)
     Q_PROPERTY(QString error READ error NOTIFY changed)
     Q_PROPERTY(QStringList fontFamilies READ fontFamilies CONSTANT)
+    Q_PROPERTY(bool canUndo READ canUndo NOTIFY changed)
+    Q_PROPERTY(bool canRedo READ canRedo NOTIFY changed)
   public:
     struct Object
     {
@@ -27,6 +29,12 @@ class AddedContent : public QObject
     };
     explicit AddedContent(PdfDocument* document);
     quint64 revision() const { return revision_; }
+    bool canUndo() const { return !editing_ && !undo_.isEmpty(); }
+    bool canRedo() const { return !editing_ && !redo_.isEmpty(); }
+    Q_INVOKABLE void beginEdit();
+    Q_INVOKABLE void endEdit();
+    Q_INVOKABLE void undo();
+    Q_INVOKABLE void redo();
     int count() const { return objects_.size(); }
     int selected() const { return selected_; }
     QString error() const { return error_; }
@@ -53,9 +61,22 @@ class AddedContent : public QObject
     int insert(int page, double x, double y, const QString& type, const QString& text,
                const QImage& image);
     QRectF bounded(int page, const QRectF& rect) const;
+    struct State
+    {
+        QList<Object> objects;
+        int selected;
+        quint64 revision;
+    };
+    State state() const;
+    void restore(const State& state);
+    void recordEdit();
+    void trimHistory();
+    QList<State> undo_, redo_;
+    bool editing_ = false, editRecorded_ = false;
     PdfDocument* document_;
     QList<Object> objects_;
     int selected_ = -1, nextId_ = 0;
     QString error_;
     quint64 revision_ = 0;
+    quint64 nextRevision_ = 0;
 };

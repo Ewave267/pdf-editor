@@ -19,6 +19,12 @@ Native form editing is also available; see [FORMS](FORMS.md). Build and launch w
   Formatting applies to the whole text box; Cancel keeps its previous settings.
   **Delete** removes
   the selected object. Esc cancels placement and clears selection.
+- **Undo / Redo** in the bottom bar reverses added-content creation, deletion,
+  moves, resizing, text and font changes. Platform undo/redo shortcuts are also
+  available (Ctrl+Z and Ctrl+Shift+Z/Ctrl+Y on Linux/Windows, Command+Z and
+  Command+Shift+Z on macOS). Each drag or text-dialog acceptance is one step.
+  Shortcuts leave text editors and native form focus alone. Native form edits
+  are not included in this history. Undo/redo is disabled while saving.
 
 Thumbnails include additions. Coordinates and sizes use top-left page points,
 independent of zoom. Text defaults to 18-point Sans Serif and wraps/clips to its rectangle;
@@ -37,7 +43,15 @@ used on the page, in thumbnails and in exported PDFs, which embed the resolved
 font. Font availability and missing-glyph fallback depend on the platform.
 These controls format added text boxes; existing PDF text and native form fonts
 are not edited. Individual words within a box cannot have different formatting.
-Recovery, undo/redo, aspect locking,
+History stays in memory for the open document, with at most 100 steps and a
+64 MiB budget for estimated history metadata/text and unique retained image
+pixels. Older states are discarded when either bound is exceeded. Undoing back
+to the saved addition state clears its unsaved marker; native form changes are
+tracked separately. A new edit after undo clears redo. Closing/replacing the
+document clears history; reopening an exported PDF does not restore its history
+or individually editable addition objects.
+
+Recovery, aspect locking,
 and keyboard manipulation are later work.
 
 ## Model and rendering
@@ -72,3 +86,8 @@ The Phase 2 font regression checks validation and revision tracking, changed
 preview pixels, underline rendering, dialog creation/edit/cancel, and saving and
 reopening. Pinned PDF.js independently checks a 24-point embedded Liberation
 Serif Bold Italic font with system-font fallback disabled.
+
+Undo/redo regressions cover grouped creation/formatting and drags/resizing,
+deletion, images/signatures after source removal, branch truncation, invalid and
+no-op edits, the history step bound, saved-state markers, in-flight saves, close,
+and the actual QML buttons and keyboard shortcuts.

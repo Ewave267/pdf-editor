@@ -82,6 +82,123 @@ class ViewerTests : public QObject
 #endif
     }
   private slots:
+    void additionUndoRedo()
+    {
+        PdfDocument document;
+        document.open(fixture("normal/blank.pdf"));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        auto* content = document.additions();
+        QVERIFY(!content->canUndo());
+        content->beginEdit();
+        const int id = content->addText(0, 40, 50, "Original text");
+        QVERIFY(content->setTextStyle(id, "Serif", 24, true, true, false));
+        content->endEdit();
+        const auto original = content->object(id);
+        QVERIFY(document.dirty());
+        content->undo();
+        QCOMPARE(content->count(), 0);
+        QVERIFY(!document.dirty());
+        QVERIFY(!content->canUndo());
+        QVERIFY(content->canRedo());
+        content->redo();
+        QCOMPARE(content->object(id), original);
+        const auto originalRevision = content->revision();
+        content->beginEdit();
+        for (int x = 41; x < 80; ++x)
+            QVERIFY(content->geometry(id, x, 60, 230, 80));
+        QVERIFY(content->setText(id, "Moved and edited"));
+        QVERIFY(content->setTextStyle(id, "Monospace", 20, false, false, true));
+        QVERIFY(!content->canUndo());
+        content->endEdit();
+        const auto edited = content->object(id);
+        content->undo();
+        QCOMPARE(content->object(id), original);
+        QCOMPARE(content->revision(), originalRevision);
+        content->redo();
+        QCOMPARE(content->object(id), edited);
+        content->removeSelected();
+        QCOMPARE(content->count(), 0);
+        content->undo();
+        QCOMPARE(content->object(id), edited);
+        QCOMPARE(content->selected(), id);
+        content->undo();
+        QCOMPARE(content->object(id), original);
+        QVERIFY(content->canRedo());
+        const auto beforeInvalid = content->revision();
+        QVERIFY(!content->setTextStyle(id, "Serif", 200, false, false, false));
+        QCOMPARE(content->revision(), beforeInvalid);
+        QVERIFY(content->canRedo());
+        QVERIFY(content->setText(id, "New branch"));
+        QVERIFY(!content->canRedo());
+        QVERIFY(content->revision() > beforeInvalid);
+        content->undo();
+        QCOMPARE(content->object(id), original);
+        content->redo();
+        QCOMPARE(content->object(id)["text"].toString(), QString("New branch"));
+
+        QTemporaryDir directory;
+        QImage image(20, 20, QImage::Format_ARGB32);
+        image.fill(Qt::magenta);
+        const QString path = directory.filePath("signature.png");
+        QVERIFY(image.save(path));
+        for (bool signature : {false, true})
+        {
+            const int imageId = content->addImage(0, 40, 200, QUrl::fromLocalFile(path), signature);
+            QVERIFY(imageId > 0);
+            content->removeSelected();
+            content->undo();
+            QCOMPARE(content->selected(), imageId);
+            QCOMPARE(content->objects().last().image, image);
+            content->redo();
+            QVERIFY(content->object(imageId).isEmpty());
+        }
+        QVERIFY(QFile::remove(path));
+        content->undo();
+        QCOMPARE(content->objects().last().image, image);
+        for (int index = 0; index < 110; ++index)
+            QVERIFY(content->setText(id, QString::number(index)));
+        int undoCount = 0;
+        while (content->canUndo())
+        {
+            content->undo();
+            ++undoCount;
+        }
+        QCOMPARE(undoCount, 100);
+        document.close();
+        QVERIFY(!content->canUndo());
+        QVERIFY(!content->canRedo());
+    }
+
+    void additionUndoSaveCheckpoint()
+    {
+        PdfDocument document;
+        document.open(fixture("normal/blank.pdf"));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        auto* content = document.additions();
+        const int id = content->addText(0, 40, 50, "Saved baseline");
+        QTemporaryDir directory;
+        document.saveAs(QUrl::fromLocalFile(directory.filePath("saved.pdf")));
+        const auto revision = content->revision();
+        content->undo(); // History must not change the in-flight save snapshot.
+        QCOMPARE(content->revision(), revision);
+        QTRY_VERIFY_WITH_TIMEOUT(!document.saving(), 30000);
+        QVERIFY2(document.saveError().isEmpty(), qPrintable(document.saveError()));
+        QVERIFY(!document.dirty());
+        QVERIFY(content->setTextStyle(id, "Serif", 36, true, false, false));
+        QVERIFY(document.dirty());
+        content->undo();
+        QVERIFY(!document.dirty());
+        content->redo();
+        QVERIFY(document.dirty());
+        document.saveAs(QUrl::fromLocalFile(directory.filePath("styled.pdf")));
+        QTRY_VERIFY_WITH_TIMEOUT(!document.saving(), 30000);
+        QVERIFY(!document.dirty());
+        content->undo();
+        QVERIFY(document.dirty());
+        content->redo();
+        QVERIFY(!document.dirty());
+    }
+
     void textFormattingAndPersistence()
     {
         PdfDocument document;
@@ -909,6 +1026,14 @@ class ViewerTests : public QObject
         size->setProperty("value", 20);
         QVERIFY(QMetaObject::invokeMethod(dialog, "accept"));
         QCOMPARE(content->object(textId)["fontSize"].toInt(), 20);
+        QVERIFY(click("undoAdditionsButton"));
+        QCOMPARE(content->object(textId)["fontSize"].toInt(), 30);
+        QVERIFY(click("redoAdditionsButton"));
+        QCOMPARE(content->object(textId)["fontSize"].toInt(), 20);
+        QTest::keyClick(window, Qt::Key_Z, Qt::ControlModifier);
+        QTRY_COMPARE(content->object(textId)["fontSize"].toInt(), 30);
+        QTest::keyClick(window, Qt::Key_Z, Qt::ControlModifier | Qt::ShiftModifier);
+        QTRY_COMPARE(content->object(textId)["fontSize"].toInt(), 20);
         QVERIFY(std::abs(content->object(textId)["x"].toDouble() - 45) < 2);
         QTemporaryDir dir;
         QImage image(80, 40, QImage::Format_ARGB32);
@@ -932,12 +1057,17 @@ class ViewerTests : public QObject
             }
             const int id = content->selected();
             QCOMPARE(content->object(id)["type"].toString(), type);
+            const auto beforeDrag = content->object(id);
             QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, scene(60, 60));
             QTest::mouseMove(window, scene(75, 80), 20);
             QTest::mouseMove(window, scene(90, 100), 20);
             QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, scene(90, 100));
             QTRY_VERIFY(content->object(id)["x"].toDouble() > 65);
             const auto before = content->object(id);
+            QVERIFY(click("undoAdditionsButton"));
+            QCOMPARE(content->object(id), beforeDrag);
+            QVERIFY(click("redoAdditionsButton"));
+            QCOMPARE(content->object(id), before);
             const double right =
                 before["x"].toDouble() + before["width"].toDouble() - 2 / document.zoom();
             const double bottom =
@@ -947,6 +1077,11 @@ class ViewerTests : public QObject
             QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier,
                                 scene(right + 25, bottom + 20));
             QTRY_VERIFY(content->object(id)["width"].toDouble() > before["width"].toDouble() + 15);
+            const auto resized = content->object(id);
+            QVERIFY(click("undoAdditionsButton"));
+            QCOMPARE(content->object(id), before);
+            QVERIFY(click("redoAdditionsButton"));
+            QCOMPARE(content->object(id), resized);
             QVERIFY(click("deleteObjectButton"));
             QTRY_COMPARE(content->count(), 0);
         }

@@ -2,6 +2,32 @@
 
 Last updated: 2026-10-08
 
+## Roadmap Phase 2 — added-content undo/redo
+
+Added session history for text, images and signatures: creation, deletion,
+movement, resizing, text edits and font changes. QML groups placement plus
+formatting, each text-dialog acceptance and an entire drag into one step.
+Bottom-bar controls and platform keyboard shortcuts expose history without
+intercepting text-editor or native-form focus. History changes are blocked
+during saving; native form edits are tracked separately and are not undoable
+through these controls.
+
+History restores unique saved-state IDs, so undo/redo correctly updates the
+unsaved marker. New branches discard redo; invalid/no-op edits preserve it.
+Snapshots preserve imported pixels after source deletion. History is bounded
+to 100 states and 64 MiB of estimated metadata/text and unique retained image
+pixels; closing/replacing the document clears it.
+
+Local focused tests cover grouped edits and actual QML drags/resizing, buttons,
+shortcuts, all addition types, branching, the step bound, saved-state markers,
+in-flight saving and reset. All six combined local CTest suites passed. This
+batch reuses PDFium and remains local to avoid another native artifact build.
+Fresh tarball and AppImage previews each passed all 27 QtTest results after
+relocation to a path containing spaces. These Fedora previews require glibc
+2.39 and do not establish the RHEL 9 or native Windows/macOS release gates.
+Copy/paste, multi-select, alignment and the additional drawing tools remain
+Phase 2 work.
+
 Pipeline follow-up: PDF Integration run 37811582359 failed the new underline
 raster assertion on Ubuntu's Qt 6.4.2, although it passed local Qt 6.10.2.
 The test now selects the explicitly installed Liberation Serif family for

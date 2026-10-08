@@ -3,9 +3,102 @@
 #include "pdf/PdfDocument.h"
 #include <QFontDatabase>
 #include <QImageReader>
+#include <QSet>
 #include <algorithm>
 #include <cmath>
 AddedContent::AddedContent(PdfDocument* document) : QObject(document), document_(document) {}
+AddedContent::State AddedContent::state() const
+{
+    auto objects = objects_;
+    // Mutators hold references into objects_; detach the snapshot rather than
+    // letting a later reference write also mutate its shared list storage.
+    objects.detach();
+    return {objects, selected_, revision_};
+}
+void AddedContent::restore(const State& state)
+{
+    objects_ = state.objects;
+    selected_ = state.selected;
+    revision_ = state.revision;
+    error_.clear();
+    emit changed();
+}
+void AddedContent::beginEdit()
+{
+    if (editing_)
+        return;
+    editing_ = true;
+    editRecorded_ = false;
+    emit changed();
+}
+void AddedContent::endEdit()
+{
+    if (!editing_)
+        return;
+    editing_ = false;
+    editRecorded_ = false;
+    emit changed();
+}
+void AddedContent::recordEdit()
+{
+    if (!editing_ || !editRecorded_)
+    {
+        undo_.append(state());
+        redo_.clear();
+        editRecorded_ = true;
+        trimHistory();
+    }
+    // State IDs stay unique on new branches, but undo restores a previous ID
+    // so returning to the saved state also clears the unsaved marker.
+    revision_ = ++nextRevision_;
+}
+void AddedContent::trimHistory()
+{
+    const auto bytes = [this]()
+    {
+        qint64 total = 0;
+        QSet<qint64> images;
+        for (const auto* history : {&undo_, &redo_})
+            for (const auto& state : *history)
+                for (const auto& object : state.objects)
+                {
+                    total += sizeof(Object) + 2 * (object.text.size() + object.fontFamily.size());
+                    if (!object.image.isNull() && !images.contains(object.image.cacheKey()))
+                    {
+                        images.insert(object.image.cacheKey());
+                        total += object.image.sizeInBytes();
+                    }
+                }
+        return total;
+    };
+    while (undo_.size() + redo_.size() > 100 || bytes() > 64 * 1024 * 1024)
+    {
+        if (!undo_.isEmpty())
+            undo_.removeFirst();
+        else if (!redo_.isEmpty())
+            redo_.removeFirst();
+        else
+            break;
+    }
+}
+void AddedContent::undo()
+{
+    if (!canUndo() || document_->saving())
+        return;
+    const auto previous = undo_.takeLast();
+    redo_.append(state());
+    trimHistory();
+    restore(previous);
+}
+void AddedContent::redo()
+{
+    if (!canRedo() || document_->saving())
+        return;
+    const auto next = redo_.takeLast();
+    undo_.append(state());
+    trimHistory();
+    restore(next);
+}
 QStringList AddedContent::fontFamilies() const
 {
     auto families = QFontDatabase::families();
@@ -45,7 +138,7 @@ int AddedContent::insert(int page, double x, double y, const QString& type, cons
     const QRectF rect = bounded(page, {x, y, w, h});
     if (rect.isEmpty())
         return -1;
-    ++revision_;
+    recordEdit();
     objects_.append({++nextId_, page, type, text, rect, image});
     selected_ = nextId_;
     error_.clear();
@@ -118,7 +211,9 @@ bool AddedContent::geometry(int id, double x, double y, double w, double h)
             const auto r = bounded(o.page, {x, y, w, h});
             if (r.isEmpty())
                 return false;
-            ++revision_;
+            if (o.rect == r)
+                return true;
+            recordEdit();
             o.rect = r;
             emit changed();
             return true;
@@ -134,7 +229,7 @@ bool AddedContent::setText(int id, const QString& text)
         {
             if (o.text == text)
                 return true;
-            ++revision_;
+            recordEdit();
             o.text = text;
             emit changed();
             return true;
@@ -152,12 +247,12 @@ bool AddedContent::setTextStyle(int id, const QString& family, int size, bool bo
             if (object.fontFamily == family && object.fontSize == size && object.bold == bold &&
                 object.italic == italic && object.underline == underline)
                 return true;
+            recordEdit();
             object.fontFamily = family;
             object.fontSize = size;
             object.bold = bold;
             object.italic = italic;
             object.underline = underline;
-            ++revision_;
             emit changed();
             return true;
         }
@@ -171,14 +266,17 @@ void AddedContent::select(int id)
 void AddedContent::removeSelected()
 {
     if (selected_ >= 0)
-        ++revision_;
+        recordEdit();
     objects_.removeIf([this](const Object& o) { return o.id == selected_; });
     selected_ = -1;
     emit changed();
 }
 void AddedContent::clear()
 {
-    ++revision_;
+    revision_ = ++nextRevision_;
+    undo_.clear();
+    redo_.clear();
+    editing_ = editRecorded_ = false;
     objects_.clear();
     selected_ = -1;
     error_.clear();
