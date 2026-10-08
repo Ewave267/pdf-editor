@@ -2,8 +2,11 @@
 
 Use **Save As** or **Ctrl+Shift+S** to choose a new local PDF. The application
 preserves the open document's original content, edited form values and form structures and embeds
-its text, image, and signature additions in the new PDF. Text uses embedded
-fonts; images use lossless encoding, including signature transparency.
+its text, image, signature, checkmark, drawing, highlight, shape and stamp
+additions in the new PDF. Text uses embedded fonts; paths stay vector graphics,
+and images use lossless encoding. Highlights and signatures retain transparency.
+Pages, thumbnails and export share the added-content painter. Saving waits until
+an active drawing, movement or resize gesture is finished.
 
 The original source filename and its existing file aliases are rejected as
 save destinations. Saving to another existing filename uses the file dialog's

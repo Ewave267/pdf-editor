@@ -15,25 +15,19 @@ void AddedOverlay::paint(QPainter* p)
     for (const auto& o : content_->objects())
         if (o.page == page_)
         {
-            p->save();
-            p->setClipRect(o.rect);
-            if (o.type == "text")
-            {
-                p->setFont(AddedContent::textFont(o));
-                p->setPen(Qt::black);
-                p->drawText(o.rect, Qt::AlignLeft | Qt::AlignTop | Qt::TextWordWrap, o.text);
-            }
-            else
-                p->drawImage(o.rect, o.image);
-            p->restore();
-            if (selection_ && o.id == content_->selected())
+            AddedContent::paintObject(p, o);
+            if (selection_ && content_->isSelected(o.id))
             {
                 p->setPen(QPen(QColor("#225a91"), 1.5 / scale));
                 p->setBrush(Qt::NoBrush);
                 p->drawRect(o.rect);
-                p->fillRect(QRectF(o.rect.right() - 5 / scale, o.rect.bottom() - 5 / scale,
-                                   10 / scale, 10 / scale),
-                            QColor("#225a91"));
+                if (content_->selectionCount() == 1)
+                    for (double x : {o.rect.left(), o.rect.center().x(), o.rect.right()})
+                        for (double y : {o.rect.top(), o.rect.center().y(), o.rect.bottom()})
+                            if (x != o.rect.center().x() || y != o.rect.center().y())
+                                p->fillRect(
+                                    QRectF(x - 4 / scale, y - 4 / scale, 8 / scale, 8 / scale),
+                                    QColor("#225a91"));
             }
         }
 }

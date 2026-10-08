@@ -48,34 +48,20 @@ unless a dependency change requires rebuilding it.
 
 ## Phase 2 — Everyday Editing
 
-Text formatting is the first Phase 2 increment: added text boxes support font
-family, size, bold, italic and underline, including thumbnail and PDF export.
-Added-content undo/redo now covers creation, deletion, movement, resizing, text
-and formatting, with grouped gestures and saved-state tracking. The remaining
-tools, copy/paste, multi-select and alignment below are still pending; Phase 2
-is not complete.
+Implementation complete. Added-content tools now include text with font family,
+size, bold, italic and underline; images and signatures; checkmarks, freehand,
+translucent highlights, rectangles, ellipses, lines and text stamps.
 
-Expand added-content tools.
+Everyday editing includes grouped undo/redo, copy/cut/paste, page-local
+multi-selection and area selection, six alignment modes, keyboard commands,
+eight resize handles and Shift-corner aspect locking. Pages, thumbnails and
+PDF export share the rendering implementation. See [ADDED-CONTENT](ADDED-CONTENT.md)
+for controls, tests and bounds.
 
-Support:
-
-- Text.
-- Signatures.
-- Images.
-- Checkmarks.
-- Freehand drawing.
-- Highlights.
-- Shapes.
-- Stamps.
-
-Add:
-
-- Undo / redo.
-- Copy / paste.
-- Multi-select.
-- Alignment.
-- Keyboard shortcuts.
-- Better selection and resize controls.
+This completes the added-content scope, not the production release roadmap.
+Existing PDF text editing, native form undo, recovery and safe dynamic XFA
+addition export remain outside this phase. Native-platform release checks are
+still required for new builds.
 
 ## Phase 3 — Form Experience
 

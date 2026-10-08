@@ -17,6 +17,13 @@ void PdfDocument::saveAs(const QUrl& url)
 {
     if (saving_)
         return;
+    if (additions_->editing())
+    {
+        saveError_ = "Finish the current edit before saving.";
+        emit saveStateChanged();
+        emit saveFinished(false);
+        return;
+    }
     saveError_.clear();
     const QFileInfo target(url.toLocalFile());
     const bool sameFile = pdf::detail::sameFile(sourcePath_, target.absoluteFilePath());
@@ -79,19 +86,7 @@ void PdfDocument::saveAs(const QUrl& url)
             for (const auto& object : additions_->objects())
                 if (object.page == page)
                 {
-                    painter.save();
-                    painter.setClipRect(object.rect);
-                    if (object.type == "text")
-                    {
-                        painter.setFont(AddedContent::textFont(object));
-                        painter.setPen(Qt::black);
-                        painter.drawText(object.rect,
-                                         Qt::AlignLeft | Qt::AlignTop | Qt::TextWordWrap,
-                                         object.text);
-                    }
-                    else
-                        painter.drawImage(object.rect, object.image);
-                    painter.restore();
+                    AddedContent::paintObject(&painter, object);
                 }
         }
         painter.end();

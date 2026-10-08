@@ -8,8 +8,11 @@ renders and scrolls pages, zooms, navigates by page number, and shows thumbnails
 PDFium runs in an isolated worker behind a C++ document interface. Step 2 also
 verifies exact XFA values through repeated saves and independent PDF.js reopening.
 The viewer also supports adding, moving, resizing, and deleting text, images,
-and image-based signatures. Added text supports font family, size, bold, italic
-and underline, with undo/redo for added-content edits. Save As embeds additions in a new PDF, with atomic writes and source-file
+image-based signatures, checkmarks, freehand strokes, highlights, shapes and
+stamps. Added text supports font family, size, bold, italic and underline.
+Everyday editing includes grouped undo/redo, copy/paste, multi-selection,
+alignment and keyboard controls; see [added-content controls](docs/ADDED-CONTENT.md).
+Save As embeds additions in a new PDF, with atomic writes and source-file
 protection. Native text fields, checkboxes, radio buttons, dropdowns, and keyboard
 navigation work for the synthetic AcroForm and dynamic XFA fixtures. Save As
 preserves edited values and XFA calculations. Dynamic XFA copies without additions
@@ -34,8 +37,8 @@ ZIPs and both Linux formats have passed native CI packaging and save/reopen
 validation. Clean-desktop walkthroughs remain the next release check.
 
 Linux release targets are RHEL 9, Fedora, and Ubuntu 22.04/24.04 or newer
-on x86_64 and aarch64 (64-bit ARM). ARM artifacts are newly added; their first
-CI validation is pending.
+on x86_64 and aarch64 (64-bit ARM). Both architectures have passed native CI
+packaging and save/reopen checks.
 The builder must bundle dependencies compiled against glibc 2.34 or older;
 the packaging tool enforces this baseline. Local Fedora previews require newer
 glibc and do not establish RHEL compatibility.

@@ -8,7 +8,9 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QGuiApplication>
+#include <QJsonArray>
 #include <QJsonDocument>
+#include <QMimeData>
 #include <QPainter>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
@@ -82,6 +84,379 @@ class ViewerTests : public QObject
 #endif
     }
   private slots:
+    void everydayEditingMouseAndKeyboard()
+    {
+        PdfDocument document;
+        QQmlApplicationEngine engine;
+        engine.rootContext()->setContextProperty("pdfDocument", &document);
+        engine.load(QUrl("qrc:/qml/Main.qml"));
+        QVERIFY(!engine.rootObjects().isEmpty());
+        auto* window = qobject_cast<QQuickWindow*>(engine.rootObjects().first());
+        QVERIFY(QTest::qWaitForWindowExposed(window));
+        document.open(fixture("normal/blank.pdf"));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        auto* content = document.additions();
+        auto click = [&](const QString& name)
+        {
+            auto* target = item(window->contentItem(), name);
+            if (!target)
+                return false;
+            QTest::mouseClick(
+                window, Qt::LeftButton, Qt::NoModifier,
+                target->mapToScene(QPointF(target->width() / 2, target->height() / 2)).toPoint());
+            return true;
+        };
+        auto* mouse = item(window->contentItem(), "contentMouse0");
+        QVERIFY(mouse);
+        auto scene = [&](double x, double y)
+        { return mouse->mapToScene(QPointF(x * document.zoom(), y * document.zoom())).toPoint(); };
+        auto* dialog = window->findChild<QObject*>("graphicDialog");
+        QVERIFY(dialog);
+        int row = 0;
+        for (const QString kind :
+             {"checkmark", "rectangle", "ellipse", "highlight", "line", "drawing", "stamp"})
+        {
+            QVERIFY(click("drawToolsButton"));
+            QTest::qWait(30);
+            QVERIFY(click(kind + "Tool"));
+            QTRY_VERIFY(dialog->property("visible").toBool());
+            if (kind == "stamp")
+            {
+                auto* text = item(window->contentItem(), "stampText");
+                QVERIFY(text);
+                text->setProperty("text", "REVIEWED");
+            }
+            QVERIFY(QMetaObject::invokeMethod(dialog, "accept"));
+            QTRY_COMPARE(window->property("placement").toString(), kind);
+            const double x = row % 2 ? 280 : 40;
+            const double y = 40 + (row / 2) * 110;
+            QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, scene(x, y));
+            if (kind != "checkmark" && kind != "stamp")
+            {
+                QTest::mouseMove(window, scene(x + 30, y + 20), 20);
+                QTest::mouseMove(window, scene(x + 100, y + 50), 20);
+            }
+            QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, scene(x + 100, y + 50));
+            ++row;
+            QTRY_COMPARE(content->count(), row);
+            QCOMPARE(content->object(content->selected())["type"].toString(), kind);
+            QVERIFY(!content->editing());
+            if (kind == "drawing")
+                QVERIFY(content->object(content->selected())["pointCount"].toInt() >= 3);
+        }
+        if (qEnvironmentVariableIsSet("PDF_PHASE2_SCREENSHOT"))
+        {
+            QTest::qWait(100);
+            QVERIFY(window->grabWindow().save(qEnvironmentVariable("PDF_PHASE2_SCREENSHOT")));
+        }
+        QVERIFY(click("selectAreaButton"));
+        QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, scene(30, 30));
+        QTest::mouseMove(window, scene(400, 100), 20);
+        QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, scene(400, 100));
+        QTRY_COMPARE(content->selectionCount(), 2);
+        const auto firstId = content->objects()[0].id, secondId = content->objects()[1].id;
+        const auto first = content->object(firstId), second = content->object(secondId);
+        QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, scene(55, 55));
+        QTest::mouseMove(window, scene(65, 65), 20);
+        QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, scene(65, 65));
+        QTRY_VERIFY(content->object(firstId)["x"].toDouble() > first["x"].toDouble());
+        QCOMPARE(content->object(secondId)["x"].toDouble() - second["x"].toDouble(),
+                 content->object(firstId)["x"].toDouble() - first["x"].toDouble());
+        QTest::keyClick(window, Qt::Key_Z, Qt::ControlModifier);
+        QTRY_COMPARE(content->object(firstId), first);
+        QTest::keyClick(window, Qt::Key_C, Qt::ControlModifier);
+        QTest::keyClick(window, Qt::Key_V, Qt::ControlModifier);
+        QTRY_COMPARE(content->count(), 9);
+        QCOMPARE(content->selectionCount(), 2);
+        QTest::keyClick(window, Qt::Key_Delete);
+        QTRY_COMPARE(content->count(), 7);
+        QTest::keyClick(window, Qt::Key_Z, Qt::ControlModifier);
+        QTRY_COMPARE(content->count(), 9);
+        content->undo(); // Undo paste too.
+        QCOMPARE(content->count(), 7);
+        content->select(secondId);
+        const auto box = content->object(secondId);
+        for (const QPointF handle : {QPointF(0, 0), QPointF(.5, 0), QPointF(1, 0), QPointF(1, .5),
+                                     QPointF(1, 1), QPointF(.5, 1), QPointF(0, 1), QPointF(0, .5)})
+        {
+            const double x = box["x"].toDouble() + handle.x() * box["width"].toDouble();
+            const double y = box["y"].toDouble() + handle.y() * box["height"].toDouble();
+            QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, scene(x, y));
+            QTest::mouseMove(window, scene(x + 10, y + 10), 20);
+            QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, scene(x + 10, y + 10));
+            QVERIFY(content->object(secondId) != box);
+            content->undo();
+            QCOMPARE(content->object(secondId), box);
+        }
+        const double right = box["x"].toDouble() + box["width"].toDouble();
+        const double bottom = box["y"].toDouble() + box["height"].toDouble();
+        QTest::mousePress(window, Qt::LeftButton, Qt::ShiftModifier, scene(right, bottom));
+        // QTest::mouseMove always sends NoModifier; preserve Shift on this event.
+        QTest::mouseEvent(QTest::MouseMove, window, Qt::NoButton, Qt::ShiftModifier,
+                          scene(right + 20, bottom + 5), 20);
+        QTest::mouseRelease(window, Qt::LeftButton, Qt::ShiftModifier,
+                            scene(right + 20, bottom + 5));
+        const auto proportional = content->object(secondId);
+        QVERIFY(std::abs(proportional["width"].toDouble() / proportional["height"].toDouble() -
+                         box["width"].toDouble() / box["height"].toDouble()) < .001);
+        QVERIFY(proportional != box);
+        content->undo();
+        // Shift-click toggles members without moving the group.
+        QTest::mouseClick(window, Qt::LeftButton, Qt::ShiftModifier, scene(55, 55));
+        QCOMPARE(content->selectionCount(), 2);
+        QVERIFY(click("alignObjectsButton"));
+        QTest::qWait(30);
+        QVERIFY(click("alignLeft"));
+        QCOMPARE(content->object(firstId)["x"], content->object(secondId)["x"]);
+        content->undo();
+        content->select(secondId);
+        QVERIFY(click("appearanceButton"));
+        QTRY_VERIFY(dialog->property("visible").toBool());
+        item(window->contentItem(), "inkColor")->setProperty("currentIndex", 2);
+        item(window->contentItem(), "inkWidth")->setProperty("value", 5);
+        QVERIFY(QMetaObject::invokeMethod(dialog, "accept"));
+        QCOMPARE(content->object(secondId)["color"].toString(), QString("#ff225a91"));
+        QCOMPARE(content->object(secondId)["lineWidth"].toDouble(), 5.);
+        content->undo();
+        QCOMPARE(content->object(secondId), box);
+        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, scene(300, 60));
+        QTest::keyClick(window, Qt::Key_Right, Qt::ShiftModifier);
+        QCOMPARE(content->object(secondId)["x"].toDouble(), box["x"].toDouble() + 10);
+        content->undo();
+        // Cancel a live gesture without discarding the previous redo branch.
+        QVERIFY(content->canRedo());
+        QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, scene(300, 60));
+        QTest::mouseMove(window, scene(310, 70), 20);
+        QVERIFY(content->editing());
+        QTest::keyClick(window, Qt::Key_Escape);
+        QTest::mouseMove(window, scene(320, 80), 20);
+        QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, scene(320, 80));
+        QVERIFY(!content->editing());
+        QCOMPARE(content->object(secondId), box);
+        QVERIFY(content->canRedo());
+        QGuiApplication::clipboard()->clear();
+        document.close();
+    }
+
+    void multiSelectionClipboardAndAlignment()
+    {
+        PdfDocument document;
+        document.open(fixture("normal/multi-page.pdf"));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        auto* content = document.additions();
+        const int first = content->addText(0, 20, 30, "First");
+        const int second = content->addText(0, 300, 150, "Second");
+        QVERIFY(content->geometry(second, 300, 150, 120, 40));
+        QVERIFY(content->setTextStyle(second, "Serif", 28, true, true, true));
+        content->select(first);
+        content->toggleSelection(second);
+        QCOMPARE(content->selectionCount(), 2);
+        content->beginEdit();
+        QVERIFY(content->moveSelection(10, 10));
+        QVERIFY(content->moveSelection(30, 40));
+        content->endEdit();
+        QCOMPARE(content->object(first)["x"].toDouble(), 50.);
+        QCOMPARE(content->object(second)["x"].toDouble(), 330.);
+        content->undo();
+        QCOMPARE(content->selectionCount(), 2);
+        QCOMPARE(content->object(first)["x"].toDouble(), 20.);
+        content->redo();
+        QVERIFY(content->nudgeSelection(10000, 10000));
+        const auto page = document.pages()[0].toMap();
+        QCOMPARE(content->object(second)["x"].toDouble() +
+                     content->object(second)["width"].toDouble(),
+                 page["width"].toDouble());
+        QCOMPARE(content->object(second)["y"].toDouble() +
+                     content->object(second)["height"].toDouble(),
+                 page["height"].toDouble());
+        QCOMPARE(content->object(second)["x"].toDouble() - content->object(first)["x"].toDouble(),
+                 280.);
+        for (const QString mode : {"left", "center", "right", "top", "middle", "bottom"})
+        {
+            const auto a = content->object(first), b = content->object(second);
+            QVERIFY(content->alignSelection(mode));
+            const auto coordinate = [&mode](const QVariantMap& object)
+            {
+                const bool horizontal = mode == "left" || mode == "center" || mode == "right";
+                const double position = object[horizontal ? "x" : "y"].toDouble();
+                const double size = object[horizontal ? "width" : "height"].toDouble();
+                return position + ((mode == "center" || mode == "middle")  ? size / 2
+                                   : (mode == "right" || mode == "bottom") ? size
+                                                                           : 0);
+            };
+            QCOMPARE(coordinate(content->object(first)), coordinate(content->object(second)));
+            content->undo();
+            QCOMPARE(content->object(first), a);
+            QCOMPARE(content->object(second), b);
+        }
+        QVERIFY(content->copySelection());
+        const auto payload = QGuiApplication::clipboard()->mimeData()->data(
+            "application/vnd.pdf-editor.additions+json");
+        QVERIFY(content->paste(1));
+        QCOMPARE(content->count(), 4);
+        QCOMPARE(content->selectionCount(), 2);
+        const int pasted = content->selected();
+        QVERIFY(pasted != second);
+        QCOMPARE(content->object(pasted)["page"].toInt(), 1);
+        QCOMPARE(content->object(pasted)["fontSize"].toInt(), 28);
+        QVERIFY(content->object(pasted)["italic"].toBool());
+        content->undo();
+        QCOMPARE(content->count(), 2);
+        content->redo();
+        QCOMPARE(content->count(), 4);
+        QVERIFY(content->cutSelection());
+        QCOMPARE(content->count(), 2);
+        content->undo();
+        QCOMPARE(content->count(), 4);
+        QCOMPARE(content->selectionCount(), 2);
+        content->toggleSelection(first);
+        QCOMPARE(content->selectionCount(), 1);
+        QCOMPARE(content->selected(), first); // Different pages never share a selection.
+        const auto revision = content->revision();
+        auto parsed = QJsonDocument::fromJson(payload).object();
+        auto objects = parsed["objects"].toArray();
+        auto invalid = objects[0].toObject();
+        invalid["width"] = 1e100;
+        objects[0] = invalid;
+        parsed["objects"] = objects;
+        auto* mime = new QMimeData;
+        mime->setData("application/vnd.pdf-editor.additions+json", QJsonDocument(parsed).toJson());
+        QGuiApplication::clipboard()->setMimeData(mime);
+        QVERIFY(!content->paste(0));
+        QCOMPARE(content->revision(), revision);
+        QCOMPARE(content->count(), 4);
+        QGuiApplication::clipboard()->setText("External clipboard text");
+        QVERIFY(content->paste(0));
+        QCOMPARE(content->object(content->selected())["text"].toString(),
+                 QString("External clipboard text"));
+        QImage image(20, 20, QImage::Format_ARGB32);
+        image.fill(Qt::magenta);
+        QGuiApplication::clipboard()->setImage(image);
+        QVERIFY(content->paste(0));
+        QCOMPARE(content->objects().last().image, image);
+        content->selectAll(1);
+        QCOMPARE(content->selectionCount(), 2);
+        content->removeSelected();
+        QCOMPARE(content->count(), 4);
+        content->undo();
+        QCOMPARE(content->count(), 6);
+        QCOMPARE(content->selectionCount(), 2);
+        QGuiApplication::clipboard()->clear();
+    }
+
+    void graphicsSaveAndReopen()
+    {
+        PdfDocument document;
+        document.open(fixture("normal/blank.pdf"));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        auto* content = document.additions();
+        QVERIFY(content->addGraphic(0, 40, 40, "checkmark", "#237a38", 3) > 0);
+        QVERIFY(content->addGraphic(0, 120, 40, "rectangle", "#225a91", 2) > 0);
+        QVERIFY(content->addGraphic(0, 280, 40, "ellipse", "#c62828", 3) > 0);
+        const int line = content->addGraphic(0, 40, 150, "line", "black", 2);
+        QVERIFY(content->setLine(line, 40, 150, 180, 200));
+        QVERIFY(content->addGraphic(0, 260, 160, "highlight", "yellow", 2) > 0);
+        QVERIFY(content->addGraphic(0, 40, 260, "stamp", "#c62828", 2, "APPROVED") > 0);
+        content->beginEdit();
+        const int drawing = content->addGraphic(0, 260, 260, "drawing", "black", 3);
+        QVERIFY(content->appendStroke(drawing, 300, 290));
+        QVERIFY(content->appendStroke(drawing, 360, 270));
+        QVERIFY(content->appendStroke(drawing, 390, 320));
+        content->endEdit();
+        QCOMPARE(content->object(drawing)["pointCount"].toInt(), 4);
+        content->undo();
+        QVERIFY(content->object(drawing).isEmpty());
+        content->redo();
+        QCOMPARE(content->object(drawing)["pointCount"].toInt(), 4);
+        const auto revision = content->revision();
+        QVERIFY(!content->appendStroke(drawing, NAN, 1));
+        QCOMPARE(content->addGraphic(0, 1, 1, "invalid", "black", 2), -1);
+        QCOMPARE(content->revision(), revision);
+        content->addText(0, 40, 390, "Everyday editing");
+        QTemporaryDir directory;
+        QImage image(40, 20, QImage::Format_ARGB32);
+        image.fill(Qt::magenta);
+        const auto path = directory.filePath("image.png");
+        QVERIFY(image.save(path));
+        content->addImage(0, 260, 390, QUrl::fromLocalFile(path));
+        image.fill(Qt::transparent);
+        {
+            QPainter painter(&image);
+            painter.fillRect(QRect(10, 5, 20, 10), Qt::magenta);
+        }
+        QVERIFY(image.save(path));
+        content->addImage(0, 40, 500, QUrl::fromLocalFile(path), true);
+        QCOMPARE(content->count(), 10);
+        content->selectAll(0);
+        QVERIFY(content->copySelection());
+        QVERIFY(content->paste(0));
+        QCOMPARE(content->count(), 20);
+        for (int i = 0; i < 10; ++i)
+        {
+            const auto& originalObject = content->objects()[i];
+            const auto& pastedObject = content->objects()[i + 10];
+            QCOMPARE(originalObject.type, pastedObject.type);
+            QCOMPARE(originalObject.points, pastedObject.points);
+            QCOMPARE(originalObject.color, pastedObject.color);
+            QCOMPARE(originalObject.image, pastedObject.image);
+        }
+        content->undo();
+        QCOMPARE(content->count(), 10);
+        QGuiApplication::clipboard()->clear();
+        content->beginEdit();
+        document.saveAs(QUrl::fromLocalFile(directory.filePath("partial.pdf")));
+        QVERIFY(!document.saveError().isEmpty());
+        QVERIFY(!QFile::exists(directory.filePath("partial.pdf")));
+        content->cancelEdit();
+        QFile source(fixture("normal/blank.pdf").toLocalFile());
+        QVERIFY(source.open(QIODevice::ReadOnly));
+        const auto original = source.readAll();
+        for (int generation = 1; generation <= 2; ++generation)
+        {
+            const auto output =
+                QUrl::fromLocalFile(directory.filePath(QString("graphics-%1.pdf").arg(generation)));
+            document.saveAs(output);
+            QTRY_VERIFY_WITH_TIMEOUT(!document.saving(), 30000);
+            QVERIFY2(document.saveError().isEmpty(), qPrintable(document.saveError()));
+#ifdef SAVE_NODE
+            QProcess reader;
+            reader.start(QString(SAVE_NODE),
+                         {QString(TEST_ROOT) + "/tools/check_phase2_content.mjs",
+                          QString(SAVE_PDFJS), output.toLocalFile()});
+            QVERIFY(reader.waitForFinished(20000));
+            const auto diagnostics = reader.readAllStandardOutput() + reader.readAllStandardError();
+            QVERIFY2(reader.exitCode() == 0, diagnostics.constData());
+#endif
+        }
+        source.seek(0);
+        QCOMPARE(source.readAll(), original);
+        const auto output = QUrl::fromLocalFile(directory.filePath("graphics-2.pdf"));
+        document.open(output);
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        QSignalSpy images(&document, &PdfDocument::rendered);
+        document.requestRender(0, 612);
+        QTRY_VERIFY_WITH_TIMEOUT(!images.isEmpty(), 10000);
+        const auto rendered = qvariant_cast<QImage>(images.first()[1]);
+        const auto hasInk = [&rendered](const QRect& area)
+        {
+            for (int y = area.top(); y <= area.bottom(); ++y)
+                for (int x = area.left(); x <= area.right(); ++x)
+                    if (qGray(rendered.pixel(x, y)) < 180)
+                        return true;
+            return false;
+        };
+        for (const auto& area :
+             {QRect(40, 40, 32, 32), QRect(120, 40, 120, 70), QRect(280, 40, 120, 70),
+              QRect(38, 148, 145, 55), QRect(255, 250, 140, 80)})
+            QVERIFY(hasInk(area));
+        const auto highlight = rendered.pixelColor(270, 170);
+        QVERIFY(highlight.red() > 245 && highlight.green() > 245 && highlight.blue() > 150 &&
+                highlight.blue() < 220);
+        QCOMPARE(rendered.pixelColor(270, 400), QColor(Qt::magenta));
+        QCOMPARE(rendered.pixelColor(110, 540), QColor(Qt::magenta));
+        QCOMPARE(rendered.pixelColor(45, 505), QColor(Qt::white));
+    }
+
     void additionUndoRedo()
     {
         PdfDocument document;

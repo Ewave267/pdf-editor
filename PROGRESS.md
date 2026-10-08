@@ -2,6 +2,42 @@
 
 Last updated: 2026-10-08
 
+## Roadmap Phase 2 — everyday editing complete
+
+Completed the remaining added-content scope: checkmarks, freehand strokes,
+translucent highlights, rectangles, ellipses, lines and editable text stamps.
+All tools use the shared page/thumbnail/export painter. Export keeps vector
+paths and transparency; generic font choices prefer available bundled
+Liberation faces to avoid duplicate extracted text from synthetic bold.
+
+Added page-local multi-selection with Shift-click, area selection and Select
+all; group movement, six alignment modes, copy/cut/paste and keyboard nudging
+and deletion. Clipboard copies preserve styles, vectors and image pixels;
+external text/images are accepted with validated bounds. Eight resize handles
+and Shift-corner aspect locking improve single-object editing. Escape rolls
+back active gestures, preserving the previous undo/redo branch. Saving rejects
+unfinished gestures. All new operations participate in grouped session history
+and saved-state tracking.
+
+Validation: all six local CTest suites passed (106 seconds); the complete
+viewer suite passed again after final gesture refinements. Fresh portable
+Linux tarball and AppImage previews each passed all 30 QtTest results after
+relocation to a folder with spaces, using bundled Qt/PDFium and the isolated
+worker. New tests exercise actual tool menus, freehand placement, area and
+Shift selection, group dragging, keyboard clipboard/deletion/nudging,
+alignment, styling, all eight handles, aspect locking and gesture cancellation.
+Model tests cover all clipboard object types, invalid input, page bounds and
+history. Saved graphics are checked through PDFium rendering and pinned PDF.js,
+including transparency, vector paths and repeated-save duplication. The actual
+QML screenshot was visually inspected.
+
+Updated README, ROADMAP, ADDED-CONTENT and SAVING documentation. Changes are
+batched locally; no native GitHub artifact workflow was triggered. These
+Fedora previews require glibc 2.39 and do not establish RHEL 9 or new
+Windows/macOS validation. Phase 1 reliability work and later production-release
+gates remain open. Existing PDF text editing, native-form undo and dynamic XFA
+addition export are outside this completed added-content phase.
+
 ## Roadmap Phase 2 — added-content undo/redo
 
 Added session history for text, images and signatures: creation, deletion,
@@ -52,8 +88,8 @@ cover style validation, revisions, changed previews, underlining, dialog
 creation/edit/cancel and save/reopen. Pinned PDF.js verifies a 24-point embedded
 Liberation Serif Bold Italic font with system-font fallback disabled. The dialog
 screenshot was inspected. Formatting is uniform within each added box; existing
-PDF text and form-field fonts are outside this feature. Phase 2's remaining
-tools, undo/redo and selection improvements remain pending.
+PDF text and form-field fonts are outside this feature. The remaining tools, undo/redo and selection improvements were pending at
+this increment and are completed by the subsequent milestones above.
 
 Fresh local tarball and AppImage previews each passed all 25 QtTest results
 after relocation to a path containing spaces. These Fedora builds require

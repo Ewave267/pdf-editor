@@ -30,6 +30,16 @@ ApplicationWindow {
     property string placement: ""
     property string pendingText: ""
     property var pendingTextStyle: ({})
+    property var pendingGraphic: ({})
+    property var inkColors: ["#000000", "#c62828", "#225a91", "#237a38", "#ffdf00", "#7638a8"]
+    function chooseGraphic(kind) {
+        graphicDialog.editing = false
+        graphicDialog.kind = kind
+        inkColor.currentIndex = kind === "highlight" ? 4 : kind === "stamp" ? 1 : 0
+        inkWidth.value = kind === "checkmark" ? 3 : 2
+        stampText.text = "APPROVED"
+        graphicDialog.open()
+    }
     property url pendingImage
     property var selectedObject: ({})
     property var discardAction
@@ -56,6 +66,44 @@ ApplicationWindow {
         standardButtons: Dialog.Discard | Dialog.Cancel
         Label { text: "Form edits or added content have not been saved. Discard changes to continue?" }
         onDiscarded: { const action = root.discardAction; root.discardAction = null; action() }
+    }
+    Dialog {
+        id: graphicDialog
+        objectName: "graphicDialog"
+        property bool editing: false
+        property string kind: "rectangle"
+        title: editing ? "Appearance" : "Add " + (kind === "drawing" ? "freehand drawing" : kind)
+        anchors.centerIn: parent
+        width: Math.min(400, root.width - 40)
+        modal: true
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        ColumnLayout {
+            width: parent.width
+            RowLayout {
+                Label { text: "Color" }
+                ComboBox { id: inkColor; objectName: "inkColor"; model: ["Black", "Red", "Blue", "Green", "Yellow", "Purple"]; Layout.fillWidth: true; Accessible.name: "Ink color" }
+            }
+            RowLayout {
+                visible: graphicDialog.kind !== "highlight" && graphicDialog.kind !== "text"
+                Label { text: "Line width (pt)" }
+                SpinBox { id: inkWidth; objectName: "inkWidth"; from: 1; to: 12; value: 2; editable: true; Accessible.name: "Line width in points" }
+            }
+            TextField { id: stampText; objectName: "stampText"; visible: graphicDialog.kind === "stamp"; Layout.fillWidth: true; maximumLength: 200; placeholderText: "Stamp text"; Accessible.name: "Stamp text"; onTextChanged: { if (graphicDialog.visible) graphicDialog.standardButton(Dialog.Ok).enabled = graphicDialog.kind !== "stamp" || text.trim().length > 0 } }
+            Label { visible: !graphicDialog.editing; Layout.fillWidth: true; wrapMode: Text.WordWrap; text: graphicDialog.kind === "drawing" ? "Press and drag on a page to draw. Release to finish." : "Click to place, or drag to choose the size." }
+        }
+        onOpened: standardButton(Dialog.Ok).enabled = kind !== "stamp" || stampText.text.trim().length > 0
+        onAccepted: {
+            const color = root.inkColors[inkColor.currentIndex]
+            if (editing) {
+                pdfDocument.additions.beginEdit()
+                pdfDocument.additions.setAppearance(pdfDocument.additions.selected, color, inkWidth.value)
+                if (kind === "stamp") pdfDocument.additions.setText(pdfDocument.additions.selected, stampText.text)
+                pdfDocument.additions.endEdit()
+            } else {
+                root.pendingGraphic = { color: color, width: inkWidth.value, text: kind === "stamp" ? stampText.text : "" }
+                root.placement = kind
+            }
+        }
     }
     Dialog {
         id: textDialog
@@ -146,7 +194,7 @@ ApplicationWindow {
         nameFilters: ["Images (*.png *.jpg *.jpeg *.webp *.bmp)"]
         onAccepted: { root.pendingImage = selectedFile; root.placement = signature ? "signature" : "image" }
     }
-    Shortcut { sequence: "Escape"; onActivated: { root.placement = ""; pdfDocument.additions.select(-1) } }
+    Shortcut { sequence: "Escape"; enabled: !textDialog.visible && !graphicDialog.visible && !imageDialog.visible && !saveDialog.visible && !discardDialog.visible && !fileDialog.visible && !saveFailure.visible && !(root.activeFocusItem instanceof FormInput); onActivated: { root.placement = ""; pdfDocument.additions.cancelEdit(); pdfDocument.additions.select(-1) } }
     Connections {
         target: pdfDocument.additions
         function onChanged() { root.selectedObject = pdfDocument.additions.object(pdfDocument.additions.selected) }
@@ -184,18 +232,32 @@ ApplicationWindow {
         target: pdfDocument
         function onSaveFinished(success) { if (!success && pdfDocument.saveError) saveFailure.open() }
     }
-    Shortcut { sequence: "Ctrl+Shift+S"; enabled: pdfDocument.ready && !pdfDocument.saving; onActivated: saveDialog.open() }
+    Shortcut { sequence: "Ctrl+Shift+S"; enabled: pdfDocument.ready && !pdfDocument.saving && !pdfDocument.additions.editing; onActivated: saveDialog.open() }
     Shortcut { sequences: [StandardKey.Open]; onActivated: fileDialog.open() }
     Shortcut { sequences: [StandardKey.Close]; onActivated: root.closeDocument() }
     Shortcut { sequence: "Ctrl++"; onActivated: pdfDocument.zoom *= 1.2 }
     Shortcut { sequence: "Ctrl+-"; onActivated: pdfDocument.zoom /= 1.2 }
     Shortcut { sequence: "Ctrl+0"; onActivated: pdfDocument.fitToPage() }
     property bool additionHistoryShortcuts: pdfDocument.ready && !pdfDocument.saving
-        && !textDialog.visible && !imageDialog.visible && !saveDialog.visible && !discardDialog.visible
+        && !pdfDocument.additions.editing && !graphicDialog.visible
+        && !textDialog.visible && !imageDialog.visible && !saveDialog.visible && !discardDialog.visible && !fileDialog.visible && !saveFailure.visible
         && !(root.activeFocusItem instanceof FormInput)
         && !(root.activeFocusItem && typeof root.activeFocusItem.undo === "function")
     Shortcut { sequences: [StandardKey.Undo]; enabled: root.additionHistoryShortcuts && pdfDocument.additions.canUndo; onActivated: pdfDocument.additions.undo() }
     Shortcut { sequences: [StandardKey.Redo]; enabled: root.additionHistoryShortcuts && pdfDocument.additions.canRedo; onActivated: pdfDocument.additions.redo() }
+    Shortcut { sequences: [StandardKey.Copy]; enabled: root.additionHistoryShortcuts && pdfDocument.additions.selectionCount > 0; onActivated: pdfDocument.additions.copySelection() }
+    Shortcut { sequences: [StandardKey.Cut]; enabled: root.additionHistoryShortcuts && pdfDocument.additions.selectionCount > 0; onActivated: pdfDocument.additions.cutSelection() }
+    Shortcut { sequences: [StandardKey.Paste]; enabled: root.additionHistoryShortcuts; onActivated: pdfDocument.additions.paste(pdfDocument.currentPage - 1) }
+    Shortcut { sequences: [StandardKey.SelectAll]; enabled: root.additionHistoryShortcuts; onActivated: pdfDocument.additions.selectAll(pdfDocument.currentPage - 1) }
+    Shortcut { sequences: ["Delete", "Backspace"]; enabled: root.additionHistoryShortcuts && pdfDocument.additions.selectionCount > 0; onActivated: pdfDocument.additions.removeSelected() }
+    Shortcut { sequence: "Left"; enabled: root.additionHistoryShortcuts && pdfDocument.additions.selectionCount > 0; onActivated: pdfDocument.additions.nudgeSelection(-1, 0) }
+    Shortcut { sequence: "Right"; enabled: root.additionHistoryShortcuts && pdfDocument.additions.selectionCount > 0; onActivated: pdfDocument.additions.nudgeSelection(1, 0) }
+    Shortcut { sequence: "Up"; enabled: root.additionHistoryShortcuts && pdfDocument.additions.selectionCount > 0; onActivated: pdfDocument.additions.nudgeSelection(0, -1) }
+    Shortcut { sequence: "Down"; enabled: root.additionHistoryShortcuts && pdfDocument.additions.selectionCount > 0; onActivated: pdfDocument.additions.nudgeSelection(0, 1) }
+    Shortcut { sequence: "Shift+Left"; enabled: root.additionHistoryShortcuts && pdfDocument.additions.selectionCount > 0; onActivated: pdfDocument.additions.nudgeSelection(-10, 0) }
+    Shortcut { sequence: "Shift+Right"; enabled: root.additionHistoryShortcuts && pdfDocument.additions.selectionCount > 0; onActivated: pdfDocument.additions.nudgeSelection(10, 0) }
+    Shortcut { sequence: "Shift+Up"; enabled: root.additionHistoryShortcuts && pdfDocument.additions.selectionCount > 0; onActivated: pdfDocument.additions.nudgeSelection(0, -10) }
+    Shortcut { sequence: "Shift+Down"; enabled: root.additionHistoryShortcuts && pdfDocument.additions.selectionCount > 0; onActivated: pdfDocument.additions.nudgeSelection(0, 10) }
 
     header: ToolBar {
         implicitHeight: 56
@@ -206,7 +268,7 @@ ApplicationWindow {
             spacing: 10
             Label { text: "PDF FORM EDITOR"; font.pixelSize: 13; font.bold: true; color: "#354a60"; Layout.rightMargin: 12 }
             Button { objectName: "openButton"; text: "Open PDF"; enabled: !pdfDocument.saving; onClicked: fileDialog.open(); Accessible.name: "Open PDF" }
-            Button { objectName: "saveButton"; text: pdfDocument.saving ? "Saving…" : "Save As"; enabled: pdfDocument.ready && !pdfDocument.saving; onClicked: saveDialog.open() }
+            Button { objectName: "saveButton"; text: pdfDocument.saving ? "Saving…" : "Save As"; enabled: pdfDocument.ready && !pdfDocument.saving && !pdfDocument.additions.editing; onClicked: saveDialog.open() }
             Button { objectName: "closeButton"; text: "Close"; enabled: !pdfDocument.saving && (pdfDocument.ready || pdfDocument.loading || pdfDocument.error || pdfDocument.dirty); onClicked: root.closeDocument() }
             Item { Layout.fillWidth: true }
             Button { objectName: "zoomOutButton"; text: "−"; enabled: pdfDocument.ready && pdfDocument.zoom > 0.25; onClicked: pdfDocument.zoom /= 1.2; Accessible.name: "Zoom out" }
@@ -297,15 +359,70 @@ ApplicationWindow {
                 Button { objectName: "addTextButton"; text: "Text"; onClicked: { textDialog.editing = false; textInput.text = ""; textDialog.loadStyle({}); textDialog.open() } }
                 Button { objectName: "addImageButton"; text: "Image"; onClicked: { imageDialog.signature = false; imageDialog.open() } }
                 Button { objectName: "addSignatureButton"; text: "Signature"; onClicked: { imageDialog.signature = true; imageDialog.open() } }
-                Button { objectName: "editTextButton"; text: "Edit text"; visible: root.selectedObject.type === "text"; onClicked: { textDialog.editing = true; textInput.text = root.selectedObject.text; textDialog.loadStyle(root.selectedObject); textDialog.open() } }
+                Button { objectName: "editTextButton"; text: "Edit text"; visible: pdfDocument.additions.selectionCount === 1 && (root.selectedObject.type === "text" || root.selectedObject.type === "stamp"); onClicked: { textDialog.editing = true; textInput.text = root.selectedObject.text; textDialog.loadStyle(root.selectedObject); textDialog.open() } }
                 Button { objectName: "deleteObjectButton"; text: "Delete"; enabled: pdfDocument.additions.selected >= 0; onClicked: pdfDocument.additions.removeSelected() }
                 Label { Layout.fillWidth: true; elide: Text.ElideRight; textFormat: Text.PlainText; text: pdfDocument.error || pdfDocument.formError || (root.placement ? "Click a page to place " + root.placement + " · Esc cancels" : pdfDocument.additions.error || (pdfDocument.dirty ? "Unsaved changes · Save As keeps edits" : pdfDocument.savedPath ? "Saved · " + pdfDocument.savedPath : pdfDocument.formType !== "PDF" ? "Click a field · Tab moves focus · Save As keeps edits" : "Add content to a page")); color: "#596878" }
+            }
+            Flickable {
+                id: extraToolView
+                anchors.top: contentTools.bottom
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.margins: 8
+                height: 40
+                clip: true
+                contentWidth: extraTools.implicitWidth
+                contentHeight: height
+                visible: pdfDocument.ready
+                enabled: !pdfDocument.saving && !pdfDocument.additions.editing
+                flickableDirection: Flickable.HorizontalFlick
+                ScrollBar.horizontal: ScrollBar {}
+                RowLayout {
+                    id: extraTools
+                    height: parent.height
+                    ToolButton {
+                        objectName: "drawToolsButton"; text: "Draw ▾"; onClicked: drawMenu.popup()
+                        Menu {
+                            id: drawMenu
+                            MenuItem { objectName: "checkmarkTool"; text: "Checkmark"; onTriggered: root.chooseGraphic("checkmark") }
+                            MenuItem { objectName: "drawingTool"; text: "Freehand"; onTriggered: root.chooseGraphic("drawing") }
+                            MenuItem { objectName: "highlightTool"; text: "Highlight"; onTriggered: root.chooseGraphic("highlight") }
+                            MenuItem { objectName: "rectangleTool"; text: "Rectangle"; onTriggered: root.chooseGraphic("rectangle") }
+                            MenuItem { objectName: "ellipseTool"; text: "Ellipse"; onTriggered: root.chooseGraphic("ellipse") }
+                            MenuItem { objectName: "lineTool"; text: "Line"; onTriggered: root.chooseGraphic("line") }
+                            MenuItem { objectName: "stampTool"; text: "Stamp"; onTriggered: root.chooseGraphic("stamp") }
+                        }
+                    }
+                    ToolButton { objectName: "copyObjectsButton"; text: "Copy"; enabled: pdfDocument.additions.selectionCount > 0; onClicked: pdfDocument.additions.copySelection() }
+                    ToolButton { objectName: "cutObjectsButton"; text: "Cut"; enabled: pdfDocument.additions.selectionCount > 0; onClicked: pdfDocument.additions.cutSelection() }
+                    ToolButton { objectName: "pasteObjectsButton"; text: "Paste"; onClicked: pdfDocument.additions.paste(pdfDocument.currentPage - 1) }
+                    ToolButton { objectName: "selectAllObjectsButton"; text: "Select all"; onClicked: pdfDocument.additions.selectAll(pdfDocument.currentPage - 1) }
+                    ToolButton { objectName: "selectAreaButton"; text: "Select area"; onClicked: root.placement = "selection" }
+                    ToolButton {
+                        objectName: "alignObjectsButton"; text: "Align ▾"; enabled: pdfDocument.additions.selectionCount > 1; onClicked: alignMenu.popup()
+                        Menu {
+                            id: alignMenu
+                            MenuItem { objectName: "alignLeft"; text: "Left"; onTriggered: pdfDocument.additions.alignSelection("left") }
+                            MenuItem { text: "Horizontal center"; onTriggered: pdfDocument.additions.alignSelection("center") }
+                            MenuItem { text: "Right"; onTriggered: pdfDocument.additions.alignSelection("right") }
+                            MenuItem { text: "Top"; onTriggered: pdfDocument.additions.alignSelection("top") }
+                            MenuItem { text: "Vertical center"; onTriggered: pdfDocument.additions.alignSelection("middle") }
+                            MenuItem { text: "Bottom"; onTriggered: pdfDocument.additions.alignSelection("bottom") }
+                        }
+                    }
+                    ToolButton { objectName: "appearanceButton"; text: "Style…"; enabled: pdfDocument.additions.selectionCount === 1 && root.selectedObject.type !== "image" && root.selectedObject.type !== "signature"; onClicked: {
+                        graphicDialog.editing = true; graphicDialog.kind = root.selectedObject.type
+                        inkColor.currentIndex = Math.max(0, root.inkColors.indexOf(root.selectedObject.color.substring(0, 1) + root.selectedObject.color.substring(3)))
+                        inkWidth.value = root.selectedObject.lineWidth; stampText.text = root.selectedObject.text; graphicDialog.open()
+                    } }
+                    Label { text: "Shift-click to select several"; color: "#596878" }
+                }
             }
             ListView {
                 id: pageView
                 objectName: "pageView"
                 anchors.fill: parent
-                anchors.topMargin: 58
+                anchors.topMargin: 106
                 visible: pdfDocument.ready
                 model: pdfDocument.pages
                 clip: true
@@ -345,9 +462,25 @@ ApplicationWindow {
                             property real startX
                             property real startY
                             property bool resizing: false
+                            property int resizeX: 0
+                            property int resizeY: 0
+                            property int drawingId: -1
+                            property string drawingKind: ""
+                            property bool selectingArea: false
+                            property bool additiveArea: false
+                            property rect selectionBox: Qt.rect(0, 0, 0, 0)
+                            Rectangle { x: parent.selectionBox.x; y: parent.selectionBox.y; width: parent.selectionBox.width; height: parent.selectionBox.height; visible: parent.selectingArea && root.placement === "selection"; color: "#18225a91"; border.color: "#225a91" }
                             onPressed: function(mouse) {
                                 pdfDocument.currentPage = index + 1
                                 const x = mouse.x / pdfDocument.zoom, y = mouse.y / pdfDocument.zoom
+                                if (root.placement === "selection") {
+                                    pdfDocument.commitForm(); forceActiveFocus()
+                                    startX = x; startY = y; selectingArea = true
+                                    additiveArea = (mouse.modifiers & Qt.ShiftModifier) !== 0
+                                    selectionBox = Qt.rect(mouse.x, mouse.y, 0, 0)
+                                    original = ({})
+                                    return
+                                }
                                 if (root.placement) {
                                     pdfDocument.commitForm()
                                     if (root.placement === "text") {
@@ -358,27 +491,101 @@ ApplicationWindow {
                                             style.bold, style.italic, style.underline)
                                         pdfDocument.additions.endEdit()
                                     }
-                                    else pdfDocument.additions.addImage(index, x, y, root.pendingImage, root.placement === "signature")
+                                    else if (root.placement === "image" || root.placement === "signature")
+                                        pdfDocument.additions.addImage(index, x, y, root.pendingImage, root.placement === "signature")
+                                    else {
+                                        pdfDocument.additions.beginEdit()
+                                        const ink = root.pendingGraphic
+                                        drawingKind = root.placement
+                                        drawingId = pdfDocument.additions.addGraphic(index, x, y, drawingKind, ink.color, ink.width, ink.text)
+                                        startX = x; startY = y
+                                        forceActiveFocus()
+                                        root.placement = ""
+                                        original = ({})
+                                        return
+                                    }
+                                    forceActiveFocus()
                                     root.placement = ""
                                     original = ({})
                                     return
                                 }
-                                const id = pdfDocument.additions.hit(index, x, y)
+                                let id = pdfDocument.additions.hit(index, x, y)
+                                if (id < 0 && pdfDocument.additions.selectionCount === 1 && root.selectedObject.page === index) {
+                                    const box = root.selectedObject
+                                    const near = function(a, b) { return Math.abs(a - b) * pdfDocument.zoom < 6 }
+                                    const atXEdge = near(x, box.x) || near(x, box.x + box.width)
+                                    const atYEdge = near(y, box.y) || near(y, box.y + box.height)
+                                    if ((atXEdge && (atYEdge || near(y, box.y + box.height / 2)))
+                                        || (atYEdge && near(x, box.x + box.width / 2))) id = box.id
+                                }
                                 if (id >= 0) pdfDocument.commitForm()
-                                pdfDocument.additions.select(id)
+                                let shiftHandle = false
+                                if (id >= 0 && pdfDocument.additions.selectionCount === 1 && pdfDocument.additions.selected === id) {
+                                    const box = root.selectedObject
+                                    const near = function(a, b) { return Math.abs(a - b) * pdfDocument.zoom < 6 }
+                                    const horizontal = near(x, box.x) || near(x, box.x + box.width)
+                                    const vertical = near(y, box.y) || near(y, box.y + box.height)
+                                    shiftHandle = (horizontal && (vertical || near(y, box.y + box.height / 2)))
+                                        || (vertical && near(x, box.x + box.width / 2))
+                                }
+                                if (id >= 0 && (mouse.modifiers & Qt.ShiftModifier) && !shiftHandle) {
+                                    pdfDocument.additions.toggleSelection(id)
+                                    original = ({})
+                                    forceActiveFocus()
+                                    return
+                                }
+                                pdfDocument.additions.focusObject(id)
                                 original = pdfDocument.additions.object(id)
-                                if (id >= 0) pdfDocument.additions.beginEdit()
+                                if (id >= 0) { pdfDocument.additions.beginEdit(); forceActiveFocus() }
                                 startX = x; startY = y
-                                resizing = id >= 0 && Math.abs(mouse.x - (original.x + original.width) * pdfDocument.zoom) < 12 && Math.abs(mouse.y - (original.y + original.height) * pdfDocument.zoom) < 12
+                                resizeX = resizeY = 0
+                                if (id >= 0 && pdfDocument.additions.selectionCount === 1) {
+                                    const near = function(a, b) { return Math.abs(a - b) * pdfDocument.zoom < 6 }
+                                    const horizontal = near(x, original.x) ? -1 : near(x, original.x + original.width) ? 1 : 0
+                                    const vertical = near(y, original.y) ? -1 : near(y, original.y + original.height) ? 1 : 0
+                                    if (horizontal && (vertical || near(y, original.y + original.height / 2))) resizeX = horizontal
+                                    if (vertical && (horizontal || near(x, original.x + original.width / 2))) resizeY = vertical
+                                }
+                                resizing = resizeX !== 0 || resizeY !== 0
                                 if (id < 0) mouse.accepted = false
                             }
                             onPositionChanged: function(mouse) {
-                                if (!pressed || original.id === undefined) return
+                                if (!pressed) return
+                                if (selectingArea) {
+                                    selectionBox = Qt.rect(Math.min(startX * pdfDocument.zoom, mouse.x), Math.min(startY * pdfDocument.zoom, mouse.y), Math.abs(mouse.x - startX * pdfDocument.zoom), Math.abs(mouse.y - startY * pdfDocument.zoom))
+                                    return
+                                }
+                                if (!pdfDocument.additions.editing) return
+                                if (drawingId >= 0) {
+                                    const x = mouse.x / pdfDocument.zoom, y = mouse.y / pdfDocument.zoom
+                                    if (drawingKind === "drawing") pdfDocument.additions.appendStroke(drawingId, x, y)
+                                    else if (drawingKind === "line") pdfDocument.additions.setLine(drawingId, startX, startY, x, y)
+                                    else pdfDocument.additions.geometry(drawingId, Math.min(startX, x), Math.min(startY, y), Math.max(12, Math.abs(x - startX)), Math.max(12, Math.abs(y - startY)))
+                                    return
+                                }
+                                if (original.id === undefined) return
                                 const dx = mouse.x / pdfDocument.zoom - startX, dy = mouse.y / pdfDocument.zoom - startY
-                                pdfDocument.additions.geometry(original.id, original.x + (resizing ? 0 : dx), original.y + (resizing ? 0 : dy), original.width + (resizing ? dx : 0), original.height + (resizing ? dy : 0))
+                                if (!resizing) { pdfDocument.additions.moveSelection(dx, dy); return }
+                                let width = Math.max(12, original.width + resizeX * dx)
+                                let height = Math.max(12, original.height + resizeY * dy)
+                                if (resizeX && resizeY && (mouse.modifiers & Qt.ShiftModifier)) {
+                                    const ratio = original.width / original.height
+                                    if (Math.abs(width - original.width) > Math.abs(height - original.height) * ratio) height = width / ratio
+                                    else width = height * ratio
+                                }
+                                pdfDocument.additions.geometry(original.id,
+                                    original.x + (resizeX < 0 ? original.width - width : 0),
+                                    original.y + (resizeY < 0 ? original.height - height : 0), width, height)
                             }
-                            onReleased: { pdfDocument.additions.endEdit(); original = ({}) }
-                            onCanceled: { pdfDocument.additions.endEdit(); original = ({}) }
+                            onReleased: {
+                                if (selectingArea && root.placement === "selection") {
+                                    pdfDocument.additions.selectRect(index, selectionBox.x / pdfDocument.zoom, selectionBox.y / pdfDocument.zoom, selectionBox.width / pdfDocument.zoom, selectionBox.height / pdfDocument.zoom, additiveArea)
+                                    root.placement = ""
+                                }
+                                selectingArea = false
+                                pdfDocument.additions.endEdit(); original = ({}); drawingId = -1; drawingKind = ""
+                            }
+                            onCanceled: { selectingArea = false; root.placement = ""; pdfDocument.additions.cancelEdit(); original = ({}); drawingId = -1; drawingKind = "" }
                         }
                     }
                 }
