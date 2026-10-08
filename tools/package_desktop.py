@@ -41,6 +41,35 @@ def verify_gui(binary, environment):
             raise RuntimeError(output)
 
 
+def verify_worker_loader(worker, environment, results):
+    # A loader failure also returns nonzero; that is not proof of isolation.
+    # Require the policy's intentional rejection before testing the sandbox.
+    result = subprocess.run([str(worker)], env=environment, capture_output=True, timeout=15)
+    output = result.stdout + result.stderr
+    (results / "worker-loader.log").write_bytes(output)
+    expected = b"Worker requires"
+    if result.returncode != 1 or expected not in output:
+        raise RuntimeError(
+            f"Packaged worker failed before its sandbox check: exit {result.returncode} "
+            f"(0x{result.returncode & 0xffffffff:08x})\n{output.decode(errors='replace')}")
+
+
+def run_smoke(test, fixtures, results, environment):
+    # Keep startup diagnostics even when the temporary deployment is removed.
+    log = results / "native-smoke.log"
+    with log.open("wb") as output:
+        try:
+            result = subprocess.run([str(test), str(fixtures), str(results)], env=environment,
+                                    stdout=output, stderr=subprocess.STDOUT, timeout=240)
+        except subprocess.TimeoutExpired:
+            print(log.read_text(errors="replace"), flush=True)
+            raise
+    transcript = log.read_text(errors="replace")
+    print(transcript, flush=True)
+    if result.returncode:
+        raise RuntimeError(f"Native smoke failed: exit {result.returncode}; diagnostics: {log}")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--target", choices=("windows", "macos"), required=True)
@@ -89,9 +118,9 @@ def main():
                 raise RuntimeError("Cannot locate the app-local MSVC x64 CRT; run in the MSVC developer environment")
             for dependency in candidates[0].glob("*.dll"):
                 shutil.copy2(dependency, root / dependency.name)
-            for name in ("msvcp140.dll", "vcruntime140.dll", "vcruntime140_1.dll"):
-                if not (root / name).is_file():
-                    raise RuntimeError(f"Missing app-local compiler runtime: {name}")
+            for runtime_name in ("msvcp140.dll", "vcruntime140.dll", "vcruntime140_1.dll"):
+                if not (root / runtime_name).is_file():
+                    raise RuntimeError(f"Missing app-local compiler runtime: {runtime_name}")
             platforms = root / "platforms"
             platforms.mkdir(exist_ok=True)
             shutil.copy2(args.qt_prefix / "plugins/platforms/qoffscreen.dll", platforms / "qoffscreen.dll")
@@ -118,15 +147,26 @@ def main():
                     run(["install_name_tool", "-change", dependency, "@rpath/libpdfium.dylib", worker])
             test = contents / "MacOS/native-smoke"
             shutil.copy2(args.smoke, test)
-            platforms = contents / "PlugIns/platforms"
-            platforms.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(args.qt_prefix / "plugins/platforms/libqoffscreen.dylib",
-                         platforms / "libqoffscreen.dylib")
-            # Validation helper must also select the deployed frameworks rather
-            # than a developer SDK. Deploy all three executables together.
+            # Deploy only editor plugins. Copying every SQL driver drags in
+            # optional database client libraries absent from hosted runners.
+            plugins = []
+            for category in ("platforms", "imageformats", "iconengines", "styles"):
+                destination = contents / "PlugIns" / category
+                destination.mkdir(parents=True, exist_ok=True)
+                for plugin in sorted((args.qt_prefix / "plugins" / category).glob("*.dylib")):
+                    deployed = destination / plugin.name
+                    shutil.copy2(plugin, deployed)
+                    plugins.append(deployed)
+            for required in ("libqcocoa.dylib", "libqoffscreen.dylib"):
+                if not (contents / "PlugIns/platforms" / required).is_file():
+                    raise RuntimeError(f"Required native Qt platform plugin is missing: {required}")
+            # Scan each selected plugin as well as the GUI/worker/helper so its
+            # own framework dependencies are deployed and rewritten too.
             run([args.qt_prefix / "bin/macdeployqt", bundle, f"-qmldir={ROOT / 'qml'}",
-                 f"-executable={worker}", f"-executable={test}", "-always-overwrite"])
-            for file in (binary, worker, test):
+                 f"-executable={worker}", f"-executable={test}",
+                 *[f"-executable={plugin}" for plugin in plugins],
+                 "-no-plugins", "-always-overwrite"])
+            for file in (binary, worker, test, *plugins):
                 rpaths = run(["otool", "-l", file], capture_output=True, text=True).stdout
                 for path in re.findall(r"\bpath (.+) \(offset \d+\)", rpaths):
                     if str(args.qt_prefix) in path:
@@ -153,12 +193,9 @@ def main():
         shutil.copytree(args.qt_notices, notices, dirs_exist_ok=True)
         shutil.copy2(ROOT / "LICENSE", root / "LICENSE")
         shutil.copy2(ROOT / "docs/NATIVE-RELEASES.md", root / "README.md")
+        verify_worker_loader(worker, env, smoke_results)
         verify_gui(binary, env)
-        run([test, args.fixtures.resolve(), smoke_results], env=env, timeout=240)
-        # Direct worker invocation must fail closed outside its native sandbox.
-        rejected = subprocess.run([str(worker)], env=env, capture_output=True, timeout=15)
-        if rejected.returncode == 0:
-            raise RuntimeError("Worker ran without its native sandbox")
+        run_smoke(test, args.fixtures.resolve(), smoke_results, env)
         test.unlink()
         if args.target == "macos":
             run(["codesign", "--force", "--deep", "--preserve-metadata=entitlements", "--sign", "-",

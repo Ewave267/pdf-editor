@@ -244,6 +244,9 @@ int wmain(int argc, wchar_t** argv)
                 "Cannot wait for worker completion");
         DWORD exitCode = 1;
         require(GetExitCodeProcess(child.value, &exitCode), "Cannot read worker exit status");
+        if (exitCode != 0)
+            std::cerr << "Native PDF sandbox: worker exit " << exitCode << " (0x" << std::hex
+                      << exitCode << ")\n";
         return static_cast<int>(exitCode);
     }
     catch (const std::exception& error)

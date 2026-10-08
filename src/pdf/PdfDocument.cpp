@@ -276,14 +276,29 @@ void PdfDocument::open(const QUrl& url)
                     diagnostics_ += worker_->readAllStandardError().left(
                         std::max(0, 4096 - static_cast<int>(diagnostics_.size())));
             });
+    auto reportFailure = [this]
+    {
+        if (!worker_)
+            return;
+        diagnostics_ += worker_->readAllStandardError().left(
+            std::max(0, 4096 - static_cast<int>(diagnostics_.size())));
+        if (qEnvironmentVariableIsSet("PDF_EDITOR_WORKER_DIAGNOSTICS"))
+            qWarning().noquote() << "PDF worker: process error" << worker_->error()
+                                 << worker_->errorString() << "exit" << worker_->exitCode() << "hex"
+                                 << QString::number(static_cast<quint32>(worker_->exitCode()), 16)
+                                 << "status" << worker_->exitStatus()
+                                 << QString::fromUtf8(diagnostics_);
+    };
     connect(worker_, &QProcess::errorOccurred, this,
-            [this](QProcess::ProcessError) { fail("Cannot start the isolated PDF renderer."); });
-    connect(worker_, &QProcess::finished, this,
-            [this](int, QProcess::ExitStatus)
+            [this, reportFailure](QProcess::ProcessError)
             {
-                if (qEnvironmentVariableIsSet("PDF_EDITOR_WORKER_DIAGNOSTICS") &&
-                    !diagnostics_.isEmpty())
-                    qWarning().noquote() << "PDF worker:" << QString::fromUtf8(diagnostics_);
+                reportFailure();
+                fail("Cannot start the isolated PDF renderer.");
+            });
+    connect(worker_, &QProcess::finished, this,
+            [this, reportFailure](int, QProcess::ExitStatus)
+            {
+                reportFailure();
                 fail(loading_ && diagnostics_.contains("bwrap:")
                          ? "Your system could not start the PDF sandbox. Check the viewer setup "
                            "instructions."

@@ -462,9 +462,8 @@ int main(int argc, char** argv)
     }
     catch (const std::exception& error)
     {
-        if (argc == 2)
-            std::cerr << error.what() << '\n';
-        else
+        std::cerr << error.what() << '\n';
+        if (argc != 2)
             reply({{"error", error.what()}});
         return 1;
     }

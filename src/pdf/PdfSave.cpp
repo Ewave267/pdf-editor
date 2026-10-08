@@ -142,24 +142,33 @@ void PdfDocument::startSaveWorker(const QByteArray& baseline)
     }
     args[inputIndex] = input;
     args << "--save";
-    connect(saveWorker_, &QProcess::readyReadStandardError, this,
-            [this]
-            {
-                if (saveWorker_)
-                {
-                    auto diagnostics = saveWorker_->readAllStandardError();
-                    if (qEnvironmentVariableIsSet("PDF_EDITOR_WORKER_DIAGNOSTICS"))
-                    {
-                        const int used = saveWorker_->property("diagnosticBytes").toInt();
-                        diagnostics = diagnostics.left(std::max(0, 4096 - used));
-                        saveWorker_->setProperty("diagnosticBytes",
-                                                 used + static_cast<int>(diagnostics.size()));
-                        if (!diagnostics.isEmpty())
-                            qWarning().noquote()
-                                << "PDF save worker:" << QString::fromUtf8(diagnostics);
-                    }
-                }
-            });
+    auto drainDiagnostics = [this]
+    {
+        if (!saveWorker_)
+            return;
+        auto diagnostics = saveWorker_->readAllStandardError();
+        if (qEnvironmentVariableIsSet("PDF_EDITOR_WORKER_DIAGNOSTICS"))
+        {
+            const int used = saveWorker_->property("diagnosticBytes").toInt();
+            diagnostics = diagnostics.left(std::max(0, 4096 - used));
+            saveWorker_->setProperty("diagnosticBytes",
+                                     used + static_cast<int>(diagnostics.size()));
+            if (!diagnostics.isEmpty())
+                qWarning().noquote() << "PDF save worker:" << QString::fromUtf8(diagnostics);
+        }
+    };
+    auto reportFailure = [this, drainDiagnostics]
+    {
+        drainDiagnostics();
+        if (saveWorker_ && qEnvironmentVariableIsSet("PDF_EDITOR_WORKER_DIAGNOSTICS"))
+            qWarning().noquote() << "PDF save worker: process error" << saveWorker_->error()
+                                 << saveWorker_->errorString() << "exit" << saveWorker_->exitCode()
+                                 << "hex"
+                                 << QString::number(static_cast<quint32>(saveWorker_->exitCode()),
+                                                    16)
+                                 << "status" << saveWorker_->exitStatus();
+    };
+    connect(saveWorker_, &QProcess::readyReadStandardError, this, drainDiagnostics);
     connect(saveWorker_, &QProcess::readyReadStandardOutput, this,
             [this]
             {
@@ -169,17 +178,23 @@ void PdfDocument::startSaveWorker(const QByteArray& baseline)
                 if (saveBytes_.size() > 64 * 1024 * 1024)
                     finishSave("The saved PDF exceeds the 64 MiB limit.");
             });
-    connect(saveWorker_, &QProcess::errorOccurred, this, [this](QProcess::ProcessError)
-            { finishSave("Cannot run the isolated PDF save worker. Your changes are retained."); });
+    connect(saveWorker_, &QProcess::errorOccurred, this,
+            [this, reportFailure](QProcess::ProcessError)
+            {
+                reportFailure();
+                finishSave("Cannot run the isolated PDF save worker. Your changes are retained.");
+            });
     connect(saveWorker_, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this,
-            [this](int code, QProcess::ExitStatus status)
+            [this, reportFailure, drainDiagnostics](int code, QProcess::ExitStatus status)
             {
                 if (!saveWorker_)
                     return;
+                drainDiagnostics();
                 saveBytes_ += saveWorker_->readAllStandardOutput();
                 if (code != 0 || status != QProcess::NormalExit ||
                     !saveBytes_.startsWith("%PDF-") || saveBytes_.size() > 64 * 1024 * 1024)
                 {
+                    reportFailure();
                     finishSave("The PDF could not be saved. Your changes are retained.");
                     return;
                 }

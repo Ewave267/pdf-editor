@@ -26,8 +26,11 @@ to find the actual application archive and `SHA256SUMS`.
 Keep the full extracted application folder together. The current package
 version is `0.1.0-rc.1`. These are test candidates, not an automatically published
 GitHub Release. The first PDFium/V8 build is substantial; later runs cache the
-patched PDFium library. Each job has a three-hour limit and separate diagnostics
-on failure. Windows and macOS are new ports and require their first native CI
+patched PDFium library. Linux builds have a three-hour limit; Windows/Mac builds
+have a six-hour limit. XML-tested PDFium is cached before desktop deployment,
+so a later smoke failure does not require recompiling it. Jobs provide separate
+diagnostics on failure, including `worker-loader.log` and `native-smoke.log`
+for desktop startup failures. Windows and macOS are new ports and require their first native CI
 runs before their runtime behavior can be confirmed.
 
 ## Linux compatibility and usage
@@ -91,7 +94,9 @@ CPU, memory, lifetime and child-process limits. No administrator installation
 is required. Keep its helper, worker and DLLs beside the editor EXE.
 
 Mac builds target macOS 13 or newer, separately for Intel and Apple Silicon.
-`macdeployqt` bundles the Qt frameworks, QML/plugins and PDFium worker. The worker
+`macdeployqt` bundles the Qt frameworks, QML/plugins and PDFium worker.
+Only the editor's platform, image, icon and style plugins are selected; unused
+SQL drivers and their external database clients are excluded. The worker
 uses `/usr/bin/sandbox-exec` with a deny-default profile and resource limits;
 no network, child-process or host file-write access is granted. The worker
 verifies its sandbox before parsing a document. This uses Darwin sandbox SPI;

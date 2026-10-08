@@ -384,3 +384,27 @@ Python 3.14; PDFium and packaging retain Python 3.12. The foundation job now
 pins Ubuntu 24.04 instead of following the changing latest label. Workflow
 lint and whitespace checks passed; native MSVC setup awaits the next Windows
 GitHub run.
+
+## Native candidate startup diagnostics — 2026-10-07
+
+First macOS ARM and Windows jobs reach packaging but fail starting the isolated
+worker; the supplied excerpts do not identify the underlying loader/sandbox
+error. Worker failures now drain stderr before teardown and log process status,
+exit codes and Windows hexadecimal codes in the validation transcript. Native
+workers always report startup exceptions to stderr. Packaging distinguishes
+intentional unsandboxed-worker rejection from a DLL/dyld loader failure and
+preserves `worker-loader.log` and `native-smoke.log` in failure artifacts.
+
+Mac deployment now selects only platform, image, icon and style plugins,
+excluding unused SQL drivers with unavailable database libraries. A Windows
+packaging variable collision that changed the ZIP name was corrected. Desktop
+jobs now allow six hours; Intel Mac builds use four compiler jobs. XML-tested
+PDFium is cached immediately, even if later desktop deployment fails. Mac ARM
+queue capacity is controlled by GitHub. Native worker failures remain unconfirmed
+until the improved logs from the next platform runs are available.
+
+Validation: the editor rebuild and all six Linux regression suites passed.
+Python helper checks verified intentional policy rejection, rejection of loader
+failures, and preservation of failing smoke transcripts. Python compilation,
+Actionlint and whitespace checks passed. Windows/macOS native execution remains
+pending; no sandbox permissions were broadened based on these incomplete logs.
