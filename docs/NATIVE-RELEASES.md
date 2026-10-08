@@ -12,13 +12,14 @@ release candidates → Run workflow**, choose the branch and start it manually.
 No self-hosted runner or signing secrets are required.
 
 Wait for the jobs to finish, then open the workflow run and download its
-**Artifacts**. Choose a `pdf-editor-*` artifact; `linux-validation-inputs`
+**Artifacts**. Choose a `pdf-editor-*` artifact; `linux-validation-inputs-*` and `pdfium-linux-arm64-build-inputs`
 is temporary tooling for the validation job. GitHub wraps each artifact in an extra ZIP; extract that first
 to find the actual application archive and `SHA256SUMS`.
 
 | GitHub artifact | Application package | Start |
 | --- | --- | --- |
 | `pdf-editor-linux-x86_64` | Portable `.tar.gz` and `.AppImage` | Extract tarball and run `./pdf-editor`, or run AppImage |
+| `pdf-editor-linux-aarch64` | ARM64 portable `.tar.gz` and `.AppImage` | Extract tarball and run `./pdf-editor`, or run AppImage on 64-bit ARM Linux |
 | `pdf-editor-windows-x64` | ZIP with EXE and DLLs | Extract completely, double-click `pdf-editor.exe` |
 | `pdf-editor-macos-arm64` | ZIP with `PDF Editor.app` | Extract on an Apple Silicon Mac, open the app |
 | `pdf-editor-macos-x64` | ZIP with `PDF Editor.app` | Extract on an Intel Mac, open the app |
@@ -35,6 +36,15 @@ passed Mac Intel/Apple Silicon and both Linux formats. Windows passed the full
 native job in [37783202566](https://github.com/Ewave267/pdf-editor/actions/runs/37783202566),
 including independent verification of added text and both form save generations.
 
+Linux ARM support is newly added and awaits its first successful CI run. The
+x86_64 packages keep their existing names. ARM uses a native GitHub-hosted
+`ubuntu-22.04-arm` runner for Qt builds, PDFium XML tests, sandboxed editing
+and independent save verification. PDFium alone is cross-compiled on x86_64
+using Chromium's pinned compiler and Rocky 9 ARM headers, because that upstream
+compiler is distributed for x86_64 Linux. The cross build is cached only after
+its XML tests pass on the native ARM runner. Each architecture has separate
+runtime checksum pins, caches, intermediate inputs and final artifacts.
+
 ## Linux compatibility and usage
 
 Linux binaries and bundled dependencies are built in a Rocky Linux 9 builder
@@ -49,9 +59,9 @@ the older runtime keeps the GCC ABI while avoiding that newer requirement.
 Its vendor signature is checked during extraction and its notices/source URL
 are included in the package.
 
-The target is x86_64 RHEL 9, Fedora and Ubuntu 22.04/24.04 or newer with a
+The targets are x86_64 and aarch64 (64-bit ARM) RHEL 9, Fedora and Ubuntu 22.04/24.04 or newer with a
 graphical desktop session. This baseline improves portability; it does not
-replace testing on those desktops. Older glibc systems, ARM Linux and musl
+replace testing on those desktops. Older glibc systems, 32-bit ARM and musl
 systems such as Alpine are outside this candidate's target.
 
 ```sh

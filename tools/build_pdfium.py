@@ -83,12 +83,25 @@ def setup_windows_git(environment):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--jobs", type=int, default=4)
+    parser.add_argument("--target-cpu", choices=("x64", "arm64"), help="Linux cross-build target")
+    parser.add_argument("--sysroot", type=Path, help="Target Linux baseline sysroot for cross builds")
+    parser.add_argument("--defer-xml-tests", action="store_true",
+                        help="Cross-build only: include XML tests for the native target runner")
     parser.add_argument("--skip-sync", action="store_true", help="reuse an already completed pinned source sync")
     args = parser.parse_args()
     target_os = {"linux": "linux", "win32": "win", "darwin": "mac"}.get(sys.platform)
     target_cpu = "arm64" if platform.machine().lower() in ("arm64", "aarch64") else "x64"
     if not target_os or (target_os != "mac" and target_cpu != "x64"):
         raise RuntimeError("supported hosts are Linux/Windows x64 and macOS x64/arm64")
+    cross_build = args.target_cpu is not None and args.target_cpu != target_cpu
+    if args.target_cpu is not None and target_os != "linux":
+        parser.error("--target-cpu is only supported for Linux")
+    if cross_build and (args.target_cpu != "arm64" or not args.sysroot or not args.defer_xml_tests):
+        parser.error("Linux ARM cross builds require --sysroot and --defer-xml-tests")
+    if not cross_build and (args.sysroot or args.defer_xml_tests):
+        parser.error("--sysroot and --defer-xml-tests are only for cross builds")
+    if args.target_cpu:
+        target_cpu = args.target_cpu
     if not 1 <= args.jobs <= 8:
         raise RuntimeError("jobs must be between 1 and 8")
     for program in ("git", "ninja", "cmake"):
@@ -165,16 +178,22 @@ use_glib = false
 """)
     with (build / "args.gn").open("a") as output:
         output.write(f'target_cpu = "{target_cpu}"\ntarget_os = "{target_os}"\n')
+        if cross_build:
+            output.write('target_sysroot = ' + json.dumps(args.sysroot.resolve().as_posix()) + '\n')
         if target_os == "mac":
             output.write('use_system_xcode = true\nmac_deployment_target = "13.0"\n')
     gn = source / {"linux": "buildtools/linux64/gn", "win": "buildtools/win/gn.exe", "mac": "buildtools/mac/gn"}[target_os]
     run([str(gn), "gen", str(build)], source, environment, "configure")
     run([shutil.which("ninja"), "-C", str(build), "-j", str(args.jobs), "pdfium", "pdfium_unittests"],
         source, environment, "compile")
-    run([str(build / ("pdfium_unittests.exe" if target_os == "win" else "pdfium_unittests")), "--gtest_filter=CFXXML*"],
-        source, environment, "xml-tests")
+    if not cross_build:
+        run([str(build / ("pdfium_unittests.exe" if target_os == "win" else "pdfium_unittests")), "--gtest_filter=CFXXML*"],
+            source, environment, "xml-tests")
     package = DEPS / "pdfium-patched"
     (package / "lib").mkdir(parents=True, exist_ok=True)
+    if cross_build:
+        (package / "build-tests").mkdir(exist_ok=True)
+        shutil.copyfile(build / "pdfium_unittests", package / "build-tests/pdfium_unittests")
     library_relative = {"linux": "lib/libpdfium.so", "mac": "lib/libpdfium.dylib", "win": "bin/pdfium.dll"}[target_os]
     library_name = Path(library_relative).name
     (package / Path(library_relative).parent).mkdir(parents=True, exist_ok=True)
@@ -223,7 +242,8 @@ set_target_properties(pdfium PROPERTIES
     for library in ("libc++", "libc++abi"):
         shutil.copyfile(source / "third_party" / library / "src/LICENSE.TXT",
                         package / "licenses" / f"{library}.txt")
-    print(f"Built and XML-tested PDFium persistence/compatibility patchset 2: {package}", flush=True)
+    status = "Built; native XML tests pending" if cross_build else "Built and XML-tested"
+    print(f"{status} PDFium persistence/compatibility patchset 2: {package}", flush=True)
 
 
 if __name__ == "__main__":

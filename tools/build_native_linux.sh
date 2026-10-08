@@ -13,6 +13,13 @@ export PATH="$PWD/.deps/bubblewrap-build:$PATH"
 if [[ ! -f .deps/pdfium-patched/PDFiumConfig.cmake ]]; then
     python3 tools/build_pdfium.py --jobs 4
 fi
+python3 - <<'PY'
+import json, platform
+from pathlib import Path
+expected = {'x86_64': 'x64', 'aarch64': 'arm64'}[platform.machine()]
+metadata = json.loads(Path('.deps/pdfium-patched/build-info.json').read_text())
+assert metadata['target_os'] == 'linux' and metadata['target_cpu'] == expected, metadata
+PY
 cmake -S . -B build-native -G Ninja -DCMAKE_BUILD_TYPE=Release \
     -DPDF_EDITOR_BUILD_VIEWER=ON -DBUILD_TESTING=OFF \
     -DPDF_EDITOR_BUILD_NATIVE_SMOKE=ON -DPDFium_DIR="$PWD/.deps/pdfium-patched"

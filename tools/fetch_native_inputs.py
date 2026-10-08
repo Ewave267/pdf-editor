@@ -4,6 +4,7 @@
 import argparse
 import hashlib
 import json
+import platform
 from pathlib import Path, PurePosixPath
 import re
 import shutil
@@ -35,12 +36,16 @@ def main():
     parser.add_argument("--output", type=Path, default=ROOT / ".deps/release-inputs")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
+    architecture = platform.machine().lower()
+    if (args.appimage or args.portable_libgcc) and architecture not in ("x86_64", "aarch64"):
+        parser.error("Linux runtime inputs require x86_64 or aarch64")
+    suffix = "-aarch64" if architecture == "aarch64" else ""
     if args.appimage:
-        pin = json.loads((ROOT / "packaging/native/appimage-runtime.json").read_text())
+        pin = json.loads((ROOT / f"packaging/native/appimage-runtime{suffix}.json").read_text())
         download(pin["url"], args.output / "appimage-runtime", pin["sha256"])
         download(pin["license_url"], args.output / "APPIMAGE-LICENSE", pin["license_sha256"])
     if args.portable_libgcc:
-        pin = json.loads((ROOT / "packaging/native/libgcc-runtime.json").read_text())
+        pin = json.loads((ROOT / f"packaging/native/libgcc-runtime{suffix}.json").read_text())
         archive = args.output / "libgcc-runtime.rpm"
         download(pin["url"], archive, pin["sha256"])
         subprocess.run(["rpm", "--checksig", str(archive)], check=True)

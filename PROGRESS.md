@@ -519,3 +519,14 @@ Silicon ZIPs, and Linux x86_64 tarball/AppImage with separate Ubuntu validation.
 The matching PDF Integration run 37783202498 also passed. All artifacts are
 available in the native run. Clean-desktop user walkthroughs remain pending;
 Windows is unsigned and Macs are ad-hoc signed, not notarized.
+
+### Linux architecture expansion
+
+Keep existing `x86_64` artifact names. Added `aarch64` (ARM64) tarball and
+AppImage workflow targets, with native ARM Qt builds, PDFium XML tests and
+separate Ubuntu ARM package validation. PDFium cross-compiles with the pinned
+Chromium x86_64 compiler against a Rocky 9 ARM sysroot; it is cached only after
+native ARM XML tests pass. Runtime inputs are separately checksum-pinned and
+architecture-specific caches/artifact names prevent mixing payloads. Existing
+Linux seccomp already supports AArch64. Python compilation, shell syntax and
+actionlint pass. First ARM CI validation pending.

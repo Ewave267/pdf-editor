@@ -1,0 +1,10 @@
+{
+  "architecture": "aarch64",
+  "url": "https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-aarch64",
+  "sha256": "b4ff0030242d0c3bb12ce40541828303cf167493f4793456f0436edd6255c39d",
+  "source": "https://github.com/AppImage/type2-runtime",
+  "source_revision": "8f39b89e2ac31e1640b3d3f7e9a5108e6ce805fa",
+  "license_url": "https://raw.githubusercontent.com/AppImage/type2-runtime/8f39b89e2ac31e1640b3d3f7e9a5108e6ce805fa/LICENSE",
+  "license_sha256": "aa154fc9070614bbe7921f89db11efd1dba7a1f3a41685958110e2230f9c0ca1",
+  "note": "Continuous assets can change. A hash mismatch must fail; explicitly review and update the pin when needed."
+}

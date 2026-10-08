@@ -32,7 +32,9 @@ for downloading and running each package. Windows and Mac Intel/Apple Silicon
 ZIPs and both Linux formats have passed native CI packaging and save/reopen
 validation. Clean-desktop walkthroughs remain the next release check.
 
-Linux release targets are RHEL 9, Fedora, and Ubuntu 22.04/24.04 or newer.
+Linux release targets are RHEL 9, Fedora, and Ubuntu 22.04/24.04 or newer
+on x86_64 and aarch64 (64-bit ARM). ARM artifacts are newly added; their first
+CI validation is pending.
 The builder must bundle dependencies compiled against glibc 2.34 or older;
 the packaging tool enforces this baseline. Local Fedora previews require newer
 glibc and do not establish RHEL compatibility.

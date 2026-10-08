@@ -162,7 +162,7 @@ def stage(args, directory):
                            "Rebuild application, PDFium and dependencies on the baseline host. "
                            "Override --max-glibc only for a clearly identified local preview.")
     revision = run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True).stdout.strip()
-    manifest = {"version": args.version, "platform": "linux-x86_64", "glibc_minimum": minimum,
+    manifest = {"version": args.version, "platform": f"linux-{platform.machine()}", "glibc_minimum": minimum,
                 "build_host": platform.platform(), "application_revision": revision,
                 "working_tree_modified": bool(run(["git", "status", "--porcelain"], cwd=ROOT,
                                                    capture_output=True, text=True).stdout),
@@ -197,8 +197,8 @@ def main():
     args = parser.parse_args()
     if args.target != "linux":
         parser.error("Use tools/package_desktop.py on a native Windows/macOS runner")
-    if platform.system() != "Linux" or platform.machine() != "x86_64":
-        parser.error("Linux packaging currently requires an x86_64 Linux build host")
+    if platform.system() != "Linux" or platform.machine() not in ("x86_64", "aarch64"):
+        parser.error("Linux packaging currently requires an x86_64 or aarch64 Linux build host")
     if not args.qt_runtime or not args.font_dir:
         parser.error("--qt-runtime and --font-dir are required")
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", args.version):
@@ -206,7 +206,7 @@ def main():
     if not re.fullmatch(r"\d+\.\d+", args.max_glibc):
         parser.error("--max-glibc must be a version such as 2.34")
     if args.appimage_runtime:
-        pin = json.loads((ROOT / "packaging/native/appimage-runtime.json").read_text())
+        pin = json.loads((ROOT / f"packaging/native/appimage-runtime{'-aarch64' if platform.machine() == 'aarch64' else ''}.json").read_text())
         if hashlib.sha256(args.appimage_runtime.read_bytes()).hexdigest() != pin["sha256"]:
             parser.error("AppImage runtime does not match the reviewed SHA-256 pin")
         if not args.appimage_license or not args.appimage_license.is_file():
@@ -217,7 +217,7 @@ def main():
             parser.error("Install squashfs-tools on the packaging host")
     args.output = args.output.resolve()
     args.output.mkdir(parents=True, exist_ok=True)
-    name = f"pdf-editor-{args.version}-linux-x86_64"
+    name = f"pdf-editor-{args.version}-linux-{platform.machine()}"
     with tempfile.TemporaryDirectory(prefix="pdf-editor-native-") as temp:
         appdir = Path(temp) / name
         stage(args, appdir)
