@@ -8,8 +8,9 @@ The test now selects the explicitly installed Liberation Serif family for
 both preview/export and counts visible antialiased line coverage rather than
 requiring nearly black pixels. A matching non-underlined preview must fail
 the line check, so the assertion still detects a missing underline. The updated
-font save/reopen and independent-reader test passes locally; CI verification is
-pending. This test-only fix does not trigger the native artifact workflow.
+font save/reopen and independent-reader test passes locally. PDF Integration
+rerun 37815325926 passed the full suite on Qt 6.4.2 and relocated-package checks.
+This test-only fix does not trigger the native artifact workflow.
 ARM-only native run 37802627076 has now completed successfully.
 
 ## Roadmap Phase 2 — added-text formatting
