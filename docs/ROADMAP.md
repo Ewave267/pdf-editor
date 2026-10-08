@@ -48,6 +48,10 @@ unless a dependency change requires rebuilding it.
 
 ## Phase 2 — Everyday Editing
 
+Text formatting is the first Phase 2 increment: added text boxes support font
+family, size, bold, italic and underline, including thumbnail and PDF export.
+The remaining tools and undo/redo below are still pending; Phase 2 is not complete.
+
 Expand added-content tools.
 
 Support:

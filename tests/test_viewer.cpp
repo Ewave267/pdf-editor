@@ -82,6 +82,88 @@ class ViewerTests : public QObject
 #endif
     }
   private slots:
+    void textFormattingAndPersistence()
+    {
+        PdfDocument document;
+        document.open(fixture("normal/blank.pdf"));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        auto* content = document.additions();
+        const int id = content->addText(0, 50, 80, "Styled text");
+        QVERIFY(id > 0);
+        const auto originalRevision = content->revision();
+        QVERIFY(!content->setTextStyle(id, "Serif", 0, true, true, true));
+        QVERIFY(!content->setTextStyle(id, "Serif", 145, true, true, true));
+        QVERIFY(!content->setTextStyle(id, "No such installed font 12345", 24, true, true, true));
+        QCOMPARE(content->revision(), originalRevision);
+        QVERIFY(content->setTextStyle(id, "Serif", 24, true, true, true));
+        QCOMPARE(content->object(id)["fontSize"].toInt(), 24);
+        const auto revision = content->revision();
+        QVERIFY(content->setTextStyle(id, "Serif", 24, true, true, true));
+        QCOMPARE(content->revision(), revision);
+        QVERIFY(content->setText(id, "Styled text"));
+        QCOMPARE(content->revision(), revision);
+        AddedOverlay overlay;
+        overlay.setContent(content);
+        overlay.setProperty("page", 0);
+        overlay.setProperty("selection", false);
+        overlay.setWidth(612);
+        overlay.setHeight(792);
+        const auto preview = [&overlay]()
+        {
+            QImage image(612, 792, QImage::Format_ARGB32);
+            image.fill(Qt::white);
+            QPainter painter(&image);
+            overlay.paint(&painter);
+            return image;
+        };
+        const auto styled = preview();
+        const auto longestLine = [](const QImage& image)
+        {
+            int longest = 0;
+            for (int y = 80; y < 120; ++y)
+            {
+                int run = 0;
+                for (int x = 50; x < 270; ++x)
+                {
+                    run = qGray(image.pixel(x, y)) < 100 ? run + 1 : 0;
+                    longest = std::max(longest, run);
+                }
+            }
+            return longest;
+        };
+        QVERIFY(longestLine(styled) > 80); // Continuous underline, rather than glyph strokes.
+        QVERIFY(content->setTextStyle(id, "Monospace", 12, false, false, false));
+        QVERIFY(styled != preview());
+        QVERIFY(content->setTextStyle(id, "Liberation Serif", 24, true, true, true));
+        QTemporaryDir directory;
+        const auto output = QUrl::fromLocalFile(directory.filePath("styled.pdf"));
+        document.saveAs(output);
+        QTRY_VERIFY_WITH_TIMEOUT(!document.saving(), 30000);
+        QVERIFY2(document.saveError().isEmpty(), qPrintable(document.saveError()));
+        QVERIFY(!document.dirty());
+#ifdef SAVE_NODE
+        QProcess reader;
+        reader.start(QString(SAVE_NODE), {QString(TEST_ROOT) + "/tools/check_text_style.mjs",
+                                          QString(SAVE_PDFJS), output.toLocalFile()});
+        QVERIFY(reader.waitForFinished(20000));
+        const auto diagnostics = reader.readAllStandardOutput() + reader.readAllStandardError();
+        QVERIFY2(reader.exitCode() == 0, diagnostics.constData());
+#endif
+        document.open(output);
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        QSignalSpy images(&document, &PdfDocument::rendered);
+        document.requestRender(0, 612);
+        QTRY_VERIFY_WITH_TIMEOUT(!images.isEmpty(), 10000);
+        const auto rendered = qvariant_cast<QImage>(images.first()[1]);
+        QVERIFY(rendered != QImage());
+        QVERIFY(longestLine(rendered) > 80);
+        bool ink = false;
+        for (int y = 80; y < 110; ++y)
+            for (int x = 50; x < 210; ++x)
+                ink |= qGray(rendered.pixel(x, y)) < 100;
+        QVERIFY(ink);
+    }
+
     void rejectedOpenRetainsUnsavedDocument_data()
     {
         QTest::addColumn<QString>("path");
@@ -780,6 +862,22 @@ class ViewerTests : public QObject
         auto* input = item(window->contentItem(), "addedTextInput");
         QVERIFY(input);
         input->setProperty("text", "User entered text");
+        auto* family = item(window->contentItem(), "textFontFamily");
+        auto* size = item(window->contentItem(), "textFontSize");
+        auto* bold = item(window->contentItem(), "textBold");
+        auto* italic = item(window->contentItem(), "textItalic");
+        auto* underline = item(window->contentItem(), "textUnderline");
+        QVERIFY(family && size && bold && italic && underline);
+        family->setProperty("currentIndex", content->fontFamilies().indexOf("Serif"));
+        size->setProperty("value", 30);
+        bold->setProperty("checked", true);
+        italic->setProperty("checked", true);
+        underline->setProperty("checked", true);
+        if (qEnvironmentVariableIsSet("PDF_TEXT_STYLE_SCREENSHOT"))
+        {
+            QTest::qWait(100);
+            QVERIFY(window->grabWindow().save(qEnvironmentVariable("PDF_TEXT_STYLE_SCREENSHOT")));
+        }
         QVERIFY(QMetaObject::invokeMethod(dialog, "accept"));
         QTRY_COMPARE(window->property("placement").toString(), "text");
         auto* mouse = item(window->contentItem(), "contentMouse0");
@@ -790,6 +888,23 @@ class ViewerTests : public QObject
         QTRY_COMPARE(content->count(), 1);
         const int textId = content->selected();
         QCOMPARE(content->object(textId)["text"].toString(), "User entered text");
+        QCOMPARE(content->object(textId)["fontFamily"].toString(), QString("Serif"));
+        QCOMPARE(content->object(textId)["fontSize"].toInt(), 30);
+        QVERIFY(content->object(textId)["bold"].toBool());
+        QVERIFY(content->object(textId)["italic"].toBool());
+        QVERIFY(content->object(textId)["underline"].toBool());
+        QVERIFY(click("editTextButton"));
+        QTRY_VERIFY(dialog->property("visible").toBool());
+        QCOMPARE(size->property("value").toInt(), 30);
+        QVERIFY(bold->property("checked").toBool());
+        size->setProperty("value", 40);
+        QVERIFY(QMetaObject::invokeMethod(dialog, "reject"));
+        QCOMPARE(content->object(textId)["fontSize"].toInt(), 30);
+        QVERIFY(click("editTextButton"));
+        QTRY_VERIFY(dialog->property("visible").toBool());
+        size->setProperty("value", 20);
+        QVERIFY(QMetaObject::invokeMethod(dialog, "accept"));
+        QCOMPARE(content->object(textId)["fontSize"].toInt(), 20);
         QVERIFY(std::abs(content->object(textId)["x"].toDouble() - 45) < 2);
         QTemporaryDir dir;
         QImage image(80, 40, QImage::Format_ARGB32);

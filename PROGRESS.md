@@ -2,6 +2,33 @@
 
 Last updated: 2026-10-08
 
+## Roadmap Phase 2 — added-text formatting
+
+Added text boxes now offer installed/bundled font families and generic fallback
+choices, integer sizes from 6–144 points, bold, italic and underline. The dialog
+previews the style; editing a selection reloads its settings and Cancel retains
+the original. Page/thumbnail painting and PDF export share one font definition.
+Unchanged text/style updates do not mark the document dirty.
+
+Local validation passed all six combined CTest suites (104 seconds). New checks
+cover style validation, revisions, changed previews, underlining, dialog
+creation/edit/cancel and save/reopen. Pinned PDF.js verifies a 24-point embedded
+Liberation Serif Bold Italic font with system-font fallback disabled. The dialog
+screenshot was inspected. Formatting is uniform within each added box; existing
+PDF text and form-field fonts are outside this feature. Phase 2's remaining
+tools, undo/redo and selection improvements remain pending.
+
+Fresh local tarball and AppImage previews each passed all 25 QtTest results
+after relocation to a path containing spaces. These Fedora builds require
+glibc 2.39 and do not establish the RHEL 9 or Windows/macOS release gates.
+
+GitHub build review: completed run 37787302766 failed its ARM64 PDFium link
+because GCC startup objects/libraries were missing from the sysroot. The fix is
+already pushed in 1026aa2, with ARM retry 37802627076 still running when checked.
+That failed run's Windows, both Macs and Linux x86_64 validation passed. The
+newer run 37807286440 also passed Windows and both Macs; its ARM job is pending.
+No additional native workflow was triggered for this local formatting batch.
+
 ## Roadmap Phase 1 — first reliability batch
 
 - Opening preflight now prepares and validates the replacement snapshot before

@@ -29,6 +29,7 @@ ApplicationWindow {
     property url initialFolder: typeof startupFolder !== "undefined" ? startupFolder : ""
     property string placement: ""
     property string pendingText: ""
+    property var pendingTextStyle: ({})
     property url pendingImage
     property var selectedObject: ({})
     property var discardAction
@@ -68,20 +69,70 @@ ApplicationWindow {
         function validateText() {
             standardButton(Dialog.Ok).enabled = textInput.text.trim().length > 0 && textInput.text.length <= 10000
         }
+        function loadStyle(object) {
+            const family = object.fontFamily || "Sans Serif"
+            fontFamily.currentIndex = Math.max(0, fontFamily.find(family))
+            fontSize.value = object.fontSize || 18
+            boldText.checked = object.bold || false
+            italicText.checked = object.italic || false
+            underlineText.checked = object.underline || false
+        }
         onOpened: { textInput.forceActiveFocus(); validateText() }
-        TextArea {
-            id: textInput
-            objectName: "addedTextInput"
+        ColumnLayout {
             width: parent.width
-            height: 140
-            wrapMode: TextEdit.Wrap
-            selectByMouse: true
-            placeholderText: "Enter text (up to 10,000 characters)"
-            onTextChanged: { if (textDialog.visible) textDialog.validateText() }
+            RowLayout {
+                Layout.fillWidth: true
+                Label { text: "Font" }
+                ComboBox {
+                    id: fontFamily
+                    objectName: "textFontFamily"
+                    Layout.fillWidth: true
+                    model: pdfDocument.additions.fontFamilies
+                    Accessible.name: "Font family"
+                }
+                Label { text: "Size (pt)" }
+                SpinBox {
+                    id: fontSize
+                    objectName: "textFontSize"
+                    from: 6; to: 144; value: 18; editable: true
+                    Accessible.name: "Font size in points"
+                }
+            }
+            RowLayout {
+                CheckBox { id: boldText; objectName: "textBold"; text: "Bold"; font.bold: true }
+                CheckBox { id: italicText; objectName: "textItalic"; text: "Italic"; font.italic: true }
+                CheckBox { id: underlineText; objectName: "textUnderline"; text: "Underline"; font.underline: true }
+            }
+            ScrollView {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 160
+                TextArea {
+                    id: textInput
+                    objectName: "addedTextInput"
+                    wrapMode: TextEdit.Wrap
+                    selectByMouse: true
+                    textFormat: TextEdit.PlainText
+                    font.family: fontFamily.currentText
+                    font.pixelSize: fontSize.value
+                    font.bold: boldText.checked
+                    font.italic: italicText.checked
+                    font.underline: underlineText.checked
+                    placeholderText: "Enter text (up to 10,000 characters)"
+                    onTextChanged: { if (textDialog.visible) textDialog.validateText() }
+                }
+            }
         }
         onAccepted: {
-            if (editing) pdfDocument.additions.setText(pdfDocument.additions.selected, textInput.text)
-            else if (textInput.text.trim().length > 0 && textInput.text.length <= 10000) { root.pendingText = textInput.text; root.placement = "text" }
+            const style = { family: fontFamily.currentText, size: fontSize.value,
+                            bold: boldText.checked, italic: italicText.checked, underline: underlineText.checked }
+            if (editing) {
+                pdfDocument.additions.setText(pdfDocument.additions.selected, textInput.text)
+                pdfDocument.additions.setTextStyle(pdfDocument.additions.selected,
+                    style.family, style.size, style.bold, style.italic, style.underline)
+            }
+            else if (textInput.text.trim().length > 0 && textInput.text.length <= 10000) {
+                root.pendingText = textInput.text; root.pendingTextStyle = style; root.placement = "text"
+            }
         }
     }
     FileDialog {
@@ -233,10 +284,10 @@ ApplicationWindow {
                 anchors.margins: 8
                 height: 42
                 visible: pdfDocument.ready
-                Button { objectName: "addTextButton"; text: "Text"; onClicked: { textDialog.editing = false; textInput.text = ""; textDialog.open() } }
+                Button { objectName: "addTextButton"; text: "Text"; onClicked: { textDialog.editing = false; textInput.text = ""; textDialog.loadStyle({}); textDialog.open() } }
                 Button { objectName: "addImageButton"; text: "Image"; onClicked: { imageDialog.signature = false; imageDialog.open() } }
                 Button { objectName: "addSignatureButton"; text: "Signature"; onClicked: { imageDialog.signature = true; imageDialog.open() } }
-                Button { objectName: "editTextButton"; text: "Edit text"; visible: root.selectedObject.type === "text"; onClicked: { textDialog.editing = true; textInput.text = root.selectedObject.text; textDialog.open() } }
+                Button { objectName: "editTextButton"; text: "Edit text"; visible: root.selectedObject.type === "text"; onClicked: { textDialog.editing = true; textInput.text = root.selectedObject.text; textDialog.loadStyle(root.selectedObject); textDialog.open() } }
                 Button { objectName: "deleteObjectButton"; text: "Delete"; enabled: pdfDocument.additions.selected >= 0; onClicked: pdfDocument.additions.removeSelected() }
                 Label { Layout.fillWidth: true; elide: Text.ElideRight; textFormat: Text.PlainText; text: pdfDocument.error || pdfDocument.formError || (root.placement ? "Click a page to place " + root.placement + " · Esc cancels" : pdfDocument.additions.error || (pdfDocument.dirty ? "Unsaved changes · Save As keeps edits" : pdfDocument.savedPath ? "Saved · " + pdfDocument.savedPath : pdfDocument.formType !== "PDF" ? "Click a field · Tab moves focus · Save As keeps edits" : "Add content to a page")); color: "#596878" }
             }
@@ -289,7 +340,12 @@ ApplicationWindow {
                                 const x = mouse.x / pdfDocument.zoom, y = mouse.y / pdfDocument.zoom
                                 if (root.placement) {
                                     pdfDocument.commitForm()
-                                    if (root.placement === "text") pdfDocument.additions.addText(index, x, y, root.pendingText)
+                                    if (root.placement === "text") {
+                                        const id = pdfDocument.additions.addText(index, x, y, root.pendingText)
+                                        const style = root.pendingTextStyle
+                                        pdfDocument.additions.setTextStyle(id, style.family, style.size,
+                                            style.bold, style.italic, style.underline)
+                                    }
                                     else pdfDocument.additions.addImage(index, x, y, root.pendingImage, root.placement === "signature")
                                     root.placement = ""
                                     original = ({})

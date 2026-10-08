@@ -83,9 +83,7 @@ void PdfDocument::saveAs(const QUrl& url)
                     painter.setClipRect(object.rect);
                     if (object.type == "text")
                     {
-                        QFont font("Sans Serif");
-                        font.setPixelSize(18);
-                        painter.setFont(font);
+                        painter.setFont(AddedContent::textFont(object));
                         painter.setPen(Qt::black);
                         painter.drawText(object.rect,
                                          Qt::AlignLeft | Qt::AlignTop | Qt::TextWordWrap,

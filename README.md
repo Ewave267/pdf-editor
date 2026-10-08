@@ -8,7 +8,8 @@ renders and scrolls pages, zooms, navigates by page number, and shows thumbnails
 PDFium runs in an isolated worker behind a C++ document interface. Step 2 also
 verifies exact XFA values through repeated saves and independent PDF.js reopening.
 The viewer also supports adding, moving, resizing, and deleting text, images,
-and image-based signatures. Save As embeds additions in a new PDF, with atomic writes and source-file
+and image-based signatures. Added text supports font family, size, bold, italic
+and underline. Save As embeds additions in a new PDF, with atomic writes and source-file
 protection. Native text fields, checkboxes, radio buttons, dropdowns, and keyboard
 navigation work for the synthetic AcroForm and dynamic XFA fixtures. Save As
 preserves edited values and XFA calculations. Dynamic XFA copies without additions

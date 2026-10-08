@@ -1,10 +1,30 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "AddedContent.h"
 #include "pdf/PdfDocument.h"
+#include <QFontDatabase>
 #include <QImageReader>
 #include <algorithm>
 #include <cmath>
 AddedContent::AddedContent(PdfDocument* document) : QObject(document), document_(document) {}
+QStringList AddedContent::fontFamilies() const
+{
+    auto families = QFontDatabase::families();
+    families.prepend("Monospace");
+    families.prepend("Serif");
+    families.prepend("Sans Serif");
+    families.removeDuplicates();
+    return families;
+}
+QFont AddedContent::textFont(const Object& object)
+{
+    QFont font(object.fontFamily);
+    // Both painters use page-point coordinates; the PDF writer runs at 72 DPI.
+    font.setPixelSize(object.fontSize);
+    font.setBold(object.bold);
+    font.setItalic(object.italic);
+    font.setUnderline(object.underline);
+    return font;
+}
 QRectF AddedContent::bounded(int page, const QRectF& r) const
 {
     if (!document_->ready() || page < 0 || page >= document_->pageCount() ||
@@ -72,6 +92,11 @@ QVariantMap AddedContent::object(int id) const
                     {"page", o.page},
                     {"type", o.type},
                     {"text", o.text},
+                    {"fontFamily", o.fontFamily},
+                    {"fontSize", o.fontSize},
+                    {"bold", o.bold},
+                    {"italic", o.italic},
+                    {"underline", o.underline},
                     {"x", o.rect.x()},
                     {"y", o.rect.y()},
                     {"width", o.rect.width()},
@@ -107,8 +132,32 @@ bool AddedContent::setText(int id, const QString& text)
     for (auto& o : objects_)
         if (o.id == id && o.type == "text")
         {
+            if (o.text == text)
+                return true;
             ++revision_;
             o.text = text;
+            emit changed();
+            return true;
+        }
+    return false;
+}
+bool AddedContent::setTextStyle(int id, const QString& family, int size, bool bold, bool italic,
+                                bool underline)
+{
+    if (size < 6 || size > 144 || !fontFamilies().contains(family))
+        return false;
+    for (auto& object : objects_)
+        if (object.id == id && object.type == "text")
+        {
+            if (object.fontFamily == family && object.fontSize == size && object.bold == bold &&
+                object.italic == italic && object.underline == underline)
+                return true;
+            object.fontFamily = family;
+            object.fontSize = size;
+            object.bold = bold;
+            object.italic = italic;
+            object.underline = underline;
+            ++revision_;
             emit changed();
             return true;
         }

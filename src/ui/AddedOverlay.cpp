@@ -19,9 +19,7 @@ void AddedOverlay::paint(QPainter* p)
             p->setClipRect(o.rect);
             if (o.type == "text")
             {
-                QFont font("Sans Serif");
-                font.setPixelSize(18);
-                p->setFont(font);
+                p->setFont(AddedContent::textFont(o));
                 p->setPen(Qt::black);
                 p->drawText(o.rect, Qt::AlignLeft | Qt::AlignTop | Qt::TextWordWrap, o.text);
             }

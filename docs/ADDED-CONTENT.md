@@ -1,23 +1,27 @@
 # Step 5 — Added content
 
 The viewer supports application-owned text, images, and image-based signatures.
-Step 4's form editing remains pending. Build and launch with the existing
+Native form editing is also available; see [FORMS](FORMS.md). Build and launch with the existing
 [viewer instructions](VIEWER.md); the PDFium dependency can be reused.
 
 ## Controls
 
-- **Text** opens a plain-text editor. Accept, then click a page to place it.
+- **Text** opens a plain-text editor with font family, size (6–144 points),
+  bold, italic and underline controls. The editor previews the chosen style.
+  Accept, then click a page to place it.
 - **Image** selects a local image. Accept, then click a page to place it.
 - **Signature** selects a local signature image, including transparent PNGs.
   Accept, then click a page to place it. This is a visual signature, not a
   cryptographic signature; a handwritten drawing tool is not included.
 - Click an object to select it. Drag its body to move it and its bottom-right
   corner to resize it. Geometry stays inside its original page.
-- **Edit text** changes the selected text object's content. **Delete** removes
+- **Edit text** changes the selected text object's content and formatting.
+  Formatting applies to the whole text box; Cancel keeps its previous settings.
+  **Delete** removes
   the selected object. Esc cancels placement and clears selection.
 
 Thumbnails include additions. Coordinates and sizes use top-left page points,
-independent of zoom. Text uses an 18-point font and wraps/clips to its rectangle;
+independent of zoom. Text defaults to 18-point Sans Serif and wraps/clips to its rectangle;
 resizing changes that rectangle. Images and signatures stretch to their resized
 rectangle. Text is limited to 10,000 characters and imported images to 16 million
 pixels. Images are copied into memory, so deleting or changing the original image
@@ -27,7 +31,13 @@ file does not change an imported object.
 closing the document, or closing the window asks before discarding unsaved
 changes. The source PDF stays unchanged. Reopening saved additions shows them
 as ordinary PDF content. Dynamic XFA additions cannot yet be saved safely;
-see [SAVING](SAVING.md). Recovery, undo/redo, font controls, aspect locking,
+see [SAVING](SAVING.md). Available font families come from Qt's installed/bundled
+fonts, with Sans Serif, Serif and Monospace fallback choices. The same style is
+used on the page, in thumbnails and in exported PDFs, which embed the resolved
+font. Font availability and missing-glyph fallback depend on the platform.
+These controls format added text boxes; existing PDF text and native form fonts
+are not edited. Individual words within a box cannot have different formatting.
+Recovery, undo/redo, aspect locking,
 and keyboard manipulation are later work.
 
 ## Model and rendering
@@ -57,3 +67,8 @@ pickers, placement clicks, body dragging, corner resizing, deletion, and cancel
 and discard paths when closing. The screenshot is visually inspected. The
 existing viewer, XFA regression, and independent-reader gates remain enabled.
 Coverage is synthetic fixtures; no broad PDF compatibility claim is made.
+
+The Phase 2 font regression checks validation and revision tracking, changed
+preview pixels, underline rendering, dialog creation/edit/cancel, and saving and
+reopening. Pinned PDF.js independently checks a 24-point embedded Liberation
+Serif Bold Italic font with system-font fallback disabled.

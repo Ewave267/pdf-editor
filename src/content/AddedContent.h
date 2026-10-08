@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
+#include <QFont>
 #include <QImage>
 #include <QObject>
 #include <QRectF>
@@ -12,6 +13,7 @@ class AddedContent : public QObject
     Q_PROPERTY(int count READ count NOTIFY changed)
     Q_PROPERTY(int selected READ selected WRITE select NOTIFY changed)
     Q_PROPERTY(QString error READ error NOTIFY changed)
+    Q_PROPERTY(QStringList fontFamilies READ fontFamilies CONSTANT)
   public:
     struct Object
     {
@@ -19,6 +21,9 @@ class AddedContent : public QObject
         QString type, text;
         QRectF rect;
         QImage image;
+        QString fontFamily = "Sans Serif";
+        int fontSize = 18;
+        bool bold = false, italic = false, underline = false;
     };
     explicit AddedContent(PdfDocument* document);
     quint64 revision() const { return revision_; }
@@ -26,6 +31,8 @@ class AddedContent : public QObject
     int selected() const { return selected_; }
     QString error() const { return error_; }
     const QList<Object>& objects() const { return objects_; }
+    QStringList fontFamilies() const;
+    static QFont textFont(const Object& object);
     PdfDocument* document() const { return document_; }
     Q_INVOKABLE int addText(int page, double x, double y, const QString& text);
     Q_INVOKABLE int addImage(int page, double x, double y, const QUrl& file,
@@ -34,6 +41,8 @@ class AddedContent : public QObject
     Q_INVOKABLE int hit(int page, double x, double y) const;
     Q_INVOKABLE bool geometry(int id, double x, double y, double width, double height);
     Q_INVOKABLE bool setText(int id, const QString& text);
+    Q_INVOKABLE bool setTextStyle(int id, const QString& family, int size, bool bold, bool italic,
+                                  bool underline);
     Q_INVOKABLE void select(int id);
     Q_INVOKABLE void removeSelected();
     void clear();
