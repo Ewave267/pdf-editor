@@ -126,6 +126,13 @@ The worker verifies its sandbox before parsing a document. This uses Darwin sand
 unsupported hosts fail closed rather than silently disabling isolation.
 Native workers receive a minimal environment rather than the GUI's host environment.
 
+If the Windows editor exits during startup, check
+`%LOCALAPPDATA%\PDF Editor\startup.log` (the preceding launch is saved as
+`startup.log.previous`). Qt fatal errors and failures to load the interface
+also display an error dialog on desktop launches. Failures before application
+entry or native crashes may not appear in this log. Keep the full extracted
+folder together and launch `pdf-editor.exe`, rather than either helper.
+
 Windows candidates are unsigned. Mac candidates are ad-hoc signed for native
 execution, not Developer ID signed or notarized. Downloaded candidates may need
 explicit approval through the operating system's security UI. Production signing

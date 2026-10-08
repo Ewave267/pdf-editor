@@ -19,6 +19,7 @@ if(PDF_EDITOR_BUILD_VIEWER)
     qt_add_executable(pdf-form-editor src/app/viewer_main.cpp qml/viewer.qrc)
     if(WIN32)
         set_target_properties(pdf-form-editor PROPERTIES OUTPUT_NAME pdf-editor WIN32_EXECUTABLE TRUE)
+        target_link_libraries(pdf-form-editor PRIVATE user32)
     elseif(APPLE)
         set_target_properties(pdf-form-editor PROPERTIES MACOSX_BUNDLE TRUE
             MACOSX_BUNDLE_BUNDLE_NAME "PDF Editor"

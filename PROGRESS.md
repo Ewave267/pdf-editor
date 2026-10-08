@@ -2,6 +2,12 @@
 
 Last updated: 2026-10-08
 
+Windows desktop follow-up: a user reports that Explorer launch exits while
+PowerShell launch works. Added early Qt startup logging under
+`%LOCALAPPDATA%\PDF Editor` and desktop error dialogs for Qt fatal/interface
+load failures. The cause and double-click fix remain unverified; CI's offscreen
+startup check does not reproduce this user's desktop environment.
+
 ## Current state
 
 The distribution goal is
