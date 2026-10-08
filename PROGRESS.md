@@ -466,3 +466,14 @@ which includes trusted loader/shared-cache mappings. Mac policy now measures
 that startup map and installs a hard ceiling with 768 MiB growth headroom,
 verified after sandbox entry. This does not claim a 768 MiB resident-memory
 limit. Native CI confirmation is pending.
+
+## Windows private desktop startup — 2026-10-08
+
+Latest broker trace confirms process creation and bounded-job assignment now
+succeed, then the worker exits with 0xC0000142 (DLL initialization failure).
+The worker links Windows graphics libraries whose initialization requires an
+accessible window station/desktop. The broker now creates a separate private
+station and desktop with ACLs for the current user and worker AppContainer SID,
+and a low integrity label. No host desktop/clipboard ACLs are changed. Handles
+remain alive until the worker exits. This is a candidate fix pending native CI.
+The Linux build and relocated package validation jobs passed in run 37777568560.

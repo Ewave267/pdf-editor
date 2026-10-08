@@ -126,7 +126,7 @@ if(PDF_EDITOR_BUILD_VIEWER)
         add_executable(pdf-sandbox src/app/windows_sandbox_main.cpp)
         target_compile_features(pdf-sandbox PRIVATE cxx_std_20)
         target_compile_definitions(pdf-sandbox PRIVATE _WIN32_WINNT=0x0A00)
-        target_link_libraries(pdf-sandbox PRIVATE userenv advapi32 ole32)
+        target_link_libraries(pdf-sandbox PRIVATE userenv advapi32 ole32 user32)
         add_dependencies(pdf-form-editor pdf-sandbox)
         # Run developer binaries with their actual PDFium DLL beside them too.
         add_custom_command(TARGET pdf-render-worker POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different

@@ -11,6 +11,7 @@
 #include <iostream>
 #include <map>
 #include <objbase.h>
+#include <sddl.h>
 #include <stdexcept>
 #include <string>
 #include <userenv.h>
@@ -109,6 +110,88 @@ struct PrivateRuntime
         fs::remove_all(path, ignored);
     }
 };
+struct WindowStation
+{
+    HWINSTA value = nullptr;
+    ~WindowStation()
+    {
+        if (value)
+            CloseWindowStation(value);
+    }
+};
+struct Desktop
+{
+    HDESK value = nullptr;
+    ~Desktop()
+    {
+        if (value)
+            CloseDesktop(value);
+    }
+};
+struct LocalMemory
+{
+    HLOCAL value = nullptr;
+    ~LocalMemory()
+    {
+        if (value)
+            LocalFree(value);
+    }
+};
+struct PrivateDesktop
+{
+    WindowStation station;
+    Desktop desktop;
+    std::wstring name;
+    PrivateDesktop(PSID appSid, const wchar_t* identity)
+    {
+        Handle token;
+        require(OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token.value),
+                "Cannot inspect desktop owner");
+        DWORD size = 0;
+        GetTokenInformation(token.value, TokenUser, nullptr, 0, &size);
+        std::vector<unsigned char> owner(size);
+        require(GetTokenInformation(token.value, TokenUser, owner.data(), size, &size),
+                "Cannot read desktop owner");
+        LPWSTR ownerText = nullptr, appText = nullptr;
+        require(ConvertSidToStringSidW(reinterpret_cast<TOKEN_USER*>(owner.data())->User.Sid,
+                                       &ownerText),
+                "Cannot format desktop owner");
+        LocalMemory ownerString{ownerText};
+        require(ConvertSidToStringSidW(appSid, &appText), "Cannot format desktop isolation SID");
+        LocalMemory appString{appText};
+        const std::wstring sddl = L"D:P(A;;GA;;;" + std::wstring(ownerText) + L")(A;;GRGWGX;;;" +
+                                  std::wstring(appText) + L")S:(ML;;NW;;;LW)";
+        PSECURITY_DESCRIPTOR descriptor = nullptr;
+        require(ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl.c_str(), SDDL_REVISION_1,
+                                                                     &descriptor, nullptr),
+                "Cannot create private desktop permissions");
+        LocalMemory security{descriptor};
+        SECURITY_ATTRIBUTES access{sizeof(SECURITY_ATTRIBUTES), descriptor, FALSE};
+        const std::wstring requested = std::wstring(L"PdfEditor-") + identity;
+        station.value =
+            CreateWindowStationW(requested.c_str(), CWF_CREATE_ONLY, WINSTA_ALL_ACCESS, &access);
+        // Unprivileged users may only request an automatically named station.
+        if (!station.value && GetLastError() == ERROR_ACCESS_DENIED)
+            station.value =
+                CreateWindowStationW(nullptr, CWF_CREATE_ONLY, WINSTA_ALL_ACCESS, &access);
+        require(station.value != nullptr, "Cannot create private window station");
+        const auto original = GetProcessWindowStation();
+        struct Restore
+        {
+            HWINSTA original;
+            ~Restore() { SetProcessWindowStation(original); }
+        } restore{original};
+        require(SetProcessWindowStation(station.value), "Cannot select private window station");
+        desktop.value =
+            CreateDesktopW(L"Renderer", nullptr, nullptr, 0, DESKTOP_ALL_ACCESS, &access);
+        require(desktop.value != nullptr, "Cannot create private worker desktop");
+        wchar_t stationName[512]{};
+        require(GetUserObjectInformationW(station.value, UOI_NAME, stationName, sizeof(stationName),
+                                          &size),
+                "Cannot read private window station name");
+        name = std::wstring(stationName) + L"\\Renderer";
+    }
+};
 struct Attributes
 {
     std::vector<unsigned char> storage;
@@ -159,6 +242,8 @@ int wmain(int argc, wchar_t** argv)
         require(SUCCEEDED(CoCreateGuid(&guid)), "Cannot create private runtime identity");
         wchar_t identity[40]{};
         require(StringFromGUID2(guid, identity, 40) > 0, "Cannot format runtime identity");
+        PrivateDesktop desktop(sid.value, identity);
+        trace("private window station and desktop ready");
         PrivateRuntime runtime{input.parent_path() / (std::wstring(L"runtime-") + identity)};
         require(fs::create_directory(runtime.path), "Cannot create private worker runtime");
         grantRead(runtime.path, sid.value);
@@ -223,6 +308,7 @@ int wmain(int argc, wchar_t** argv)
         STARTUPINFOEXW startup{};
         startup.StartupInfo.cb = sizeof(startup);
         startup.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+        startup.StartupInfo.lpDesktop = desktop.name.data();
         startup.StartupInfo.hStdInput = inherited[0];
         startup.StartupInfo.hStdOutput = inherited[1];
         startup.StartupInfo.hStdError = inherited[2];
