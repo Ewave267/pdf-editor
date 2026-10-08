@@ -37,7 +37,8 @@ limits. Native GitHub jobs deploy Qt, run the real GUI offscreen, edit/save/reop
 normal PDFs and AcroForm/XFA fixtures twice, independently check saved fields
 with PDF.js, and upload ZIPs only after these checks pass. Windows/macOS execution
 is not locally verified. Mac Intel and Apple Silicon passed native CI in run
-37781063288; Windows startup validation remains pending. Mac candidates are
+37781063288. Windows passed native CI in run 37783202566, including isolated
+worker startup and independent verification of both saved generations. Mac candidates are
 ad-hoc signed, not notarized; Windows candidates are unsigned. No GitHub release is published automatically. See [NATIVE-RELEASES](docs/NATIVE-RELEASES.md).
 
 Steps 1, 2, 3, 4, 5 and 7 are implemented and verified locally. Step 2's isolated PDFium
@@ -504,3 +505,17 @@ smoke tests after switching the pipe worker to the GUI subsystem. PDF.js then
 correctly rejected missing added text: the Windows offscreen Qt backend had no
 font directory configured. Packaging now points that CI-only backend at Windows
 Fonts, and native smoke explicitly rejects an empty font database. Pending CI.
+
+Windows job in run 37783202566 passed normal-PDF added text, AcroForm and
+dynamic XFA edits, both saved generations, malformed-document recovery and
+independent PDF.js verification. Downloaded its artifact and verified SHA-256
+and ZIP contents (editor EXE, worker, sandbox helper and Qt DLLs).
+
+### All native artifact jobs passed
+
+[Run 37783202566](https://github.com/Ewave267/pdf-editor/actions/runs/37783202566)
+completed successfully on every target: Windows x64 ZIP, Mac Intel and Apple
+Silicon ZIPs, and Linux x86_64 tarball/AppImage with separate Ubuntu validation.
+The matching PDF Integration run 37783202498 also passed. All artifacts are
+available in the native run. Clean-desktop user walkthroughs remain pending;
+Windows is unsigned and Macs are ad-hoc signed, not notarized.

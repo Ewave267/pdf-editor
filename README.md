@@ -28,9 +28,9 @@ bundle. See [native release status and build instructions](docs/NATIVE-RELEASES.
 GitHub Actions builds and tests the real editor on native Windows, macOS and
 Linux runners, then uploads downloadable artifacts. Push this branch to GitHub
 and open **Actions → Native release candidates**. See the linked instructions
-for downloading and running each package. Mac Intel/Apple Silicon ZIPs and both
-Linux formats passed native CI packaging and save/reopen validation. Windows
-worker startup remains under investigation.
+for downloading and running each package. Windows and Mac Intel/Apple Silicon
+ZIPs and both Linux formats have passed native CI packaging and save/reopen
+validation. Clean-desktop walkthroughs remain the next release check.
 
 Linux release targets are RHEL 9, Fedora, and Ubuntu 22.04/24.04 or newer.
 The builder must bundle dependencies compiled against glibc 2.34 or older;

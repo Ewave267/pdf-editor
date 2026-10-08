@@ -31,8 +31,9 @@ have a six-hour limit. XML-tested PDFium is cached before desktop deployment,
 so a later smoke failure does not require recompiling it. Jobs provide separate
 diagnostics on failure, including `worker-loader.log` and `native-smoke.log`
 for desktop startup failures. Run [37781063288](https://github.com/Ewave267/pdf-editor/actions/runs/37781063288)
-passed Mac Intel/Apple Silicon and both Linux formats; Windows worker startup
-remains under investigation.
+passed Mac Intel/Apple Silicon and both Linux formats. Windows passed the full
+native job in [37783202566](https://github.com/Ewave267/pdf-editor/actions/runs/37783202566),
+including independent verification of added text and both form save generations.
 
 ## Linux compatibility and usage
 
@@ -134,8 +135,10 @@ and passed both relocated formats with independent PDF.js checks. GUI startup
 with bundled libraries/fonts also passed on minimal Ubuntu 22.04 without Qt.
 Worker tests ran on Fedora. Mac Intel and Apple Silicon native CI passed
 GUI startup, isolated document editing, both saved generations and independent
-PDF.js verification. Windows worker startup and clean-desktop walkthroughs
-remain pending.
+PDF.js verification. Windows also passed these checks after removing console
+initialization from its pipe worker. Its offscreen CI font loader explicitly
+uses Windows Fonts; the desktop application uses the normal Windows Qt backend.
+Clean-desktop walkthroughs remain pending.
 
 Offscreen checks do not establish usability on a clean desktop. Download the
 matching artifact and test opening your PDFs, editing, Save As and reopening.
