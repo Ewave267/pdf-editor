@@ -8,7 +8,7 @@ bounded metadata, field text, rendered images and saved PDF bytes.
 The policy and validation details below describe Linux. New Windows candidates
 use an AppContainer with no capabilities and a bounded Job Object; new macOS
 candidates apply a deny-default Seatbelt profile inside the worker after trusted
-dynamic loading, before document reads or PDFium initialization, and enforce
+dynamic loading and empty PDFium/V8 heap initialization, before document reads, and enforce
 resource limits. Both reject
 direct worker execution without their sandbox. These ports await native CI
 validation and do not claim Linux's tested seccomp/resource-limit coverage.

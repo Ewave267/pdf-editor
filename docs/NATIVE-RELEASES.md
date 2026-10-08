@@ -100,7 +100,7 @@ Mac builds target macOS 13 or newer, separately for Intel and Apple Silicon.
 Only the editor's platform, image, icon and style plugins are selected; unused
 SQL drivers and their external database clients are excluded. The worker
 applies a deny-default Seatbelt profile inside the worker after trusted
-dynamic loading, before Qt startup, PDFium initialization or document reads.
+dynamic loading and empty PDFium/V8 heap initialization, before Qt startup or document reads.
 Resource limits are installed before Seatbelt, then verified inside the sandbox;
 no network, child-process or host file-write access is granted. The Mac data limit accounts for its trusted startup VM mappings and bounds
 additional growth to 768 MiB; this is not a 768 MiB resident-memory limit.

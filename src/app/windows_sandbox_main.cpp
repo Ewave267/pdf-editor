@@ -183,7 +183,12 @@ struct PrivateDesktop
         } restore{original};
         require(SetProcessWindowStation(station.value), "Cannot select private window station");
         desktop.value =
-            CreateDesktopW(L"Renderer", nullptr, nullptr, 0, DESKTOP_ALL_ACCESS, &access);
+            CreateDesktopW(L"Renderer", nullptr, nullptr, 0,
+                           STANDARD_RIGHTS_REQUIRED | DESKTOP_READOBJECTS | DESKTOP_CREATEWINDOW |
+                               DESKTOP_CREATEMENU | DESKTOP_HOOKCONTROL | DESKTOP_JOURNALRECORD |
+                               DESKTOP_JOURNALPLAYBACK | DESKTOP_ENUMERATE | DESKTOP_WRITEOBJECTS |
+                               DESKTOP_SWITCHDESKTOP,
+                           &access);
         require(desktop.value != nullptr, "Cannot create private worker desktop");
         wchar_t stationName[512]{};
         require(GetUserObjectInformationW(station.value, UOI_NAME, stationName, sizeof(stationName),

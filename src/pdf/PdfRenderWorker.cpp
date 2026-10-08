@@ -395,8 +395,11 @@ int main(int argc, char** argv)
         _setmode(_fileno(stdout), _O_BINARY);
 #endif
 #ifdef Q_OS_MACOS
-        // Let the trusted runtime finish dynamic loading before applying
-        // Seatbelt. No document reads or PDFium initialization precede this.
+        // V8 reserves its trusted, empty heap cages before Darwin's VM growth
+        // ceiling is measured. No document bytes are read before Seatbelt.
+        stage("initializing trusted PDFium runtime");
+        pdf::detail::Library library;
+        // Apply Seatbelt before Qt startup and all document reads.
         for (int index = 1; index < argc; ++index)
         {
             if (std::string(argv[index]) == "--sandbox-profile")
@@ -436,7 +439,9 @@ int main(int argc, char** argv)
                 throw std::runtime_error("Unknown worker argument.");
         }
         stage("initializing PDFium and V8");
+#ifndef Q_OS_MACOS
         pdf::detail::Library library;
+#endif
         stage("opening document snapshot");
         PdfDocument document(inputPath);
         if (save)

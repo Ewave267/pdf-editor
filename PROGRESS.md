@@ -477,3 +477,12 @@ station and desktop with ACLs for the current user and worker AppContainer SID,
 and a low integrity label. No host desktop/clipboard ACLs are changed. Handles
 remain alive until the worker exits. This is a candidate fix pending native CI.
 The Linux build and relocated package validation jobs passed in run 37777568560.
+
+### Native CI follow-up: trusted startup reservations
+
+Run 37779644823 passed both Linux jobs. Windows compilation exposed an undefined
+`DESKTOP_ALL_ACCESS` macro; the broker now uses the explicit documented desktop
+rights mask. Mac ARM passed sandbox/resource verification but V8 aborted during
+its empty Oilpan heap reservation. The Mac worker now initializes the trusted
+PDFium runtime before measuring its VM baseline and applying Seatbelt; no PDF
+bytes are read until policy verification succeeds. Native CI validation pending.
