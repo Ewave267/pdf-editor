@@ -3,6 +3,7 @@
 #include <fpdf_formfill.h>
 #include <fpdfview.h>
 #include <functional>
+#include <string>
 
 namespace pdf::detail
 {
@@ -29,7 +30,10 @@ struct Host : FPDF_FORMFILLINFO
     int deniedRequests = 0;
     int pageIndex = 0;
     bool changed = false, topLeftCoordinates = false;
+    std::u16string validationMessage;
     std::function<FPDF_PAGE(int)> lookupPage;
+    std::function<void(FPDF_PAGE, double, double, double, double)> caret;
+    std::function<void(int)> changePage;
 
     static Host& host(FPDF_FORMFILLINFO* info) { return *static_cast<Host*>(info); }
     static Host& host(IPDF_JSPLATFORM* info) { return *static_cast<Host*>(info->m_pFormfillinfo); }
@@ -40,8 +44,16 @@ struct Host : FPDF_FORMFILLINFO
         xfa_disabled = false;
         javascript.version = 3;
         javascript.m_pFormfillinfo = this;
-        javascript.app_alert = [](IPDF_JSPLATFORM*, FPDF_WIDESTRING, FPDF_WIDESTRING, int, int)
-        { return JSPLATFORM_ALERT_RETURN_CANCEL; };
+        javascript.app_alert =
+            [](IPDF_JSPLATFORM* info, FPDF_WIDESTRING message, FPDF_WIDESTRING, int, int)
+        {
+            auto& text = host(info).validationMessage;
+            text.clear();
+            if (message)
+                for (int i = 0; i < 4096 && message[i]; ++i)
+                    text.push_back(message[i]);
+            return JSPLATFORM_ALERT_RETURN_CANCEL;
+        };
         javascript.app_beep = [](IPDF_JSPLATFORM*, int) {};
         javascript.app_response = [](IPDF_JSPLATFORM*, FPDF_WIDESTRING, FPDF_WIDESTRING,
                                      FPDF_WIDESTRING, FPDF_WIDESTRING, FPDF_BOOL, void*, int)
@@ -85,11 +97,19 @@ struct Host : FPDF_FORMFILLINFO
         FFI_DoURIAction = [](FPDF_FORMFILLINFO* info, FPDF_BYTESTRING)
         { ++host(info).deniedRequests; };
         FFI_DoGoToAction = [](FPDF_FORMFILLINFO*, int, int, float*, int) {};
-        FFI_DisplayCaret = [](FPDF_FORMFILLINFO*, FPDF_PAGE, FPDF_BOOL, double, double, double,
-                              double) {};
+        FFI_DisplayCaret = [](FPDF_FORMFILLINFO* info, FPDF_PAGE page, FPDF_BOOL visible,
+                              double left, double top, double right, double bottom)
+        {
+            if (visible && host(info).caret)
+                host(info).caret(page, left, top, right, bottom);
+        };
         FFI_GetCurrentPageIndex = [](FPDF_FORMFILLINFO* info, FPDF_DOCUMENT)
         { return host(info).pageIndex; };
-        FFI_SetCurrentPage = [](FPDF_FORMFILLINFO*, FPDF_DOCUMENT, int) {};
+        FFI_SetCurrentPage = [](FPDF_FORMFILLINFO* info, FPDF_DOCUMENT, int index)
+        {
+            if (host(info).changePage)
+                host(info).changePage(index);
+        };
         FFI_GotoURL = [](FPDF_FORMFILLINFO* info, FPDF_DOCUMENT, FPDF_WIDESTRING)
         { ++host(info).deniedRequests; };
         FFI_GetPageViewRect = [](FPDF_FORMFILLINFO* info, FPDF_PAGE page, double* left, double* top,

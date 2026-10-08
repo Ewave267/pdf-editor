@@ -2,6 +2,52 @@
 
 Last updated: 2026-10-08
 
+## Roadmap Phase 3 — form experience
+
+Implemented the form toolbar, native field highlighting and AcroForm outlines
+with required markers, read-only indication and validation feedback. The field
+list and Previous/Next/Tab traversal focus and scroll fields across mixed-size
+pages; input follows the focused page. Check form commits native input, checks
+required values/recognized dates and lists issues that jump to their fields.
+Native document alert messages are bounded and displayed as plain text.
+
+Added confirmation-based field/form reset to opening values, preserving all
+application additions. Radio reset restores the original group choice. Choice
+helpers use native option selection; date helpers respect recognized authored
+formats and month/leap-year bounds. Sign guides drawing/importing a visual
+signature without changing native digital signature fields. Native field cut
+now complements select/copy/paste. Entry-script access changes are rechecked
+before helpers can edit a field.
+
+Full XFA remains native. Whole-form reset recreates its environment from the
+immutable opening snapshot, preserving scripts and calculations. Caret-based
+focus scrolling and bounded adjacent-page traversal work when native Tab
+reports an exhausted page. Public APIs cannot enumerate full XFA required
+fields/options or individually reset them, and page-local wrapping cannot be
+reliably detected; the relevant helpers remain disabled and these limits are
+explicit in FORMS. AcroForm helpers bound metadata, widget count, option labels
+and readable values. Invalid/rejected operations keep the document available
+and preserve/mark any retained changes.
+
+Added original multi-page AcroForm/XFA fixtures and a field that becomes readonly
+on entry, with deterministic regeneration. Actual QML tests exercise field and
+issue lists, date/choice dialogs, reset cancellation/confirmation, signature
+drawing, cross-page scrolling and subsequent keyboard input. Model/native
+checks cover invalid dates, radio reset, access rules, XFA cut/reset and working
+calculations after reset. Pinned PDF.js independently checks repeated saves,
+values/flags, retained form structure, visual paths and XFA data. The form-screen
+screenshot was visually inspected.
+
+All six local CTest suites passed (109 seconds). Relevant viewer/worker/XFA
+checks were rerun after the final refinements. Fresh portable tarball and
+AppImage previews each passed all 33 QtTest results after relocation to a
+folder containing spaces, using the bundled libraries and isolated worker.
+Reused patched PDFium throughout;
+no dependency rebuild or GitHub artifact workflow was triggered. Local Linux
+previews target this Fedora host (glibc 2.39), rather than proving the RHEL 9 or
+Windows/macOS release gates. Updated README, FORMS, ROADMAP and fixture docs.
+Production reliability work and broader document compatibility remain open.
+
 ## Roadmap Phase 2 — everyday editing complete
 
 Completed the remaining added-content scope: checkmarks, freehand strokes,

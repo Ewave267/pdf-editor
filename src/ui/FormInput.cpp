@@ -51,6 +51,8 @@ void FormInput::keyPressEvent(QKeyEvent* event)
         document_->formEvent(page_, "selectAll");
     else if (event->matches(QKeySequence::Copy))
         document_->formEvent(page_, "copy");
+    else if (event->matches(QKeySequence::Cut))
+        document_->formEvent(page_, "cut");
     else if (event->matches(QKeySequence::Paste))
         document_->formEvent(page_, "text", 0, 0, 0, QGuiApplication::clipboard()->text());
     else
@@ -103,7 +105,9 @@ void FormInput::keyPressEvent(QKeyEvent* event)
             key = 32;
             break;
         }
-        if (key)
+        if (key == 9 && document_->formHelpersAvailable())
+            document_->navigateForm(modifiers & 1 || event->key() == Qt::Key_Backtab);
+        else if (key)
             document_->formEvent(page_, "key", 0, 0, key, {},
                                  modifiers | (event->key() == Qt::Key_Backtab ? 1 : 0));
         else if (!event->text().isEmpty() && !(modifiers & 6))
@@ -136,7 +140,9 @@ QVariant FormInput::inputMethodQuery(Qt::InputMethodQuery query) const
 }
 void FormInput::focusOutEvent(QFocusEvent* event)
 {
-    if (usable())
+    // Moving Qt focus between page surfaces must not blur the newly focused
+    // native field after an asynchronous cross-page navigation response.
+    if (usable() && event->reason() != Qt::OtherFocusReason)
         document_->formEvent(page_, "blur");
     QQuickItem::focusOutEvent(event);
 }

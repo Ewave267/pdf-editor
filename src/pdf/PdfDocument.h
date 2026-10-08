@@ -22,6 +22,12 @@ class PdfDocument : public QObject
     Q_PROPERTY(QString formError READ formError NOTIFY formsChanged)
     Q_PROPERTY(int formFieldType READ formFieldType NOTIFY formsChanged)
     Q_PROPERTY(bool formBusy READ formBusy NOTIFY formsChanged)
+    Q_PROPERTY(QVariantList formFields READ formFields NOTIFY formsChanged)
+    Q_PROPERTY(bool canResetForm READ canResetForm NOTIFY formsChanged)
+    Q_PROPERTY(QVariantMap focusedField READ focusedField NOTIFY formsChanged)
+    Q_PROPERTY(bool formHelpersAvailable READ formHelpersAvailable NOTIFY formsChanged)
+    Q_PROPERTY(QVariantList formValidation READ formValidation NOTIFY formsChanged)
+    Q_PROPERTY(bool formValidated READ formValidated NOTIFY formsChanged)
     Q_PROPERTY(bool saving READ saving NOTIFY saveStateChanged)
     Q_PROPERTY(bool dirty READ dirty NOTIFY saveStateChanged)
     Q_PROPERTY(QString saveError READ saveError NOTIFY saveStateChanged)
@@ -56,6 +62,19 @@ class PdfDocument : public QObject
     bool formBusy() const { return pendingFormEvents_ > 0; }
     Q_INVOKABLE quint64 formEvent(int page, const QString& action, double x = 0, double y = 0,
                                   int key = 0, const QString& text = {}, int flags = 0);
+    bool canResetForm() const { return formHelpersAvailable() || formType_ == "XFA"; }
+    QVariantList formFields() const { return formFields_; }
+    QVariantMap focusedField() const;
+    bool formHelpersAvailable() const { return formType_ == "AcroForm" && fieldsComplete_; }
+    QVariantList formValidation() const;
+    bool formValidated() const { return formValidated_; }
+    Q_INVOKABLE quint64 focusFormField(int id);
+    Q_INVOKABLE quint64 navigateForm(bool backwards = false);
+    Q_INVOKABLE quint64 resetFormField(int id);
+    Q_INVOKABLE quint64 resetForm();
+    Q_INVOKABLE quint64 validateForm();
+    Q_INVOKABLE quint64 chooseFormOption(int id, int option);
+    Q_INVOKABLE quint64 setFormFieldText(int id, const QString& text);
     Q_INVOKABLE void commitForm();
     Q_INVOKABLE void saveAs(const QUrl& url);
     bool ready() const { return ready_; }
@@ -81,6 +100,7 @@ class PdfDocument : public QObject
   signals:
     void formsChanged();
     void formRepaint();
+    void formFocusRequested(int page, const QVariantMap& field);
     void formEventFinished(quint64 id, bool handled);
     void saveStateChanged();
     void saveFinished(bool success);
@@ -119,6 +139,9 @@ class PdfDocument : public QObject
     quint64 formRevision_ = 0, savedFormRevision_ = 0, saveFormRevision_ = 0;
     int pendingFormEvents_ = 0, formFieldType_ = -1, formPage_ = 0;
     QString formText_, formError_;
+    QVariantList formFields_;
+    int focusedField_ = -1;
+    bool fieldsComplete_ = false, formValidated_ = false;
     QProcess* worker_ = nullptr;
     QTimer deadline_;
     QByteArray incoming_, diagnostics_;

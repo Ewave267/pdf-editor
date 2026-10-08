@@ -84,6 +84,320 @@ class ViewerTests : public QObject
 #endif
     }
   private slots:
+    void xfaCrossPageNavigation()
+    {
+        PdfDocument document;
+        QQmlApplicationEngine engine;
+        engine.rootContext()->setContextProperty("pdfDocument", &document);
+        engine.load(QUrl("qrc:/qml/Main.qml"));
+        auto* window = qobject_cast<QQuickWindow*>(engine.rootObjects().first());
+        QVERIFY(QTest::qWaitForWindowExposed(window));
+        document.open(fixture("xfa-dynamic/phase3-navigation.pdf"));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        QCOMPARE(document.pageCount(), 2);
+        auto* surface = item(window->contentItem(), "formInput0");
+        QVERIFY(surface);
+        QTest::mouseClick(
+            window, Qt::LeftButton, Qt::NoModifier,
+            surface->mapToScene(QPointF(100 * document.zoom(), 87 * document.zoom())).toPoint());
+        QTRY_COMPARE(document.formText(), QString("first"));
+        QTest::keyClick(window, Qt::Key_Tab);
+        QTRY_COMPARE(document.currentPage(), 2);
+        QTRY_COMPARE(document.formText(), QString("second"));
+        QTRY_VERIFY(window->activeFocusItem() &&
+                    window->activeFocusItem()->objectName() == "formInput1");
+        surface = item(window->contentItem(), "formInput1");
+        const auto point =
+            surface->mapToScene(QPointF(100 * document.zoom(), 615 * document.zoom()));
+        QVERIFY(point.y() > 210 && point.y() < window->height() - 60);
+        QTest::keyClick(window, Qt::Key_A, Qt::ControlModifier);
+        QTest::keyClick(window, Qt::Key_Z);
+        QTRY_COMPARE(document.formText(), QString("z"));
+        QTest::keyClick(window, Qt::Key_Backtab, Qt::ShiftModifier);
+        QTRY_COMPARE(document.currentPage(), 1);
+        QTRY_COMPARE(document.formText(), QString("first"));
+        document.resetForm();
+        QTRY_VERIFY(!document.formBusy());
+        QVERIFY2(document.formError().isEmpty(), qPrintable(document.formError()));
+        QTemporaryDir directory;
+        for (int generation = 1; generation <= 2; ++generation)
+        {
+            const auto output =
+                directory.filePath(QString("xfa-navigation-%1.pdf").arg(generation));
+            document.saveAs(QUrl::fromLocalFile(output));
+            QTRY_VERIFY_WITH_TIMEOUT(!document.saving(), 30000);
+            QVERIFY2(document.saveError().isEmpty(), qPrintable(document.saveError()));
+#ifdef SAVE_NODE
+            QProcess reader;
+            reader.start(QString(SAVE_NODE), {QString(TEST_ROOT) + "/tools/check_phase3_forms.mjs",
+                                              QString(SAVE_PDFJS), output, "xfa-navigation"});
+            QVERIFY(reader.waitForFinished(20000));
+            const auto diagnostics = reader.readAllStandardOutput() + reader.readAllStandardError();
+            QVERIFY2(reader.exitCode() == 0, diagnostics.constData());
+#endif
+        }
+        document.close();
+    }
+
+    void formExperienceUi()
+    {
+        PdfDocument document;
+        QQmlApplicationEngine engine;
+        engine.rootContext()->setContextProperty("pdfDocument", &document);
+        engine.load(QUrl("qrc:/qml/Main.qml"));
+        QVERIFY(!engine.rootObjects().isEmpty());
+        auto* window = qobject_cast<QQuickWindow*>(engine.rootObjects().first());
+        QVERIFY(QTest::qWaitForWindowExposed(window));
+        document.open(fixture("acroform/phase3.pdf"));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        auto click = [&](const QString& name)
+        {
+            auto* target = item(window->contentItem(), name);
+            if (!target)
+                return false;
+            QTest::mouseClick(
+                window, Qt::LeftButton, Qt::NoModifier,
+                target->mapToScene(QPointF(target->width() / 2, target->height() / 2)).toPoint());
+            return true;
+        };
+        const auto dialog = [&](const QString& name) { return window->findChild<QObject*>(name); };
+        QVERIFY(click("validateFormButton"));
+        QTRY_VERIFY(dialog("formValidationDialog")->property("visible").toBool());
+        QCOMPARE(document.formValidation().size(), 3);
+        QVERIFY(click("formIssueItem0"));
+        QTRY_COMPARE(document.focusedField()["id"].toInt(), 0);
+        document.setFormFieldText(0, "Alice");
+        QTRY_VERIFY(!document.formBusy());
+        QVERIFY(click("nextFieldButton"));
+        QTRY_COMPARE(document.focusedField()["id"].toInt(), 1);
+        QVERIFY(click("enterFormDateButton"));
+        QTRY_VERIFY(dialog("formDateDialog")->property("visible").toBool());
+        item(window->contentItem(), "dateYear")->setProperty("value", 2028);
+        item(window->contentItem(), "dateMonth")->setProperty("value", 2);
+        item(window->contentItem(), "dateDay")->setProperty("value", 29);
+        QVERIFY(QMetaObject::invokeMethod(dialog("formDateDialog"), "accept"));
+        QTRY_VERIFY(!document.formBusy());
+        QCOMPARE(document.formFields()[1].toMap()["value"].toString(), QString("2028-02-29"));
+        QVERIFY(click("formFieldsButton"));
+        QTRY_VERIFY(dialog("fieldsDialog")->property("visible").toBool());
+        QVERIFY(click("formFieldItem2"));
+        QTRY_COMPARE(document.focusedField()["id"].toInt(), 2);
+        QVERIFY(click("chooseFormValueButton"));
+        QTRY_VERIFY(dialog("formChoiceDialog")->property("visible").toBool());
+        QVERIFY(click("formOptionItem1"));
+        QTRY_VERIFY(!document.formBusy());
+        QCOMPARE(document.formFields()[2].toMap()["value"].toString(), QString("Beta"));
+        QVERIFY(click("formFieldsButton"));
+        QTRY_VERIFY(dialog("fieldsDialog")->property("visible").toBool());
+        QVERIFY(click("formFieldItem6"));
+        QTRY_COMPARE(document.currentPage(), 2);
+        QTRY_COMPARE(document.focusedField()["id"].toInt(), 6);
+        QTRY_VERIFY(window->activeFocusItem() &&
+                    window->activeFocusItem()->objectName() == "formInput1");
+        auto* surface = item(window->contentItem(), "formInput1");
+        const auto fieldPoint =
+            surface->mapToScene(QPointF(100 * document.zoom(), 815 * document.zoom()));
+        QVERIFY(fieldPoint.y() > 210 && fieldPoint.y() < window->height() - 60);
+        QTest::keyClick(window, Qt::Key_A, Qt::ControlModifier);
+        QTest::keyClick(window, Qt::Key_X);
+        QTRY_VERIFY(!document.formBusy());
+        QCOMPARE(document.formFields()[6].toMap()["value"].toString(), QString("x"));
+        QTest::keyClick(window, Qt::Key_A, Qt::ControlModifier);
+        QTest::keyClick(window, Qt::Key_X, Qt::ControlModifier);
+        QTRY_VERIFY(!document.formBusy());
+        QCOMPARE(QGuiApplication::clipboard()->text(), QString("x"));
+        QCOMPARE(document.formText(), QString());
+        QTest::keyClick(window, Qt::Key_V, Qt::ControlModifier);
+        QTRY_COMPARE(document.formText(), QString("x"));
+        QTest::keyClick(window, Qt::Key_Tab);
+        QTRY_COMPARE(document.currentPage(), 1);
+        QTRY_VERIFY(window->activeFocusItem() &&
+                    window->activeFocusItem()->objectName() == "formInput0");
+        if (qEnvironmentVariableIsSet("PDF_FORM_EXPERIENCE_SCREENSHOT"))
+        {
+            QTest::qWait(150);
+            QVERIFY(
+                window->grabWindow().save(qEnvironmentVariable("PDF_FORM_EXPERIENCE_SCREENSHOT")));
+        }
+        QVERIFY(click("resetWholeFormButton"));
+        QTRY_VERIFY(dialog("resetFormDialog")->property("visible").toBool());
+        QVERIFY(QMetaObject::invokeMethod(dialog("resetFormDialog"), "reject"));
+        QCOMPARE(document.formFields()[0].toMap()["value"].toString(), QString("Alice"));
+        document.additions()->addText(0, 400, 400, "Keep me");
+        QVERIFY(click("resetWholeFormButton"));
+        QTRY_VERIFY(dialog("resetFormDialog")->property("visible").toBool());
+        QVERIFY(QMetaObject::invokeMethod(dialog("resetFormDialog"), "accept"));
+        QTRY_VERIFY(!document.formBusy());
+        QCOMPARE(document.formFields()[0].toMap()["value"].toString(), QString());
+        QCOMPARE(document.additions()->count(), 1);
+        QVERIFY(click("signFormButton"));
+        QTRY_VERIFY(dialog("signDialog")->property("visible").toBool());
+        QVERIFY(click("drawSignatureButton"));
+        QTRY_VERIFY(dialog("graphicDialog")->property("visible").toBool());
+        QVERIFY(QMetaObject::invokeMethod(dialog("graphicDialog"), "accept"));
+        QTRY_COMPARE(window->property("placement").toString(), QString("drawing"));
+        auto* mouse = item(window->contentItem(), "contentMouse0");
+        const auto point = [&](double x, double y)
+        { return mouse->mapToScene(QPointF(x * document.zoom(), y * document.zoom())).toPoint(); };
+        QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, point(90, 410));
+        QTest::mouseMove(window, point(150, 420), 20);
+        QTest::mouseMove(window, point(200, 410), 20);
+        QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, point(200, 410));
+        QCOMPARE(document.additions()->count(), 2);
+        QCOMPARE(document.additions()->object(document.additions()->selected())["type"].toString(),
+                 QString("drawing"));
+        document.close();
+    }
+
+    void formExperienceHelpers()
+    {
+        PdfDocument document;
+        document.open(fixture("acroform/phase3.pdf"));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        QVERIFY(document.formHelpersAvailable());
+        QCOMPARE(document.formFields().size(), 7);
+        const auto field = [&](int id) { return document.formFields()[id].toMap(); };
+        QCOMPARE(field(1)["dateFormat"].toString(), QString("yyyy-mm-dd"));
+        QVERIFY(field(0)["required"].toBool());
+        QVERIFY(field(4)["readOnly"].toBool());
+        QVERIFY(document.validateForm());
+        QTRY_VERIFY(!document.formBusy());
+        QCOMPARE(document.formValidation().size(), 3);
+        QVERIFY(document.setFormFieldText(0, "Alice"));
+        QTRY_VERIFY(!document.formBusy());
+        QVERIFY2(document.formError().isEmpty(), qPrintable(document.formError()));
+        QCOMPARE(field(0)["value"].toString(), QString("Alice"));
+        QVERIFY(document.setFormFieldText(1, "2026-02-30"));
+        QTRY_VERIFY(!document.formBusy());
+        QVERIFY(!document.formError().isEmpty() || !document.formValidation().isEmpty());
+        QVERIFY(document.setFormFieldText(1, "2026-10-08"));
+        QTRY_VERIFY(!document.formBusy());
+        QCOMPARE(field(1)["value"].toString(), QString("2026-10-08"));
+        QVERIFY(document.chooseFormOption(2, 1));
+        QTRY_VERIFY(!document.formBusy());
+        QVERIFY2(document.formError().isEmpty(), qPrintable(document.formError()));
+        QCOMPARE(field(2)["value"].toString(), QString("Beta"));
+        QCOMPARE(document.formValidation().size(), 1);
+        document.formEvent(0, "click", 82, 272);
+        QTRY_VERIFY(!document.formBusy());
+        QVERIFY(field(3)["checked"].toBool());
+        QVERIFY(document.formValidation().isEmpty());
+        QVERIFY(document.focusFormField(5));
+        QTRY_VERIFY(!document.formBusy());
+        QCOMPARE(document.focusedField()["id"].toInt(), 5);
+        QVERIFY(document.navigateForm());
+        QTRY_VERIFY(!document.formBusy());
+        QCOMPARE(document.currentPage(), 2);
+        QCOMPARE(document.focusedField()["id"].toInt(), 6);
+        QVERIFY(document.navigateForm(true));
+        QTRY_VERIFY(!document.formBusy());
+        QCOMPARE(document.currentPage(), 1);
+        QCOMPARE(document.focusedField()["id"].toInt(), 5);
+        QVERIFY(document.setFormFieldText(4, "cannot edit"));
+        QTRY_VERIFY(!document.formBusy());
+        QVERIFY(!document.formError().isEmpty());
+        QCOMPARE(field(4)["value"].toString(), QString("LOCKED"));
+        QVERIFY(document.resetFormField(0));
+        QTRY_VERIFY(!document.formBusy());
+        QCOMPARE(field(0)["value"].toString(), QString());
+        QCOMPARE(field(2)["value"].toString(), QString("Beta"));
+        QVERIFY(document.resetForm());
+        QTRY_VERIFY(!document.formBusy());
+        QVERIFY2(document.formError().isEmpty(), qPrintable(document.formError()));
+        QCOMPARE(field(1)["value"].toString(), QString());
+        QCOMPARE(field(2)["value"].toString(), QString("Alpha"));
+        QVERIFY(!field(3)["checked"].toBool());
+        QCOMPARE(document.formValidation().size(), 3);
+        QVERIFY(document.setFormFieldText(0, "Saved helper"));
+        QVERIFY(document.setFormFieldText(1, "2026-10-08"));
+        QVERIFY(document.chooseFormOption(2, 1));
+        document.formEvent(0, "click", 82, 272);
+        QVERIFY(document.setFormFieldText(6, "Saved second"));
+        QTRY_VERIFY(!document.formBusy());
+        auto* additions = document.additions();
+        additions->beginEdit();
+        const int stroke = additions->addGraphic(0, 90, 410, "drawing", "black", 2);
+        QVERIFY(additions->appendStroke(stroke, 150, 400));
+        QVERIFY(additions->appendStroke(stroke, 200, 415));
+        additions->endEdit();
+        QTemporaryDir directory;
+        QFile source(fixture("acroform/phase3.pdf").toLocalFile());
+        QVERIFY(source.open(QIODevice::ReadOnly));
+        const auto original = source.readAll();
+        for (int generation = 1; generation <= 2; ++generation)
+        {
+            const auto output =
+                directory.filePath(QString("form-experience-%1.pdf").arg(generation));
+            document.saveAs(QUrl::fromLocalFile(output));
+            QTRY_VERIFY_WITH_TIMEOUT(!document.saving(), 30000);
+            QVERIFY2(document.saveError().isEmpty(), qPrintable(document.saveError()));
+#ifdef SAVE_NODE
+            QProcess reader;
+            reader.start(QString(SAVE_NODE), {QString(TEST_ROOT) + "/tools/check_phase3_forms.mjs",
+                                              QString(SAVE_PDFJS), output, "acroform"});
+            QVERIFY(reader.waitForFinished(20000));
+            const auto diagnostics = reader.readAllStandardOutput() + reader.readAllStandardError();
+            QVERIFY2(reader.exitCode() == 0, diagnostics.constData());
+#endif
+        }
+        source.seek(0);
+        QCOMPARE(source.readAll(), original);
+        // XFA stays native: helpers fail explicitly and preserve the document.
+        document.open(fixture("xfa-dynamic/controls.pdf"));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        QVERIFY(!document.formHelpersAvailable());
+        document.formEvent(0, "click", 100, 87);
+        document.formEvent(0, "selectAll");
+        document.formEvent(0, "text", 0, 0, 0, "changed XFA");
+        QTRY_VERIFY(!document.formBusy());
+        QCOMPARE(document.formText(), QString("changed XFA"));
+        document.formEvent(0, "selectAll");
+        document.formEvent(0, "cut");
+        QTRY_VERIFY(!document.formBusy());
+        QCOMPARE(QGuiApplication::clipboard()->text(), QString("changed XFA"));
+        QCOMPARE(document.formText(), QString());
+        document.additions()->addText(0, 400, 400, "Retained addition");
+        QVERIFY(document.canResetForm());
+        QVERIFY(document.resetForm());
+        QTRY_VERIFY(!document.formBusy());
+        QVERIFY2(document.formError().isEmpty(), qPrintable(document.formError()));
+        QVERIFY(document.ready());
+        QCOMPARE(document.additions()->count(), 1);
+        document.formEvent(0, "click", 100, 87);
+        QTRY_VERIFY(!document.formBusy());
+        QCOMPARE(document.formText(), QString("original"));
+        document.formEvent(0, "selectAll");
+        document.formEvent(0, "text", 0, 0, 0, "edited");
+        document.formEvent(0, "blur");
+        document.formEvent(0, "click", 100, 147);
+        QTRY_VERIFY(!document.formBusy());
+        QCOMPARE(document.formText(), QString("JS:edited"));
+        document.additions()->removeSelected();
+        const auto xfaOutput = directory.filePath("xfa-reset-script.pdf");
+        document.saveAs(QUrl::fromLocalFile(xfaOutput));
+        QTRY_VERIFY_WITH_TIMEOUT(!document.saving(), 30000);
+        QVERIFY2(document.saveError().isEmpty(), qPrintable(document.saveError()));
+        checkFormOutput(xfaOutput, "xfa", "0", "A", "Alpha");
+        document.open(fixture("acroform/controls.pdf"));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        document.formEvent(0, "click", 152, 212);
+        QTRY_VERIFY(!document.formBusy());
+        QVERIFY(document.formFields()[3].toMap()["checked"].toBool());
+        QVERIFY(document.resetFormField(3));
+        QTRY_VERIFY(!document.formBusy());
+        QVERIFY2(document.formError().isEmpty(), qPrintable(document.formError()));
+        QVERIFY(document.formFields()[2].toMap()["checked"].toBool());
+        QVERIFY(!document.formFields()[3].toMap()["checked"].toBool());
+        document.open(fixture("acroform/phase3-lock-on-focus.pdf"));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        QVERIFY(document.setFormFieldText(0, "must stay empty"));
+        QTRY_VERIFY(!document.formBusy());
+        QVERIFY(!document.formError().isEmpty());
+        QVERIFY(document.formFields()[0].toMap()["readOnly"].toBool());
+        QCOMPARE(document.formFields()[0].toMap()["value"].toString(), QString());
+        QVERIFY(document.ready());
+    }
+
     void everydayEditingMouseAndKeyboard()
     {
         PdfDocument document;

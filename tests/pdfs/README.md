@@ -7,7 +7,9 @@ the repository's GPL-3.0-only license. The scripted URL uses the reserved
 
 Regenerate the PDFs with `python3 tools/generate_probe_fixtures.py`. The XFA XML
 sources are `xfa-javascript/calculation.xdp` and `xfa-dynamic/controls.xdp`; the generator writes deterministic
-uncompressed PDFs with byte-accurate cross-reference tables.
+uncompressed PDFs with byte-accurate cross-reference tables. Phase 3 fixtures use
+`python3 tools/generate_phase3_fixture.py`; their XFA source is
+`xfa-dynamic/phase3-navigation.xdp`.
 
 | Fixture | Purpose | Expected behavior with patched pinned build |
 | --- | --- | --- |
@@ -17,6 +19,9 @@ uncompressed PDFs with byte-accurate cross-reference tables.
 | `normal/multi-page.pdf` | Three labeled/color-coded pages with portrait, landscape and tall layouts | Every page and thumbnail preserves its own dimensions and color |
 | `acroform/controls.pdf` | Text, checkbox, mutually exclusive radios and dropdown | Native input, keyboard navigation and exact saved control values verified in PDF.js |
 | `xfa-dynamic/controls.pdf` | Same controls plus calculated text and exit-event JavaScript | Native input, checked/unchecked persistence, radio exclusivity and exact values verified in PDF.js |
+| `acroform/phase3.pdf` | Two mixed-size pages with required text/date/choice/checkbox, readonly text and an unsigned signature widget | Helpers preserve native values/flags; navigation scrolls and focuses fields across pages |
+| `acroform/phase3-lock-on-focus.pdf` | Entry script changes a text field to readonly | Helpers recheck access after focus and retain the original value |
+| `xfa-dynamic/phase3-navigation.pdf` | Two native XFA text fields on different pages, including a far-down field | Forward/backward Tab on exhausted pages, caret scrolling, reset and saved values |
 | `acroform/text.pdf` | Editable text widget with differing value/default and a keystroke JavaScript action | Save with additions retains values, widget, appearance and actions |
 | `normal/rotated-cropped.pdf` | Three cropped pages rotated 0, 90 and 270 degrees | Saved additions retain displayed positions |
 | `normal/blank.pdf` | Valid one-page PDF without forms | Probe rejects it as non-XFA |

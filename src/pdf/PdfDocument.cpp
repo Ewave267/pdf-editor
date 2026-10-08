@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "PdfDocument.h"
 #include "NativeFile.h"
+#include <QDate>
 
 #include <QBuffer>
 #include <QClipboard>
@@ -81,6 +82,10 @@ void PdfDocument::close()
     pendingFormEvents_ = 0;
     formFieldType_ = -1;
     formText_.clear();
+    formFields_.clear();
+    focusedField_ = -1;
+    formPage_ = 0;
+    fieldsComplete_ = formValidated_ = false;
     formError_.clear();
     emit formsChanged();
     saveError_.clear();
@@ -113,6 +118,10 @@ void PdfDocument::fail(const QString& message)
     ready_ = loading_ = false;
     pages_.clear();
     formText_.clear();
+    formFields_.clear();
+    focusedField_ = -1;
+    formPage_ = 0;
+    fieldsComplete_ = formValidated_ = false;
     formFieldType_ = -1;
     error_ = message;
     if (lostFormEdits)
@@ -360,6 +369,17 @@ void PdfDocument::receive()
         {
             --pendingFormEvents_;
             formError_ = response["error"].toString();
+            if (response.contains("fields"))
+                formFields_ = response["fields"].toArray().toVariantList();
+            if (response.contains("fieldsComplete"))
+                fieldsComplete_ = response["fieldsComplete"].toBool();
+            if (response["changed"].toBool())
+            {
+                ++formRevision_;
+                cache_.clear();
+                cachedRequests_.clear();
+                emit formRepaint();
+            }
             emit formsChanged();
             emit saveStateChanged();
             emit formEventFinished(id, false);
@@ -396,6 +416,9 @@ void PdfDocument::receive()
         const int type = response.value("formType").toInt();
         xfaFull_ = type == 2;
         formType_ = type == 0 ? "PDF" : type == 1 ? "AcroForm" : "XFA";
+        formFields_ = response["fields"].toArray().toVariantList();
+        fieldsComplete_ = response["fieldsComplete"].toBool();
+        emit formsChanged();
         loading_ = false;
         ready_ = true;
         updateFit();
@@ -428,12 +451,40 @@ void PdfDocument::receive()
         }
         else
         {
-            if (command["action"].toString() == "copy")
+            if (command["action"].toString() == "copy" || command["action"].toString() == "cut")
                 QGuiApplication::clipboard()->setText(response["selectedText"].toString());
             --pendingFormEvents_;
             formText_ = response["text"].toString();
             formFieldType_ = response["fieldType"].toInt(-1);
-            formError_.clear();
+            formFields_ = response["fields"].toArray().toVariantList();
+            if (response.contains("fieldsComplete"))
+                fieldsComplete_ = response["fieldsComplete"].toBool();
+            if (response.contains("resetPages"))
+            {
+                pages_ = response["resetPages"].toArray().toVariantList();
+                setCurrentPage(1);
+                updateFit();
+                emit stateChanged();
+            }
+            const int previousFocus = focusedField_;
+            focusedField_ = response["focusedField"].toInt(-1);
+            formPage_ = response["focusPage"].toInt(formPage_);
+            if (command["action"].toString() == "validate")
+                formValidated_ = true;
+            if (focusedField_ >= 0 &&
+                (focusedField_ != previousFocus || command["action"] == "focusField" ||
+                 command["action"] == "nextField"))
+            {
+                setCurrentPage(formPage_ + 1);
+                emit formFocusRequested(formPage_, focusedField());
+            }
+            if (xfaFull_ && response["caretUpdated"].toBool() && command["action"] == "key" &&
+                command["key"].toInt() == 9)
+            {
+                setCurrentPage(formPage_ + 1);
+                emit formFocusRequested(formPage_, response["focusRect"].toObject().toVariantMap());
+            }
+            formError_ = response["validationMessage"].toString();
             if (response["changed"].toBool())
                 ++formRevision_;
             cache_.clear();
@@ -552,7 +603,10 @@ quint64 PdfDocument::formEvent(int page, const QString& action, double x, double
         emit formsChanged();
         return 0;
     }
-    const QStringList allowed{"click", "text", "key", "selectAll", "blur", "copy"};
+    const QStringList allowed{"click",      "text",      "key",          "selectAll",
+                              "blur",       "copy",      "cut",          "highlight",
+                              "focusField", "nextField", "setFieldText", "chooseOption",
+                              "resetField", "resetForm", "validate"};
     if (!allowed.contains(action))
         return 0;
     const quint64 id = ++nextId_;
@@ -565,6 +619,59 @@ quint64 PdfDocument::formEvent(int page, const QString& action, double x, double
     emit saveStateChanged();
     nextRequest();
     return id;
+}
+QVariantMap PdfDocument::focusedField() const
+{
+    return focusedField_ >= 0 && focusedField_ < formFields_.size()
+               ? formFields_[focusedField_].toMap()
+               : QVariantMap{};
+}
+QVariantList PdfDocument::formValidation() const
+{
+    QVariantList issues;
+    if (!formValidated_)
+        return issues;
+    for (const auto& value : formFields_)
+    {
+        const auto field = value.toMap();
+        if (field["readOnly"].toBool())
+            continue;
+        const QString text = field["value"].toString().trimmed();
+        const int type = field["type"].toInt();
+        QString message;
+        if (field["required"].toBool() &&
+            (text.isEmpty() || (type == 2 && !field["checked"].toBool()) ||
+             (type == 3 && text == "Off")))
+            message = "Required field is empty";
+        if (!field["valueComplete"].toBool() && type != 7)
+            message = "Field value is too large to check";
+        const auto format = field["dateFormat"].toString();
+        if (!text.isEmpty() && !format.isEmpty() &&
+            !QDate::fromString(text, QString(format).replace("mm", "MM")).isValid())
+            message = "Date must use " + format;
+        if (!message.isEmpty())
+            issues.append(QVariantMap{{"id", field["id"]},
+                                      {"page", field["page"]},
+                                      {"label", field["label"]},
+                                      {"message", message}});
+    }
+    return issues;
+}
+quint64 PdfDocument::focusFormField(int id) { return formEvent(formPage_, "focusField", 0, 0, id); }
+quint64 PdfDocument::navigateForm(bool backwards)
+{
+    return formEvent(formPage_, "nextField", 0, 0, 0, {}, backwards ? 1 : 0);
+}
+quint64 PdfDocument::resetFormField(int id) { return formEvent(formPage_, "resetField", 0, 0, id); }
+quint64 PdfDocument::resetForm() { return formEvent(formPage_, "resetForm"); }
+quint64 PdfDocument::validateForm() { return formEvent(formPage_, "validate"); }
+quint64 PdfDocument::chooseFormOption(int id, int option)
+{
+    return formEvent(formPage_, "chooseOption", 0, 0, id, QString::number(option));
+}
+quint64 PdfDocument::setFormFieldText(int id, const QString& text)
+{
+    return formEvent(formPage_, "setFieldText", 0, 0, id, text);
 }
 void PdfDocument::commitForm() { formEvent(formPage_, "blur"); }
 

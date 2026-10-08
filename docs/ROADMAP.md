@@ -65,9 +65,14 @@ still required for new builds.
 
 ## Phase 3 — Form Experience
 
-Make completing forms faster than using traditional PDF software.
+Implemented the form experience for supported AcroForms, with native XFA
+highlighting, snapshot reset and caret-based scrolling. Field navigation,
+required markers/checks, reset dialogs, date/choice helpers and guided visual
+signature placement are available. See [FORMS](FORMS.md) for controls, validation
+and explicit XFA/public-API limits. Broader production-form compatibility remains
+part of the reliability roadmap.
 
-Add:
+Delivered:
 
 - Tab navigation.
 - Clear indication of fillable fields.

@@ -14,7 +14,10 @@ Everyday editing includes grouped undo/redo, copy/paste, multi-selection,
 alignment and keyboard controls; see [added-content controls](docs/ADDED-CONTENT.md).
 Save As embeds additions in a new PDF, with atomic writes and source-file
 protection. Native text fields, checkboxes, radio buttons, dropdowns, and keyboard
-navigation work for the synthetic AcroForm and dynamic XFA fixtures. Save As
+navigation work for the synthetic AcroForm and dynamic XFA fixtures. The
+[form toolbar](docs/FORMS.md) adds field highlights, required-field feedback,
+cross-page navigation, reset, date/choice helpers and guided visual signatures,
+with explicit XFA helper limits. Save As
 preserves edited values and XFA calculations. Dynamic XFA copies without additions
 are supported; dynamic XFA additions cannot yet be saved. The Linux safety
 gate now tests malformed documents, restricted JavaScript access, memory limits

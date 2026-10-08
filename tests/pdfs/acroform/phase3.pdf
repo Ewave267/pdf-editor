@@ -1,0 +1,90 @@
+%PDF-1.7
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R /AcroForm 4 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [5 0 R 7 0 R] /Count 2 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Fields [9 0 R 10 0 R 11 0 R 12 0 R 13 0 R 14 0 R 15 0 R] /DR << /Font << /Helv 3 0 R >> >> /DA (/Helv 12 Tf 0 g) /NeedAppearances true >>
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 6 0 R /Annots [9 0 R 10 0 R 11 0 R 12 0 R 13 0 R 14 0 R] /Tabs /R >>
+endobj
+6 0 obj
+<< /Length 55 >>
+stream
+BT /F1 18 Tf 72 750 Td (Everyday form experience) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 600 900] /Resources << /Font << /F1 3 0 R >> >> /Contents 8 0 R /Annots [15 0 R] /Tabs /R >>
+endobj
+8 0 obj
+<< /Length 58 >>
+stream
+BT /F1 18 Tf 72 850 Td (Cross-page field navigation) Tj ET
+endstream
+endobj
+9 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Tx /T (Required name) /TU (Required name) /Rect [72 690 300 720] /F 4 /Ff 2 /V () /DA (/Helv 12 Tf 0 g) /P 5 0 R >>
+endobj
+10 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Tx /T (Date) /TU (Date) /Rect [72 630 300 660] /F 4 /Ff 2 /V () /DA (/Helv 12 Tf 0 g) /P 5 0 R /AA << /F << /S /JavaScript /JS (AFDate_FormatEx\("yyyy-mm-dd"\);) >> >> >>
+endobj
+11 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Ch /T (Choice) /Rect [72 570 272 600] /P 5 0 R /F 4 /Ff 131074 /Opt [(Alpha) (Beta) (Gamma)] /V (Alpha) /DA (/Helv 12 Tf 0 g) >>
+endobj
+12 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Btn /T (Consent) /Rect [72 510 92 530] /P 5 0 R /F 4 /Ff 2 /V /Off /AS /Off /AP << /N << /Off 16 0 R /Yes 17 0 R >> >> >>
+endobj
+13 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Tx /T (Read only) /TU (Read only) /Rect [72 450 300 480] /F 4 /Ff 1 /V (LOCKED) /DA (/Helv 12 Tf 0 g) /P 5 0 R >>
+endobj
+14 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Sig /T (Signature) /Rect [72 350 300 410] /P 5 0 R /F 4 >>
+endobj
+15 0 obj
+<< /Type /Annot /Subtype /Widget /FT /Tx /T (Second page) /TU (Second page) /Rect [72 70 300 100] /F 4 /Ff 0 /V (original second page) /DA (/Helv 12 Tf 0 g) /P 7 0 R >>
+endobj
+16 0 obj
+<< /Type /XObject /Subtype /Form /BBox [0 0 20 20] /Resources << >> /Length 26 >>
+stream
+q 1 w 0 G 1 1 18 18 re S Q
+endstream
+endobj
+17 0 obj
+<< /Type /XObject /Subtype /Form /BBox [0 0 20 20] /Resources << >> /Length 45 >>
+stream
+q 1 w 0 G 1 1 18 18 re S 0 g 5 5 10 10 re f Q
+endstream
+endobj
+xref
+0 18
+0000000000 65535 f 
+0000000015 00000 n 
+0000000080 00000 n 
+0000000143 00000 n 
+0000000213 00000 n 
+0000000370 00000 n 
+0000000556 00000 n 
+0000000661 00000 n 
+0000000813 00000 n 
+0000000921 00000 n 
+0000001090 00000 n 
+0000001315 00000 n 
+0000001498 00000 n 
+0000001674 00000 n 
+0000001842 00000 n 
+0000001955 00000 n 
+0000002140 00000 n 
+0000002282 00000 n 
+trailer
+<< /Size 18 /Root 1 0 R >>
+startxref
+2443
+%%EOF

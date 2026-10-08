@@ -194,13 +194,153 @@ ApplicationWindow {
         nameFilters: ["Images (*.png *.jpg *.jpeg *.webp *.bmp)"]
         onAccepted: { root.pendingImage = selectedFile; root.placement = signature ? "signature" : "image" }
     }
-    Shortcut { sequence: "Escape"; enabled: !textDialog.visible && !graphicDialog.visible && !imageDialog.visible && !saveDialog.visible && !discardDialog.visible && !fileDialog.visible && !saveFailure.visible && !(root.activeFocusItem instanceof FormInput); onActivated: { root.placement = ""; pdfDocument.additions.cancelEdit(); pdfDocument.additions.select(-1) } }
+    Shortcut { sequence: "Escape"; enabled: !root.formPopupVisible && !textDialog.visible && !graphicDialog.visible && !imageDialog.visible && !saveDialog.visible && !discardDialog.visible && !fileDialog.visible && !saveFailure.visible && !(root.activeFocusItem instanceof FormInput); onActivated: { root.placement = ""; pdfDocument.additions.cancelEdit(); pdfDocument.additions.select(-1) } }
     Connections {
         target: pdfDocument.additions
         function onChanged() { root.selectedObject = pdfDocument.additions.object(pdfDocument.additions.selected) }
     }
 
 
+    property bool highlightFields: true
+    property bool showValidation: false
+    function revealFormField(page, field) {
+        pageView.positionViewAtIndex(page, ListView.Beginning)
+        Qt.callLater(function() {
+            const delegate = pageView.itemAtIndex(page)
+            if (!delegate) return
+            const surface = delegate.formSurface
+            const top = surface ? surface.mapToItem(pageView.contentItem, 0, (field.y || 0) * pdfDocument.zoom).y : delegate.y + (field.y || 0) * pdfDocument.zoom
+            const bottom = top + (field.height || 24) * pdfDocument.zoom
+            if (bottom > pageView.contentY + pageView.height - 16)
+                pageView.contentY = Math.max(delegate.y, bottom - pageView.height + 16)
+            if (top < pageView.contentY + 16) pageView.contentY = Math.max(delegate.y, top - 16)
+            if (surface) surface.forceActiveFocus(Qt.OtherFocusReason)
+        })
+    }
+    Connections {
+        target: pdfDocument
+        function onStateChanged() {
+            if (!pdfDocument.ready) root.showValidation = false
+            if (pdfDocument.ready && pdfDocument.formType !== "PDF" && !root.highlightFields)
+                pdfDocument.formEvent(0, "highlight", 0, 0, 0)
+        }
+        function onFormFocusRequested(page, field) { root.revealFormField(page, field) }
+        function onFormEventFinished(id, handled) {
+            if (root.showValidation && !pdfDocument.formBusy) {
+                root.showValidation = false
+                validationDialog.open()
+            }
+        }
+    }
+    Dialog {
+        id: fieldsDialog; objectName: "fieldsDialog"
+        title: "Form fields · * required"
+        anchors.centerIn: parent; width: Math.min(520, root.width - 40)
+        height: Math.min(520, root.height - 80); modal: true
+        standardButtons: Dialog.Close
+        ListView {
+            anchors.fill: parent; clip: true; spacing: 4
+            model: pdfDocument.formFields
+            delegate: ItemDelegate {
+                required property var modelData
+                width: ListView.view.width
+                id: fieldEntry
+                objectName: "formFieldItem" + modelData.id
+                contentItem: Label { text: fieldEntry.text; textFormat: Text.PlainText; elide: Text.ElideRight; verticalAlignment: Text.AlignVCenter }
+                text: "Page " + (modelData.page + 1) + " · " + (modelData.label || "Unnamed field")
+                    + (modelData.required ? " *" : "") + (modelData.readOnly ? " · Read only" : "")
+                enabled: !modelData.readOnly
+                onClicked: { fieldsDialog.close(); pdfDocument.focusFormField(modelData.id) }
+            }
+        }
+    }
+    Dialog {
+        id: validationDialog; objectName: "formValidationDialog"
+        title: pdfDocument.formValidation.length || pdfDocument.formError ? "Form needs attention" : "Form checks passed"
+        anchors.centerIn: parent; width: Math.min(540, root.width - 40)
+        height: Math.min(420, root.height - 80); modal: true; standardButtons: Dialog.Close
+        ColumnLayout {
+            anchors.fill: parent
+            Label { Layout.fillWidth: true; visible: !!pdfDocument.formError; wrapMode: Text.WordWrap; textFormat: Text.PlainText; text: pdfDocument.formError; color: "#c62828" }
+            Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: "Checks required fields and recognized date formats. Document scripts still control accepted values. Review the form before submitting." }
+            ListView {
+                Layout.fillWidth: true; Layout.fillHeight: true; clip: true
+                model: pdfDocument.formValidation
+                delegate: ItemDelegate {
+                    required property var modelData
+                    width: ListView.view.width
+                    id: issueEntry
+                    objectName: "formIssueItem" + modelData.id
+                    contentItem: Label { text: issueEntry.text; textFormat: Text.PlainText; elide: Text.ElideRight; verticalAlignment: Text.AlignVCenter }
+                    text: (modelData.label || "Unnamed field") + " · " + modelData.message
+                    onClicked: { validationDialog.close(); pdfDocument.focusFormField(modelData.id) }
+                }
+            }
+        }
+    }
+    Dialog {
+        id: resetDialog; objectName: "resetFormDialog"
+        property int fieldId: -1
+        title: fieldId < 0 ? "Reset form?" : "Reset field?"
+        anchors.centerIn: parent; width: Math.min(450, root.width - 40)
+        modal: true; standardButtons: Dialog.Ok | Dialog.Cancel
+        Label { width: parent.width; wrapMode: Text.WordWrap; text: "Restore values from when this PDF was opened? Text, drawings and other additions are kept. Document calculations and validation still run." }
+        onAccepted: { if (fieldId < 0) pdfDocument.resetForm(); else pdfDocument.resetFormField(fieldId) }
+    }
+    Dialog {
+        id: choiceDialog; objectName: "formChoiceDialog"
+        property var field: ({})
+        title: "Choose a value"
+        anchors.centerIn: parent; width: Math.min(440, root.width - 40)
+        height: Math.min(420, root.height - 80); modal: true; standardButtons: Dialog.Cancel
+        ListView {
+            anchors.fill: parent; clip: true
+            model: choiceDialog.field.options || []
+            delegate: ItemDelegate {
+                required property string modelData
+                required property int index
+                id: choiceEntry
+                objectName: "formOptionItem" + index
+                contentItem: Label { text: choiceEntry.text; textFormat: Text.PlainText; elide: Text.ElideRight; verticalAlignment: Text.AlignVCenter }
+                width: ListView.view.width; text: modelData
+                highlighted: (choiceDialog.field.selectedOptions || []).indexOf(index) >= 0
+                onClicked: { choiceDialog.close(); pdfDocument.chooseFormOption(choiceDialog.field.id, index) }
+            }
+        }
+    }
+    Dialog {
+        id: dateDialog; objectName: "formDateDialog"
+        property var field: ({})
+        title: "Enter a date"
+        anchors.centerIn: parent; width: Math.min(420, root.width - 40)
+        modal: true; standardButtons: Dialog.Ok | Dialog.Cancel
+        ColumnLayout {
+            width: parent.width
+            Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; textFormat: Text.PlainText; text: (dateDialog.field.label || "Date") + " · " + (dateDialog.field.dateFormat || "yyyy-mm-dd") }
+            RowLayout {
+                SpinBox { id: dateYear; objectName: "dateYear"; from: 1900; to: 2100; value: new Date().getFullYear(); editable: true; Accessible.name: "Year" }
+                SpinBox { id: dateMonth; objectName: "dateMonth"; from: 1; to: 12; value: new Date().getMonth()+1; editable: true; Accessible.name: "Month" }
+                SpinBox { id: dateDay; objectName: "dateDay"; from: 1; to: new Date(dateYear.value, dateMonth.value, 0).getDate(); value: 1; editable: true; Accessible.name: "Day" }
+            }
+        }
+        onAccepted: {
+            const format = (field.dateFormat || "yyyy-mm-dd").replace("mm", "MM")
+            const value = Qt.formatDate(new Date(dateYear.value, dateMonth.value-1, dateDay.value), format)
+            pdfDocument.setFormFieldText(field.id, value)
+        }
+    }
+    Dialog {
+        id: signDialog; objectName: "signDialog"
+        title: "Add a visual signature"
+        anchors.centerIn: parent; width: Math.min(450, root.width - 40)
+        modal: true; standardButtons: Dialog.Cancel
+        ColumnLayout {
+            width: parent.width
+            Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: "Draw on the page or import a signature image, then resize and place it. This adds visible content; it does not digitally sign a native signature field. Added signatures cannot be saved on dynamic XFA yet." }
+            Button { objectName: "drawSignatureButton"; text: "Draw signature"; onClicked: { signDialog.close(); root.chooseGraphic("drawing") } }
+            Button { objectName: "importSignatureButton"; text: "Import signature image"; onClicked: { signDialog.close(); imageDialog.signature = true; imageDialog.open() } }
+        }
+    }
     FileDialog {
         id: fileDialog
         objectName: "openDialog"
@@ -232,14 +372,15 @@ ApplicationWindow {
         target: pdfDocument
         function onSaveFinished(success) { if (!success && pdfDocument.saveError) saveFailure.open() }
     }
-    Shortcut { sequence: "Ctrl+Shift+S"; enabled: pdfDocument.ready && !pdfDocument.saving && !pdfDocument.additions.editing; onActivated: saveDialog.open() }
+    Shortcut { sequence: "Ctrl+Shift+S"; enabled: pdfDocument.ready && !pdfDocument.saving && !pdfDocument.additions.editing && !root.formPopupVisible; onActivated: saveDialog.open() }
     Shortcut { sequences: [StandardKey.Open]; onActivated: fileDialog.open() }
     Shortcut { sequences: [StandardKey.Close]; onActivated: root.closeDocument() }
     Shortcut { sequence: "Ctrl++"; onActivated: pdfDocument.zoom *= 1.2 }
     Shortcut { sequence: "Ctrl+-"; onActivated: pdfDocument.zoom /= 1.2 }
     Shortcut { sequence: "Ctrl+0"; onActivated: pdfDocument.fitToPage() }
+    property bool formPopupVisible: fieldsDialog.visible || validationDialog.visible || resetDialog.visible || choiceDialog.visible || dateDialog.visible || signDialog.visible
     property bool additionHistoryShortcuts: pdfDocument.ready && !pdfDocument.saving
-        && !pdfDocument.additions.editing && !graphicDialog.visible
+        && !pdfDocument.additions.editing && !graphicDialog.visible && !root.formPopupVisible
         && !textDialog.visible && !imageDialog.visible && !saveDialog.visible && !discardDialog.visible && !fileDialog.visible && !saveFailure.visible
         && !(root.activeFocusItem instanceof FormInput)
         && !(root.activeFocusItem && typeof root.activeFocusItem.undo === "function")
@@ -418,11 +559,39 @@ ApplicationWindow {
                     Label { text: "Shift-click to select several"; color: "#596878" }
                 }
             }
+            Flickable {
+                id: formTools
+                anchors.top: extraToolView.bottom; anchors.left: parent.left; anchors.right: parent.right
+                anchors.margins: 8; height: 40; clip: true
+                visible: pdfDocument.ready && pdfDocument.formType !== "PDF"
+                enabled: !pdfDocument.saving && !pdfDocument.additions.editing
+                contentWidth: formToolsRow.implicitWidth; contentHeight: height
+                flickableDirection: Flickable.HorizontalFlick; ScrollBar.horizontal: ScrollBar {}
+                RowLayout {
+                    id: formToolsRow; height: parent.height
+                    CheckBox { objectName: "highlightFieldsButton"; text: "Show fields"; checked: root.highlightFields; onToggled: { root.highlightFields = checked; pdfDocument.formEvent(pdfDocument.currentPage-1, "highlight", 0, 0, checked ? 1 : 0) } }
+                    ToolButton { objectName: "formFieldsButton"; text: "Fields"; enabled: pdfDocument.formHelpersAvailable; onClicked: fieldsDialog.open() }
+                    ToolButton { objectName: "previousFieldButton"; text: "Previous field"; enabled: pdfDocument.formHelpersAvailable; onClicked: pdfDocument.navigateForm(true) }
+                    ToolButton { objectName: "nextFieldButton"; text: "Next field"; enabled: pdfDocument.formHelpersAvailable; onClicked: pdfDocument.navigateForm() }
+                    ToolButton { objectName: "validateFormButton"; text: "Check form"; enabled: pdfDocument.formHelpersAvailable; onClicked: { root.showValidation = true; pdfDocument.validateForm() } }
+                    ToolButton { objectName: "resetFieldButton"; text: "Reset field"; enabled: pdfDocument.formHelpersAvailable && pdfDocument.focusedField.id !== undefined && !pdfDocument.focusedField.readOnly && pdfDocument.focusedField.type >= 2 && pdfDocument.focusedField.type <= 6; onClicked: { resetDialog.fieldId = pdfDocument.focusedField.id; resetDialog.open() } }
+                    ToolButton { objectName: "resetWholeFormButton"; text: "Reset form"; enabled: pdfDocument.canResetForm; onClicked: { resetDialog.fieldId = -1; resetDialog.open() } }
+                    ToolButton { objectName: "chooseFormValueButton"; text: "Choose value"; visible: (pdfDocument.focusedField.options || []).length > 0; enabled: !!pdfDocument.focusedField.choicesComplete; onClicked: { choiceDialog.field = pdfDocument.focusedField; choiceDialog.open() } }
+                    ToolButton { objectName: "enterFormDateButton"; text: "Date…"; visible: (pdfDocument.focusedField.dateFormat || "").length > 0; onClicked: {
+                        dateDialog.field = pdfDocument.focusedField
+                        const parsed = Date.fromLocaleString(Qt.locale("en_US"), dateDialog.field.value, dateDialog.field.dateFormat.replace("mm", "MM"))
+                        const date = isNaN(parsed.getTime()) ? new Date() : parsed
+                        dateYear.value = date.getFullYear(); dateMonth.value = date.getMonth()+1; dateDay.value = date.getDate(); dateDialog.open()
+                    } }
+                    ToolButton { objectName: "signFormButton"; text: "Sign…"; onClicked: signDialog.open() }
+                    Label { textFormat: Text.PlainText; text: pdfDocument.formHelpersAvailable ? (pdfDocument.focusedField.label || "Tab moves to the next field") : "Native form controls · Tab moves focus"; color: "#596878" }
+                }
+            }
             ListView {
                 id: pageView
                 objectName: "pageView"
                 anchors.fill: parent
-                anchors.topMargin: 106
+                anchors.topMargin: formTools.visible ? 154 : 106
                 visible: pdfDocument.ready
                 model: pdfDocument.pages
                 clip: true
@@ -442,6 +611,7 @@ ApplicationWindow {
                 delegate: Item {
                     required property int index
                     required property var modelData
+                    property alias formSurface: nativeFormInput
                     width: pageView.contentWidth
                     height: modelData.height * pdfDocument.zoom + 32
                     Rectangle {
@@ -451,7 +621,27 @@ ApplicationWindow {
                         color: "#ffffff"
                         border.color: "#c3cbd5"
                         PdfPage { id: fullPage; objectName: "page" + index; anchors.fill: parent; anchors.margins: 1; document: pdfDocument; page: index }
-                        FormInput { objectName: "formInput" + index; anchors.fill: fullPage; document: pdfDocument; page: index; enabled: pdfDocument.formType !== "PDF" && !pdfDocument.saving }
+                        id: pageDelegate
+                        property int pageIndex: index
+                        Item {
+                            anchors.fill: fullPage
+                            visible: root.highlightFields
+                            clip: true
+                            Repeater {
+                                model: pdfDocument.formFields.filter(function(field) { return field.page === pageDelegate.pageIndex })
+                                Rectangle {
+                                    required property var modelData
+                                    x: modelData.x * pdfDocument.zoom; y: modelData.y * pdfDocument.zoom
+                                    width: modelData.width * pdfDocument.zoom; height: modelData.height * pdfDocument.zoom
+                                    color: "transparent"
+                                    border.width: modelData.id === pdfDocument.focusedField.id ? 2 : 1
+                                    border.color: pdfDocument.formValidated && pdfDocument.formValidation.some(function(issue) { return issue.id === modelData.id }) ? "#c62828" : modelData.required ? "#a46513" : "#225a91"
+                                    opacity: modelData.readOnly ? .35 : 1
+                                    Label { anchors.right: parent.right; anchors.top: parent.top; text: modelData.required ? "*" : ""; color: parent.border.color; font.bold: true }
+                                }
+                            }
+                        }
+                        FormInput { id: nativeFormInput; objectName: "formInput" + index; anchors.fill: fullPage; document: pdfDocument; page: index; enabled: pdfDocument.formType !== "PDF" && !pdfDocument.saving }
                         AddedOverlay { anchors.fill: fullPage; content: pdfDocument.additions; page: index }
                         MouseArea {
                             objectName: "contentMouse" + index
