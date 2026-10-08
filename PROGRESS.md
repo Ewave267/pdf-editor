@@ -2,6 +2,16 @@
 
 Last updated: 2026-10-08
 
+Pipeline follow-up: PDF Integration run 37811582359 failed the new underline
+raster assertion on Ubuntu's Qt 6.4.2, although it passed local Qt 6.10.2.
+The test now selects the explicitly installed Liberation Serif family for
+both preview/export and counts visible antialiased line coverage rather than
+requiring nearly black pixels. A matching non-underlined preview must fail
+the line check, so the assertion still detects a missing underline. The updated
+font save/reopen and independent-reader test passes locally; CI verification is
+pending. This test-only fix does not trigger the native artifact workflow.
+ARM-only native run 37802627076 has now completed successfully.
+
 ## Roadmap Phase 2 — added-text formatting
 
 Added text boxes now offer installed/bundled font families and generic fallback

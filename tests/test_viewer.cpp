@@ -95,10 +95,10 @@ class ViewerTests : public QObject
         QVERIFY(!content->setTextStyle(id, "Serif", 145, true, true, true));
         QVERIFY(!content->setTextStyle(id, "No such installed font 12345", 24, true, true, true));
         QCOMPARE(content->revision(), originalRevision);
-        QVERIFY(content->setTextStyle(id, "Serif", 24, true, true, true));
+        QVERIFY(content->setTextStyle(id, "Liberation Serif", 24, true, true, true));
         QCOMPARE(content->object(id)["fontSize"].toInt(), 24);
         const auto revision = content->revision();
-        QVERIFY(content->setTextStyle(id, "Serif", 24, true, true, true));
+        QVERIFY(content->setTextStyle(id, "Liberation Serif", 24, true, true, true));
         QCOMPARE(content->revision(), revision);
         QVERIFY(content->setText(id, "Styled text"));
         QCOMPARE(content->revision(), revision);
@@ -125,13 +125,17 @@ class ViewerTests : public QObject
                 int run = 0;
                 for (int x = 50; x < 270; ++x)
                 {
-                    run = qGray(image.pixel(x, y)) < 100 ? run + 1 : 0;
+                    // A thin underline may cover only part of a pixel row in
+                    // Qt 6.4. Count visible coverage rather than near-black ink.
+                    run = qGray(image.pixel(x, y)) < 240 ? run + 1 : 0;
                     longest = std::max(longest, run);
                 }
             }
             return longest;
         };
         QVERIFY(longestLine(styled) > 80); // Continuous underline, rather than glyph strokes.
+        QVERIFY(content->setTextStyle(id, "Liberation Serif", 24, true, true, false));
+        QVERIFY(longestLine(preview()) < 80); // Missing underlines must still fail the check.
         QVERIFY(content->setTextStyle(id, "Monospace", 12, false, false, false));
         QVERIFY(styled != preview());
         QVERIFY(content->setTextStyle(id, "Liberation Serif", 24, true, true, true));
