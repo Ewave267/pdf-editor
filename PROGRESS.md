@@ -486,3 +486,9 @@ rights mask. Mac ARM passed sandbox/resource verification but V8 aborted during
 its empty Oilpan heap reservation. The Mac worker now initializes the trusted
 PDFium runtime before measuring its VM baseline and applying Seatbelt; no PDF
 bytes are read until policy verification succeeds. Native CI validation pending.
+
+Run 37781063288 passed Mac Intel, Mac ARM, Linux build and Linux package
+validation. Integration run 37775905657 passed all regressions and relocated
+package checks. Windows still exits before main with `0xC0000142`, despite a
+private desktop. Its pipe-based worker now uses the Windows GUI subsystem
+with the normal main CRT entry point to avoid console initialization; CI pending.

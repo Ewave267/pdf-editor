@@ -123,6 +123,15 @@ if(PDF_EDITOR_BUILD_VIEWER)
     pdf_editor_warnings(pdf-render-worker)
     add_dependencies(pdf-form-editor pdf-render-worker)
     if(WIN32)
+        # AppContainer workers use inherited protocol pipes, not a console.
+        # Keep main() and its CRT initialization without requesting console
+        # initialization from Windows before the sandboxed process enters main.
+        set_target_properties(pdf-render-worker PROPERTIES WIN32_EXECUTABLE TRUE)
+        if(MSVC)
+            target_link_options(pdf-render-worker PRIVATE /ENTRY:mainCRTStartup)
+        else()
+            target_link_options(pdf-render-worker PRIVATE -Wl,-e,mainCRTStartup)
+        endif()
         add_executable(pdf-sandbox src/app/windows_sandbox_main.cpp)
         target_compile_features(pdf-sandbox PRIVATE cxx_std_20)
         target_compile_definitions(pdf-sandbox PRIVATE _WIN32_WINNT=0x0A00)
