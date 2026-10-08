@@ -10,8 +10,9 @@ use an AppContainer with no capabilities and a bounded Job Object; new macOS
 candidates apply a deny-default Seatbelt profile inside the worker after trusted
 dynamic loading and empty PDFium/V8 heap initialization, before document reads, and enforce
 resource limits. Both reject
-direct worker execution without their sandbox. These ports await native CI
-validation and do not claim Linux's tested seccomp/resource-limit coverage.
+direct worker execution without their sandbox. Both Mac architectures passed
+native CI save/reopen validation; Windows runtime validation remains pending.
+These ports do not claim Linux's tested seccomp/resource-limit coverage.
 In particular, Darwin's data limit does not establish the same bound on anonymous
 memory mappings. See [NATIVE-RELEASES](NATIVE-RELEASES.md).
 

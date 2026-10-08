@@ -3,6 +3,7 @@
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFile>
+#include <QFontDatabase>
 #include <QGuiApplication>
 #include <QThread>
 #include <functional>
@@ -68,6 +69,7 @@ int main(int argc, char** argv)
     QGuiApplication app(argc, argv);
     try
     {
+        require(!QFontDatabase::families().isEmpty(), "Validation has no fonts for added text");
         const auto arguments = app.arguments();
         require(arguments.size() == 3, "Usage: native-smoke FIXTURES_DIRECTORY OUTPUT_DIRECTORY");
         const QDir fixtures(arguments[1]), output(arguments[2]);

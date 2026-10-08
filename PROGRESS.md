@@ -36,7 +36,8 @@ bounded Job Object; macOS uses a deny-default Seatbelt profile and resource
 limits. Native GitHub jobs deploy Qt, run the real GUI offscreen, edit/save/reopen
 normal PDFs and AcroForm/XFA fixtures twice, independently check saved fields
 with PDF.js, and upload ZIPs only after these checks pass. Windows/macOS execution
-is not locally verified and awaits the first native CI runs. Mac candidates are
+is not locally verified. Mac Intel and Apple Silicon passed native CI in run
+37781063288; Windows startup validation remains pending. Mac candidates are
 ad-hoc signed, not notarized; Windows candidates are unsigned. No GitHub release is published automatically. See [NATIVE-RELEASES](docs/NATIVE-RELEASES.md).
 
 Steps 1, 2, 3, 4, 5 and 7 are implemented and verified locally. Step 2's isolated PDFium
@@ -497,3 +498,9 @@ Integration CI now cancels superseded runs on the same branch and saves the
 PDFium dependency cache immediately after its own tests pass. A later application
 test failure will no longer force the long dependency compilation on retry.
 Workflow syntax validated with actionlint.
+
+Windows run 37782130968 passed the AppContainer worker and all native form
+smoke tests after switching the pipe worker to the GUI subsystem. PDF.js then
+correctly rejected missing added text: the Windows offscreen Qt backend had no
+font directory configured. Packaging now points that CI-only backend at Windows
+Fonts, and native smoke explicitly rejects an empty font database. Pending CI.

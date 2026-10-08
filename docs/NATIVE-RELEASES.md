@@ -30,8 +30,9 @@ patched PDFium library. Linux builds have a three-hour limit; Windows/Mac builds
 have a six-hour limit. XML-tested PDFium is cached before desktop deployment,
 so a later smoke failure does not require recompiling it. Jobs provide separate
 diagnostics on failure, including `worker-loader.log` and `native-smoke.log`
-for desktop startup failures. Windows and macOS builds now reach packaging,
-but their worker startup checks have not yet passed.
+for desktop startup failures. Run [37781063288](https://github.com/Ewave267/pdf-editor/actions/runs/37781063288)
+passed Mac Intel/Apple Silicon and both Linux formats; Windows worker startup
+remains under investigation.
 
 ## Linux compatibility and usage
 
@@ -131,8 +132,9 @@ Linux hostile-document/regression suites remain available via CTest.
 Local validation built the glibc 2.34 candidates, passed all 69 PDFium XML tests,
 and passed both relocated formats with independent PDF.js checks. GUI startup
 with bundled libraries/fonts also passed on minimal Ubuntu 22.04 without Qt.
-Worker tests ran on Fedora. Windows/Mac native CI reaches deployment but fails
-worker startup; successful runs and the clean-desktop compatibility matrix
+Worker tests ran on Fedora. Mac Intel and Apple Silicon native CI passed
+GUI startup, isolated document editing, both saved generations and independent
+PDF.js verification. Windows worker startup and clean-desktop walkthroughs
 remain pending.
 
 Offscreen checks do not establish usability on a clean desktop. Download the

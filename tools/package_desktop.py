@@ -114,6 +114,13 @@ def main():
         root = Path(temp) / "folder with spaces" / name
         run(["cmake", "--install", args.build_dir, "--prefix", root])
         env = dict(os.environ, QT_QPA_PLATFORM="offscreen", QT_QUICK_BACKEND="software")
+        if args.target == "windows":
+            # Qt's offscreen FreeType backend does not enumerate Windows fonts
+            # through the desktop backend. Provide its CI-only font directory.
+            fonts = Path(os.environ["SystemRoot"]) / "Fonts"
+            if not any(fonts.glob("*.ttf")):
+                raise RuntimeError(f"Windows offscreen validation has no fonts: {fonts}")
+            env["QT_QPA_FONTDIR"] = str(fonts)
         for key in ("QT_PLUGIN_PATH", "QT_QPA_PLATFORM_PLUGIN_PATH", "QML_IMPORT_PATH",
                     "QML2_IMPORT_PATH", "DYLD_LIBRARY_PATH", "DYLD_FRAMEWORK_PATH"):
             env.pop(key, None)
