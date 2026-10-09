@@ -2,6 +2,22 @@
 
 Last updated: 2026-10-08
 
+## Reduced Windows worker runtime
+
+Windows packaging now recursively collects the renderer's app-local DLL imports
+using MSVC `dumpbin`, resolving normal/delay imports and checking system/API-set
+dependencies. It writes a dedicated `worker-runtime` folder and a validation
+manifest with DLL names, count and bytes. The broker stages only that runtime;
+developer builds retain their original layout. Release packages reject missing
+runtime folders rather than silently copying editor libraries.
+
+Local dependency analysis of the downloaded Windows artifact found 8 required
+app-local DLLs, 46.5 MiB, versus the old 47 DLLs / 115.8 MiB. Collector tests cover
+dependency cycles, case-insensitive names, system imports, exclusion of unrelated
+UI libraries and missing-dependency failure. Windows packaging tests the loader
+from the reduced folder and exercises both sandbox launch routes with normal,
+AcroForm and XFA editing/save/reopen. Native Windows execution remains pending CI.
+
 ## Windows performance diagnostics and input scheduling
 
 Added opt-in elapsed sandbox startup/cleanup logs, DLL copy counts and sizes,

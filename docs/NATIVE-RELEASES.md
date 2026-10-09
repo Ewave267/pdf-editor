@@ -112,7 +112,12 @@ worker runs through `pdf-sandbox.exe` in a capability-free AppContainer with
 CPU, memory, lifetime and child-process limits. No administrator installation
 is required. The broker supplies the Windows profile environment paths needed
 for AppContainer startup while keeping the executable search path restricted
-to system libraries. Keep its helper, worker and DLLs beside the editor EXE.
+to system libraries. Keep its helper, worker and DLLs beside the editor EXE,
+including the `worker-runtime` folder. Packaging recursively scans the worker's
+PE imports with MSVC `dumpbin` and collects its app-local dependencies there.
+The broker stages only that smaller runtime for each launch, rather than all
+editor DLLs. Missing non-system imports fail packaging; native loader and
+normal/AcroForm/XFA edit/save/reopen checks validate the reduced runtime.
 
 Mac builds target macOS 13 or newer, separately for Intel and Apple Silicon.
 `macdeployqt` bundles the Qt frameworks, QML/plugins and PDFium worker.

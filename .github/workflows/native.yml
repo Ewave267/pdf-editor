@@ -283,6 +283,7 @@ jobs:
         run: python tools/fetch_native_inputs.py --qt-version 6.8.3
       - name: Deploy and test packaged application
         run: |
+          python tests/test_windows_runtime.py
           helper=build-native/native-smoke
           if [[ '${{ matrix.target }}' == windows ]]; then helper+=.exe; fi
           python tools/package_desktop.py --target '${{ matrix.target }}' \

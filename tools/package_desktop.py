@@ -13,6 +13,7 @@ import subprocess
 import tempfile
 import time
 import zipfile
+from windows_runtime import collect_worker_runtime
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -152,6 +153,18 @@ def main():
             for runtime_name in ("msvcp140.dll", "vcruntime140.dll", "vcruntime140_1.dll"):
                 if not (root / runtime_name).is_file():
                     raise RuntimeError(f"Missing app-local compiler runtime: {runtime_name}")
+            worker_runtime = root / "worker-runtime"
+            runtime_report = collect_worker_runtime(
+                worker, worker_runtime, Path(os.environ["SystemRoot"]) / "System32")
+            required_worker_dlls = {"pdfium.dll", "qt6core.dll", "qt6gui.dll"}
+            if not required_worker_dlls.issubset({n.casefold() for n in runtime_report["dlls"]}):
+                raise RuntimeError("Worker import scan omitted required PDFium/Qt dependencies")
+            (smoke_results / "worker-runtime.json").write_text(json.dumps(runtime_report, indent=2) + "\n")
+            print(f"Private worker runtime: {runtime_report['dll_count']} DLLs, "
+                  f"{runtime_report['dll_bytes']} bytes", flush=True)
+            # DLL loading is tested from the same reduced runtime the broker
+            # will stage, with no SDK on PATH.
+            worker = worker_runtime / worker.name
             platforms = root / "platforms"
             platforms.mkdir(exist_ok=True)
             shutil.copy2(args.qt_prefix / "plugins/platforms/qoffscreen.dll", platforms / "qoffscreen.dll")

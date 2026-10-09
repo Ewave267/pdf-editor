@@ -271,6 +271,14 @@ int wmain(int argc, wchar_t** argv)
             GetModuleFileNameW(nullptr, filename.data(), static_cast<DWORD>(filename.size()));
         require(length > 0 && length < filename.size(), "Cannot locate native runtime");
         const fs::path installation = fs::path(filename.data()).parent_path();
+        // Release packaging provides the worker's transitive DLL closure.
+        // Keep the original layout usable for developer CMake builds only.
+        const fs::path packagedRuntime = installation / L"worker-runtime";
+        const fs::path dependencies =
+            fs::is_directory(packagedRuntime) ? packagedRuntime : installation;
+        require(fs::is_directory(packagedRuntime) ||
+                    !fs::exists(installation / L"release-info.json"),
+                "The packaged worker runtime is missing; extract the entire application");
         Sid sid;
         HRESULT result =
             CreateAppContainerProfile(L"PdfEditor.Renderer", L"PDF Editor Renderer",
@@ -289,11 +297,11 @@ int wmain(int argc, wchar_t** argv)
         require(fs::create_directory(runtime.path), "Cannot create private worker runtime");
         grantRead(runtime.path, sid.value);
         const fs::path worker = runtime.path / L"pdf-render-worker.exe";
-        fs::copy_file(installation / L"pdf-render-worker.exe", worker);
+        fs::copy_file(dependencies / L"pdf-render-worker.exe", worker);
         grantRead(worker, sid.value);
         uintmax_t copiedBytes = 0;
         unsigned copiedDlls = 0;
-        for (const auto& entry : fs::directory_iterator(installation))
+        for (const auto& entry : fs::directory_iterator(dependencies))
         {
             if (!entry.is_regular_file())
                 continue;
