@@ -2,6 +2,7 @@
 #include "PdfDocument.h"
 #include "NativeFile.h"
 #include <QDate>
+#include <QDateTime>
 
 #include <QBuffer>
 #include <QClipboard>
@@ -296,6 +297,13 @@ void PdfDocument::open(const QUrl& url)
 #endif
     sandboxArgs_ = args;
     worker_ = new QProcess(this);
+    connect(worker_, &QProcess::started, this,
+            [this]
+            {
+                if (qEnvironmentVariableIsSet("PDF_EDITOR_WORKER_DIAGNOSTICS"))
+                    qWarning() << "PDF timing: broker process started pid" << worker_->processId()
+                               << "launch_ms" << performanceClock_.elapsed() - requestStartedMs_;
+            });
     worker_->setProcessChannelMode(QProcess::SeparateChannels);
     connect(worker_, &QProcess::readyReadStandardOutput, this, &PdfDocument::receive);
     // Drain diagnostics so a noisy parser cannot fill its stderr pipe.
@@ -355,6 +363,9 @@ void PdfDocument::open(const QUrl& url)
     environment.insert("QT_PLUGIN_PATH", QCoreApplication::applicationDirPath() + "/../PlugIns");
     worker_->setProcessEnvironment(environment);
 #endif
+    if (qEnvironmentVariableIsSet("PDF_EDITOR_WORKER_DIAGNOSTICS"))
+        qWarning() << "PDF timing: launching broker epoch_ms"
+                   << QDateTime::currentMSecsSinceEpoch();
     worker_->start(sandboxProgram_, args);
 }
 
@@ -614,12 +625,18 @@ void PdfDocument::nextRequest()
     // Preserve input order, but don't make typing wait behind queued thumbnails.
     int next = 0;
     if (!saving_)
+    {
+        for (int index = 0; index < queue_.size(); ++index)
+            if (queue_[index].command.isEmpty() && queue_[index].page == currentPage_ - 1 &&
+                (queue_[next].page != currentPage_ - 1 || queue_[index].width > queue_[next].width))
+                next = index;
         for (int index = 0; index < queue_.size(); ++index)
             if (queue_[index].command.value("op") == "event")
             {
                 next = index;
                 break;
             }
+    }
     active_ = queue_.takeAt(next);
     requestStartedMs_ = performanceClock_.elapsed();
     if (qEnvironmentVariableIsSet("PDF_EDITOR_WORKER_DIAGNOSTICS"))

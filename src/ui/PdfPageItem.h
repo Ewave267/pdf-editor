@@ -11,6 +11,7 @@ class PdfPageItem : public QQuickPaintedItem
     Q_PROPERTY(PdfDocument* document READ document WRITE setDocument NOTIFY documentChanged)
     Q_PROPERTY(int page READ page WRITE setPage NOTIFY pageChanged)
     Q_PROPERTY(bool rendered READ rendered NOTIFY renderedChanged)
+    Q_PROPERTY(bool thumbnail MEMBER thumbnail_)
   public:
     explicit PdfPageItem(QQuickItem* parent = nullptr);
     ~PdfPageItem() override;
@@ -29,11 +30,12 @@ class PdfPageItem : public QQuickPaintedItem
     void geometryChange(const QRectF& next, const QRectF& previous) override;
 
   private:
-    void schedule();
+    void schedule(int delayMs = 50);
     void request();
     QPointer<PdfDocument> document_;
     QTimer debounce_;
     QImage image_;
     int page_ = -1;
+    bool thumbnail_ = false;
     quint64 request_ = 0;
 };

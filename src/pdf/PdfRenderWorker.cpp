@@ -12,11 +12,13 @@
 #include <QElapsedTimer>
 #include <QFile>
 #include <QImage>
+#include <QImageWriter>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMap>
 #include <QRegularExpression>
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -818,7 +820,9 @@ class PdfDocument
         QByteArray encoded;
         QBuffer buffer(&encoded);
         buffer.open(QIODevice::WriteOnly);
-        require(image.save(&buffer, "PNG"), "Cannot encode the rendered page.");
+        QImageWriter writer(&buffer, "PNG");
+        writer.setCompression(10); // Fast, lossless compression for interactive redraws.
+        require(writer.write(image), "Cannot encode the rendered page.");
         if (std::getenv("PDF_EDITOR_WORKER_DIAGNOSTICS"))
             std::cerr << "Native render: page=" << index << " width=" << width
                       << " raster_ms=" << rasterMs << " png_ms=" << renderTimer.elapsed() - rasterMs
@@ -857,8 +861,12 @@ int main(int argc, char** argv)
         auto stage = [&startupTimer](const char* message)
         {
             if (std::getenv("PDF_EDITOR_WORKER_DIAGNOSTICS"))
-                std::cerr << "Native worker startup: elapsed_ms=" << startupTimer.elapsed() << " "
-                          << message << std::endl;
+                std::cerr << "Native worker startup: elapsed_ms=" << startupTimer.elapsed()
+                          << " pid=" << QCoreApplication::applicationPid() << " epoch_ms="
+                          << std::chrono::duration_cast<std::chrono::milliseconds>(
+                                 std::chrono::system_clock::now().time_since_epoch())
+                                 .count()
+                          << " " << message << std::endl;
         };
         stage("entered main");
 #ifdef Q_OS_WIN

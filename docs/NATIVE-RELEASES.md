@@ -155,7 +155,13 @@ Reproduce the slow open and typing, close the application, then collect
 `elapsed_ms` and copied DLL counts/bytes. The startup log includes worker startup
 stages, request `queue_ms`, `roundtrip_ms`, `worker_ms`, and render `raster_ms` /
 `png_ms`. Request identifiers connect send/reply entries; timings log operation
-names and dimensions rather than typed text. Diagnostic logging is optional and
+names and dimensions rather than typed text. `epoch_ms` timestamps correlate
+the GUI launch, broker entry, `CreateProcessW`, resume and worker entry across
+processes. Subtract adjacent timestamps to separate broker loading, sandbox setup,
+worker process creation, pre-main loading and PDF initialization. A long pre-main
+interval establishes the boundary but does not identify which OS loading/security
+component caused it; that requires a Windows system performance trace.
+Diagnostic logging is optional and
 adds overhead; remove the two environment variables afterward for normal use.
 
 Windows candidates are unsigned. Mac candidates are ad-hoc signed for native

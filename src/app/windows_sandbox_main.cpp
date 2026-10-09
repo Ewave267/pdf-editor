@@ -30,8 +30,13 @@ void trace(const char* message)
     if (size == 0 || size >= 32768)
         return;
     std::ofstream log(fs::path(path), std::ios::app);
-    log << GetCurrentProcessId() << ": elapsed_ms=" << GetTickCount64() - started << " " << message
-        << '\n';
+    FILETIME now{};
+    GetSystemTimeAsFileTime(&now);
+    ULARGE_INTEGER ticks{};
+    ticks.LowPart = now.dwLowDateTime;
+    ticks.HighPart = now.dwHighDateTime;
+    log << GetCurrentProcessId() << ": elapsed_ms=" << GetTickCount64() - started
+        << " epoch_ms=" << ticks.QuadPart / 10000 - 11644473600000ULL << " " << message << '\n';
 }
 struct Handle
 {
@@ -402,6 +407,7 @@ int wmain(int argc, wchar_t** argv)
         }
         environment.push_back(L'\0');
         PROCESS_INFORMATION process{};
+        trace("starting CreateProcessW");
         require(CreateProcessW(worker.c_str(), command.data(), nullptr, nullptr, TRUE,
                                EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT |
                                    CREATE_SUSPENDED | CREATE_NO_WINDOW,
@@ -419,6 +425,7 @@ int wmain(int argc, wchar_t** argv)
         trace("worker assigned to bounded job");
         if (ResumeThread(thread.value) == static_cast<DWORD>(-1))
             throw std::runtime_error("Cannot resume isolated worker.");
+        trace("worker resumed; waiting for loader and main");
         require(WaitForSingleObject(child.value, INFINITE) == WAIT_OBJECT_0,
                 "Cannot wait for worker completion");
         DWORD exitCode = 1;

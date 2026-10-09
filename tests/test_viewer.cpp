@@ -1102,6 +1102,7 @@ class ViewerTests : public QObject
                 [&](quint64 id, bool) { order.append(id); });
         document.requestRender(0, 612); // Already in flight; it finishes normally.
         const auto thumbnail = document.requestRender(0, 120);
+        const auto focusedPage = document.requestRender(0, 900);
         const auto select = document.formEvent(0, "selectAll");
         const auto first = document.formEvent(0, "text", 0, 0, 0, "a");
         const auto second = document.formEvent(0, "text", 0, 0, 0, "b");
@@ -1109,6 +1110,8 @@ class ViewerTests : public QObject
         QVERIFY(order.indexOf(select) < order.indexOf(first));
         QVERIFY(order.indexOf(first) < order.indexOf(second));
         QVERIFY(order.indexOf(second) < order.indexOf(thumbnail));
+        QVERIFY(order.indexOf(second) < order.indexOf(focusedPage));
+        QVERIFY(order.indexOf(focusedPage) < order.indexOf(thumbnail));
         QCOMPARE(document.formText(), "ab");
         QVERIFY(document.formError().isEmpty());
     }

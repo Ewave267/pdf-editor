@@ -2,6 +2,27 @@
 
 Last updated: 2026-10-08
 
+## Startup boundary tracing and redraw optimization
+
+The user's reduced-runtime log showed DLL staging finished in 344ms and process
+creation finished at 1844ms, but GUI startup took 14797ms while worker document
+initialization took 236ms. Added shared epoch timestamps at GUI launch, broker
+entry, process creation/resume and worker entry to distinguish which pre-main
+boundary accounts for the remaining delay. OS loader/security attribution still
+requires measurements on Windows; no antivirus cause is asserted.
+
+Typing events were fast, but the edited page waited behind another full page and
+five thumbnails. Current-page full-size renders now take priority after native
+input; form-triggered background redraws wait for 350ms idle while the current
+surface uses a 16ms debounce. PNG transport uses lighter lossless compression.
+The queue regression checks input order, then full-page-before-thumbnail delivery.
+Local timing observed 9ms PNG encoding for a 612px page versus 23ms in a prior
+run; these are illustrative Linux samples, not a Windows speed guarantee.
+All six local CTest gates passed in 118.9 seconds, including visual/form input,
+security and independent save/reopen checks. Collector tests and workflow lint
+passed. Windows startup attribution and redraw measurements await the next
+native artifact and user logs.
+
 ## Reduced Windows worker runtime
 
 Windows packaging now recursively collects the renderer's app-local DLL imports

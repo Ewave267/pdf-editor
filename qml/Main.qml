@@ -470,6 +470,7 @@ ApplicationWindow {
                             color: pdfDocument.currentPage === index + 1 ? "#dceaf8" : "#e8edf3"
                             border.color: pdfDocument.currentPage === index + 1 ? "#225a91" : "#cbd4df"
                             PdfPage {
+                                thumbnail: true
                                 id: thumbnailPage
                                 objectName: "thumbnail" + index
                                 anchors.centerIn: parent

@@ -36,7 +36,8 @@ void PdfPageItem::setDocument(PdfDocument* document)
                     emit renderedChanged();
                     schedule();
                 });
-        connect(document_, &PdfDocument::formRepaint, this, &PdfPageItem::schedule);
+        connect(document_, &PdfDocument::formRepaint, this, [this]
+                { schedule(thumbnail_ || page_ != document_->currentPage() - 1 ? 350 : 16); });
         connect(document_, &PdfDocument::rendered, this,
                 [this](quint64 id, const QImage& image)
                 {
@@ -68,13 +69,13 @@ void PdfPageItem::geometryChange(const QRectF& next, const QRectF& previous)
     if (next.size() != previous.size())
         schedule();
 }
-void PdfPageItem::schedule()
+void PdfPageItem::schedule(int delayMs)
 {
     if (document_)
         document_->cancelRender(request_);
     request_ = 0;
     update();
-    debounce_.start();
+    debounce_.start(delayMs);
 }
 void PdfPageItem::request()
 {
