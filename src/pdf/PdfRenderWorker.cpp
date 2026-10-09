@@ -9,6 +9,7 @@
 #include <QBuffer>
 #include <QCoreApplication>
 #include <QDate>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QImage>
 #include <QJsonArray>
@@ -791,6 +792,8 @@ class PdfDocument
 
     QJsonObject render(int index, int width)
     {
+        QElapsedTimer renderTimer;
+        renderTimer.start();
         require(index >= 0 && index < FPDF_GetPageCount(document_), "Invalid page number.");
         require(width >= 96 && width <= 2400, "Unsupported rendering resolution.");
         FPDF_PAGE page = loadPage(index);
@@ -811,10 +814,15 @@ class PdfDocument
         FPDF_RenderPageBitmap(bitmap, page, 0, 0, width, height, 0, FPDF_ANNOT);
         FPDF_FFLDraw(form_, bitmap, page, 0, 0, width, height, 0, FPDF_ANNOT);
         FPDFBitmap_Destroy(bitmap);
+        const auto rasterMs = renderTimer.elapsed();
         QByteArray encoded;
         QBuffer buffer(&encoded);
         buffer.open(QIODevice::WriteOnly);
         require(image.save(&buffer, "PNG"), "Cannot encode the rendered page.");
+        if (std::getenv("PDF_EDITOR_WORKER_DIAGNOSTICS"))
+            std::cerr << "Native render: page=" << index << " width=" << width
+                      << " raster_ms=" << rasterMs << " png_ms=" << renderTimer.elapsed() - rasterMs
+                      << std::endl;
         if (currentFormPage_ >= 0)
         {
             host_.page = openPages_.value(currentFormPage_);
@@ -844,10 +852,13 @@ int main(int argc, char** argv)
 {
     try
     {
-        auto stage = [](const char* message)
+        QElapsedTimer startupTimer;
+        startupTimer.start();
+        auto stage = [&startupTimer](const char* message)
         {
             if (std::getenv("PDF_EDITOR_WORKER_DIAGNOSTICS"))
-                std::cerr << "Native worker startup: " << message << std::endl;
+                std::cerr << "Native worker startup: elapsed_ms=" << startupTimer.elapsed() << " "
+                          << message << std::endl;
         };
         stage("entered main");
 #ifdef Q_OS_WIN
@@ -923,6 +934,7 @@ int main(int argc, char** argv)
             return 0;
         }
         reply(document->initialize());
+        stage("document initialized");
         char line[64 * 1024 + 1];
         while (std::cin.getline(line, sizeof(line)))
         {
@@ -937,6 +949,8 @@ int main(int argc, char** argv)
                             std::floor(id.toDouble()) == id.toDouble(),
                         "Invalid worker request.");
                 QJsonObject result;
+                QElapsedTimer operationTimer;
+                operationTimer.start();
                 const QString op = request.value("op").toString();
                 if (op == "event" && request["action"] == "resetForm" && document->isXfa())
                 {
@@ -962,6 +976,8 @@ int main(int argc, char** argv)
                 else
                     throw std::runtime_error("Unsupported worker command.");
                 result.insert("id", id);
+                if (std::getenv("PDF_EDITOR_WORKER_DIAGNOSTICS"))
+                    result.insert("worker_ms", static_cast<double>(operationTimer.elapsed()));
                 reply(result);
             }
             catch (const std::exception& error)

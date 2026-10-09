@@ -1087,6 +1087,32 @@ class ViewerTests : public QObject
         QVERIFY(finalWordVisible);
     }
 
+    void typingTakesPriorityOverQueuedRenders()
+    {
+        PdfDocument document;
+        document.open(fixture("acroform/controls.pdf"));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        QSignalSpy done(&document, &PdfDocument::formEventFinished);
+        document.formEvent(0, "click", 100, 87);
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, 10000);
+        QList<quint64> order;
+        connect(&document, &PdfDocument::rendered, this,
+                [&](quint64 id, const QImage&) { order.append(id); });
+        connect(&document, &PdfDocument::formEventFinished, this,
+                [&](quint64 id, bool) { order.append(id); });
+        document.requestRender(0, 612); // Already in flight; it finishes normally.
+        const auto thumbnail = document.requestRender(0, 120);
+        const auto select = document.formEvent(0, "selectAll");
+        const auto first = document.formEvent(0, "text", 0, 0, 0, "a");
+        const auto second = document.formEvent(0, "text", 0, 0, 0, "b");
+        QTRY_VERIFY_WITH_TIMEOUT(order.contains(thumbnail), 10000);
+        QVERIFY(order.indexOf(select) < order.indexOf(first));
+        QVERIFY(order.indexOf(first) < order.indexOf(second));
+        QVERIFY(order.indexOf(second) < order.indexOf(thumbnail));
+        QCOMPARE(document.formText(), "ab");
+        QVERIFY(document.formError().isEmpty());
+    }
+
     void formEventsAndPersistence_data()
     {
         QTest::addColumn<QString>("path");

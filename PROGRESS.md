@@ -2,6 +2,27 @@
 
 Last updated: 2026-10-08
 
+## Windows performance diagnostics and input scheduling
+
+Added opt-in elapsed sandbox startup/cleanup logs, DLL copy counts and sizes,
+worker startup stages, queue wait and round-trip timings, worker operation time,
+and separate raster/PNG times. Windows startup now allows 60 seconds for cold
+runtime preparation; Linux/macOS retain their 15-second deadline. Pending native
+form input takes priority over queued page/thumbnail renders while retaining
+input order and save ordering. An in-flight render still completes normally.
+
+Windows closes now give the broker up to two seconds to delete its private DLL
+runtime before forced termination, rather than the former 100ms grace. This
+addresses a plausible cause of the reported temporary-folder cleanup warnings;
+the new stage logs will establish whether it resolves them on the user's PC.
+Windows still copies app-local DLLs per worker launch; sandbox access remains
+restricted. Its actual startup/typing bottleneck needs the user's timing logs.
+Inspection of the previous artifact found 47 root DLLs totaling 115.8 MiB.
+All six local CTest gates passed (113.6 seconds). The new input-priority regression
+and AcroForm/XFA keyboard checks passed with timing diagnostics enabled; worker
+stage, operation and raster/PNG times were observed in the Linux log. Windows
+runtime measurements remain pending.
+
 ## Windows portable startup and artifact layout
 
 User diagnostics identified renderer startup failure with Windows error 183.

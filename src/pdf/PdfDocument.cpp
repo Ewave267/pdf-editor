@@ -22,6 +22,7 @@
 
 PdfDocument::PdfDocument(QObject* parent) : QObject(parent), additions_(new AddedContent(this))
 {
+    performanceClock_.start();
     savedRevision_ = additions_->revision();
     connect(additions_, &AddedContent::changed, this, &PdfDocument::saveStateChanged);
     saveDeadline_.setSingleShot(true);
@@ -55,8 +56,16 @@ void PdfDocument::stopWorker()
     {
         disconnect(worker_, nullptr, this, nullptr);
         worker_->closeWriteChannel();
-        if (!worker_->waitForFinished(100))
+#ifdef Q_OS_WIN
+        constexpr int cleanupGraceMs = 2000; // Broker also removes its copied runtime.
+#else
+        constexpr int cleanupGraceMs = 100;
+#endif
+        if (!worker_->waitForFinished(cleanupGraceMs))
         {
+            if (qEnvironmentVariableIsSet("PDF_EDITOR_WORKER_DIAGNOSTICS"))
+                qWarning() << "PDF timing: forcing worker shutdown after cleanup grace_ms"
+                           << cleanupGraceMs;
             worker_->kill();
             worker_->waitForFinished(1000);
         }
@@ -232,6 +241,8 @@ void PdfDocument::open(const QUrl& url)
     if (QFileInfo(fonts).isDir() && QFileInfo::exists(fontConfig))
         args << "--ro-bind" << fonts << "/runtime/fonts"
              << "--setenv" << "FONTCONFIG_FILE" << "/runtime/fonts/sandbox.conf";
+    if (qEnvironmentVariableIsSet("PDF_EDITOR_WORKER_DIAGNOSTICS"))
+        args << "--setenv" << "PDF_EDITOR_WORKER_DIAGNOSTICS" << "1";
     args << "--ro-bind" << binary << "/probe"
          << "--ro-bind" << library << "/pdfium/libpdfium.so"
          << "--ro-bind" << snapshot_->filePath("input.pdf") << "/input.pdf"
@@ -292,8 +303,13 @@ void PdfDocument::open(const QUrl& url)
             [this]
             {
                 if (worker_)
-                    diagnostics_ += worker_->readAllStandardError().left(
-                        std::max(0, 4096 - static_cast<int>(diagnostics_.size())));
+                {
+                    const auto bytes = worker_->readAllStandardError();
+                    diagnostics_ +=
+                        bytes.left(std::max(0, 4096 - static_cast<int>(diagnostics_.size())));
+                    if (qEnvironmentVariableIsSet("PDF_EDITOR_WORKER_DIAGNOSTICS"))
+                        qWarning().noquote() << "PDF worker stages:" << QString::fromUtf8(bytes);
+                }
             });
     auto reportFailure = [this]
     {
@@ -323,7 +339,12 @@ void PdfDocument::open(const QUrl& url)
                            "instructions."
                          : "The isolated PDF renderer stopped unexpectedly.");
             });
+    requestStartedMs_ = performanceClock_.elapsed();
+#ifdef Q_OS_WIN
+    deadline_.start(60000); // Cold runtime preparation can include antivirus scans.
+#else
     deadline_.start(15000);
+#endif
 #ifdef Q_OS_MACOS
     QProcessEnvironment environment;
     environment.insert("PATH", "/usr/bin:/bin");
@@ -358,6 +379,14 @@ void PdfDocument::receive()
         return;
     }
     deadline_.stop();
+    if (qEnvironmentVariableIsSet("PDF_EDITOR_WORKER_DIAGNOSTICS"))
+        qWarning().noquote() << "PDF timing: reply"
+                             << (loading_ ? QString("startup")
+                                          : active_.command.value("op").toString("render"))
+                             << "id" << active_.id << "page" << active_.page << "width"
+                             << active_.width << "roundtrip_ms"
+                             << performanceClock_.elapsed() - requestStartedMs_ << "worker_ms"
+                             << response.value("worker_ms").toDouble(-1);
     if (response.contains("error") && !active_.command.isEmpty())
     {
         const auto id = active_.id;
@@ -558,7 +587,7 @@ quint64 PdfDocument::requestRender(int page, int width)
         if (it != queue_.end())
             it->listeners.append(id);
         else
-            queue_.append({id, page, width, {id}, {}});
+            queue_.append({id, page, width, {id}, {}, performanceClock_.elapsed()});
     }
     nextRequest();
     return id;
@@ -582,7 +611,23 @@ void PdfDocument::nextRequest()
 {
     if (!worker_ || active_.id || queue_.isEmpty())
         return;
-    active_ = queue_.takeFirst();
+    // Preserve input order, but don't make typing wait behind queued thumbnails.
+    int next = 0;
+    if (!saving_)
+        for (int index = 0; index < queue_.size(); ++index)
+            if (queue_[index].command.value("op") == "event")
+            {
+                next = index;
+                break;
+            }
+    active_ = queue_.takeAt(next);
+    requestStartedMs_ = performanceClock_.elapsed();
+    if (qEnvironmentVariableIsSet("PDF_EDITOR_WORKER_DIAGNOSTICS"))
+        qWarning().noquote() << "PDF timing: send" << active_.command.value("op").toString("render")
+                             << "action" << active_.command.value("action").toString() << "id"
+                             << active_.id << "page" << active_.page << "width" << active_.width
+                             << "queue_ms" << requestStartedMs_ - active_.queuedMs << "pending"
+                             << queue_.size();
     QJsonObject request = active_.command;
     if (request.isEmpty())
         request = {{"page", active_.page}, {"width", active_.width}};
@@ -613,7 +658,7 @@ quint64 PdfDocument::formEvent(int page, const QString& action, double x, double
     formPage_ = page;
     QJsonObject command{{"op", "event"}, {"page", page}, {"action", action}, {"x", x},
                         {"y", y},        {"key", key},   {"text", text},     {"flags", flags}};
-    queue_.append({id, page, 0, {}, command});
+    queue_.append({id, page, 0, {}, command, performanceClock_.elapsed()});
     ++pendingFormEvents_;
     emit formsChanged();
     emit saveStateChanged();

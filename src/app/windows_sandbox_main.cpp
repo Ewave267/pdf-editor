@@ -23,13 +23,15 @@ namespace
 {
 void trace(const char* message)
 {
+    static const ULONGLONG started = GetTickCount64();
     // Trusted broker only: the AppContainer worker never receives this path.
     wchar_t path[32768]{};
     const DWORD size = GetEnvironmentVariableW(L"PDF_EDITOR_SANDBOX_LOG", path, 32768);
     if (size == 0 || size >= 32768)
         return;
     std::ofstream log(fs::path(path), std::ios::app);
-    log << GetCurrentProcessId() << ": " << message << '\n';
+    log << GetCurrentProcessId() << ": elapsed_ms=" << GetTickCount64() - started << " " << message
+        << '\n';
 }
 struct Handle
 {
@@ -108,6 +110,7 @@ struct PrivateRuntime
     {
         std::error_code ignored;
         fs::remove_all(path, ignored);
+        trace(ignored ? "private runtime cleanup failed" : "private runtime cleanup completed");
     }
 };
 struct WindowStation
@@ -288,6 +291,8 @@ int wmain(int argc, wchar_t** argv)
         const fs::path worker = runtime.path / L"pdf-render-worker.exe";
         fs::copy_file(installation / L"pdf-render-worker.exe", worker);
         grantRead(worker, sid.value);
+        uintmax_t copiedBytes = 0;
+        unsigned copiedDlls = 0;
         for (const auto& entry : fs::directory_iterator(installation))
         {
             if (!entry.is_regular_file())
@@ -299,11 +304,16 @@ int wmain(int argc, wchar_t** argv)
             {
                 fs::copy_file(entry.path(), runtime.path / entry.path().filename());
                 grantRead(runtime.path / entry.path().filename(), sid.value);
+                copiedBytes += entry.file_size();
+                ++copiedDlls;
             }
         }
         fs::copy_file(input, runtime.path / L"input.pdf");
         grantRead(runtime.path / L"input.pdf", sid.value);
         trace("private runtime and read permissions ready");
+        trace(
+            ("runtime DLLs=" + std::to_string(copiedDlls) + " bytes=" + std::to_string(copiedBytes))
+                .c_str());
         Handle job(CreateJobObjectW(nullptr, nullptr));
         require(job.value != nullptr, "Cannot create worker job");
         JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};

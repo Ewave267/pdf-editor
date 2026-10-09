@@ -134,6 +134,25 @@ also display an error dialog on desktop launches. Failures before application
 entry or native crashes may not appear in this log. Keep the full extracted
 folder together and launch `pdf-editor.exe`, rather than either helper.
 
+For Windows performance diagnostics, open PowerShell in the extracted application
+folder and run:
+
+```powershell
+$env:PDF_EDITOR_WORKER_DIAGNOSTICS = "1"
+$env:PDF_EDITOR_SANDBOX_LOG = "$env:TEMP\pdf-editor-sandbox.log"
+Remove-Item $env:PDF_EDITOR_SANDBOX_LOG -ErrorAction SilentlyContinue
+.\pdf-editor.exe
+```
+
+Reproduce the slow open and typing, close the application, then collect
+`$env:TEMP\pdf-editor-sandbox.log` and
+`$env:LOCALAPPDATA\PDF Editor\startup.log`. Broker entries contain cumulative
+`elapsed_ms` and copied DLL counts/bytes. The startup log includes worker startup
+stages, request `queue_ms`, `roundtrip_ms`, `worker_ms`, and render `raster_ms` /
+`png_ms`. Request identifiers connect send/reply entries; timings log operation
+names and dimensions rather than typed text. Diagnostic logging is optional and
+adds overhead; remove the two environment variables afterward for normal use.
+
 Windows candidates are unsigned. Mac candidates are ad-hoc signed for native
 execution, not Developer ID signed or notarized. Downloaded candidates may need
 explicit approval through the operating system's security UI. Production signing

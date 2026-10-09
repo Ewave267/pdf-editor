@@ -3,6 +3,7 @@
 
 #include "content/AddedContent.h"
 #include <QCache>
+#include <QElapsedTimer>
 #include <QImage>
 #include <QJsonObject>
 #include <QObject>
@@ -117,6 +118,7 @@ class PdfDocument : public QObject
         int width;
         QList<quint64> listeners;
         QJsonObject command;
+        qint64 queuedMs = 0;
         QString key() const { return QString::number(page) + "/" + QString::number(width); }
     };
     void stopWorker();
@@ -144,6 +146,8 @@ class PdfDocument : public QObject
     bool fieldsComplete_ = false, formValidated_ = false;
     QProcess* worker_ = nullptr;
     QTimer deadline_;
+    QElapsedTimer performanceClock_;
+    qint64 requestStartedMs_ = 0;
     QByteArray incoming_, diagnostics_;
     QList<Request> queue_;
     Request active_{};
