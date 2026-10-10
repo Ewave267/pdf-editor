@@ -22,7 +22,7 @@ jobs:
           python-version: '3.14'
       - name: Check tracked dependencies without rebuilding
         run: python tools/check_dependency_security.py
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: dependency-security-report

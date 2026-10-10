@@ -52,14 +52,14 @@ jobs:
       - name: Cross-build using the pinned Chromium compiler and ARM baseline headers
         if: steps.pdfium.outputs.cache-hit != 'true'
         run: bash tools/build_pdfium_linux_arm64.sh
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: pdfium-linux-arm64-build-inputs
           path: .deps/pdfium-patched/
           compression-level: 0
           retention-days: 1
           if-no-files-found: error
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: pdfium-linux-arm64-diagnostics
@@ -117,7 +117,7 @@ jobs:
         with:
           path: .deps/pdfium-patched
           key: ${{ steps.pdfium.outputs.cache-primary-key }}
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: linux-validation-inputs-${{ matrix.arch }}
           compression-level: 0
@@ -128,7 +128,7 @@ jobs:
             dist/native/SHA256SUMS
             ci-linux/native-smoke
           if-no-files-found: error
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: linux-build-diagnostics-${{ matrix.arch }}
@@ -177,7 +177,7 @@ jobs:
               node tools/check_form_controls.mjs tests/reader/node_modules/pdfjs-dist "$folder/xfa-$generation.pdf" xfa
             done
           done
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: pdf-editor-linux-${{ matrix.arch }}
           path: |
@@ -185,7 +185,7 @@ jobs:
             dist/native/*.AppImage
             dist/native/SHA256SUMS
           if-no-files-found: error
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: linux-validation-diagnostics-${{ matrix.arch }}
@@ -301,13 +301,13 @@ jobs:
               node tools/check_form_controls.mjs tests/reader/node_modules/pdfjs-dist "$directory/xfa-$generation.pdf" xfa
             done
           done
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: matrix.target == 'windows'
         with:
           name: pdf-editor-${{ matrix.target }}-${{ matrix.cpu }}
           path: dist/native/windows/
           if-no-files-found: error
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: matrix.target != 'windows'
         with:
           name: pdf-editor-${{ matrix.target }}-${{ matrix.cpu }}
@@ -315,12 +315,12 @@ jobs:
             dist/native/*.zip
             dist/native/SHA256SUMS
           if-no-files-found: error
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: qt-sources-${{ matrix.target }}-${{ matrix.cpu }}
           path: .deps/release-inputs/qt-sources/
           compression-level: 0
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: diagnostics-${{ matrix.target }}-${{ matrix.cpu }}
