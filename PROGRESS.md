@@ -957,3 +957,8 @@ single-extraction Windows packaging, exact commit targeting, checksums and
 draft-to-prerelease commands. Actionlint and whitespace checks passed. No
 application code changed; the first preview reuses native run 38062531097
 instead of recompiling PDFium or starting another native build matrix.
+
+Publication validation: workflow 38069902937 passed in 41 seconds and published
+[Development preview — build 25](https://github.com/Ewave267/pdf-editor/releases/tag/preview-38062531097).
+Verified the release is public, marked prerelease, includes all 15 expected
+assets and points at the exact tested application commit `d748565`.
