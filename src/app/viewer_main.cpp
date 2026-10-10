@@ -97,6 +97,9 @@ int main(int argc, char** argv)
     }
     if (auto* window = qobject_cast<QQuickWindow*>(engine.rootObjects().first()))
         window->showNormal();
+#ifdef Q_OS_WIN
+    QTimer::singleShot(250, &document, &PdfDocument::prepareWindowsWorker);
+#endif
     const auto arguments = app.arguments();
     if (arguments.size() == 2)
         document.open(QUrl::fromLocalFile(arguments[1]));

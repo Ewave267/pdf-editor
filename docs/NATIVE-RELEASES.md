@@ -119,6 +119,15 @@ The broker stages only that smaller runtime for each launch, rather than all
 editor DLLs. Missing non-system imports fail packaging; native loader and
 normal/AcroForm/XFA edit/save/reopen checks validate the reduced runtime.
 
+On Windows, the application starts one sandboxed renderer shortly after opening
+its window. PDFium/V8 and the private runtime initialize while you choose a file.
+The prepared worker waits on its pipe without reading a PDF; the first validated
+document snapshot is sent through a bounded binary frame. Opening before warm-up
+finishes waits for that same worker. Closing the app also stops the idle worker.
+Warm-up moves first-document startup earlier; it does not remove Windows loading
+costs, and opening immediately can still wait. Later documents and save workers
+continue to use fresh isolated processes. Linux/macOS startup is unchanged.
+
 Mac builds target macOS 13 or newer, separately for Intel and Apple Silicon.
 `macdeployqt` bundles the Qt frameworks, QML/plugins and PDFium worker.
 Only the editor's platform, image, icon and style plugins are selected; unused

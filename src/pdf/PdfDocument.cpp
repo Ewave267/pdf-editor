@@ -40,6 +40,46 @@ PdfDocument::~PdfDocument()
     stopWorker();
 }
 
+void PdfDocument::prepareWindowsWorker()
+{
+#ifdef Q_OS_WIN
+    if (worker_ || saving_ || loading_ || ready_)
+        return;
+    warmRuntime_ = std::make_unique<QTemporaryDir>();
+    if (!warmRuntime_->isValid())
+        return;
+    sandboxProgram_ = QCoreApplication::applicationDirPath() + "/pdf-sandbox.exe";
+    warming_ = true;
+    warmReady_ = false;
+    launchWorker({"--prepare", warmRuntime_->path()});
+#endif
+}
+
+void PdfDocument::loadPreparedInput()
+{
+    QFile input(snapshot_->filePath("input.pdf"));
+    if (!input.open(QIODevice::ReadOnly))
+    {
+        fail("Cannot read the private document snapshot.");
+        return;
+    }
+    warming_ = warmReady_ = false;
+    sandboxArgs_ = {"--input", snapshot_->filePath("input.pdf")};
+    requestStartedMs_ = performanceClock_.elapsed();
+    const QJsonObject header{{"op", "load"}, {"bytes", static_cast<double>(input.size())}};
+    worker_->write(QJsonDocument(header).toJson(QJsonDocument::Compact) + '\n');
+    while (!input.atEnd())
+    {
+        const auto chunk = input.read(65536);
+        if (chunk.isEmpty() || worker_->write(chunk) != chunk.size())
+        {
+            fail("Cannot send the PDF to the prepared renderer.");
+            return;
+        }
+    }
+    deadline_.start(15000);
+}
+
 qint64 PdfDocument::workerPid() const { return worker_ ? worker_->processId() : 0; }
 
 double PdfDocument::maxPageWidth() const
@@ -73,6 +113,8 @@ void PdfDocument::stopWorker()
         worker_->deleteLater();
         worker_ = nullptr;
     }
+    warmRuntime_.reset();
+    warming_ = warmReady_ = false;
     incoming_.clear();
     diagnostics_.clear();
     queue_.clear();
@@ -100,10 +142,10 @@ void PdfDocument::close()
     emit formsChanged();
     saveError_.clear();
     savedPath_.clear();
-    snapshot_.reset();
     sourcePath_.clear();
     emit saveStateChanged();
     stopWorker();
+    snapshot_.reset();
     ready_ = loading_ = false;
     pages_.clear();
     error_.clear();
@@ -189,13 +231,22 @@ void PdfDocument::open(const QUrl& url)
     }
     copy.close();
     source.close();
-    close();
+    const bool usePrepared = warming_ && worker_;
+    if (!usePrepared)
+        close();
     snapshot_ = std::move(snapshot);
     sourcePath_ = sourcePath;
     fileName_ = input.fileName();
+    error_.clear();
     loading_ = true;
     fitting_ = true;
     emit stateChanged();
+    if (usePrepared)
+    {
+        if (warmReady_)
+            loadPreparedInput();
+        return;
+    }
 #ifdef Q_OS_LINUX
     const QString bwrap = QStandardPaths::findExecutable("bwrap");
     const QString binary = QCoreApplication::applicationDirPath() + "/pdf-render-worker";
@@ -296,6 +347,11 @@ void PdfDocument::open(const QUrl& url)
 #error "No native worker sandbox for this platform"
 #endif
     sandboxArgs_ = args;
+    launchWorker(args);
+}
+
+void PdfDocument::launchWorker(const QStringList& args)
+{
     worker_ = new QProcess(this);
     connect(worker_, &QProcess::started, this,
             [this]
@@ -390,6 +446,15 @@ void PdfDocument::receive()
         return;
     }
     deadline_.stop();
+    if (warming_ && response["warm"].toBool())
+    {
+        warmReady_ = true;
+        if (qEnvironmentVariableIsSet("PDF_EDITOR_WORKER_DIAGNOSTICS"))
+            qWarning() << "PDF timing: prewarmed worker ready";
+        if (loading_)
+            loadPreparedInput();
+        return;
+    }
     if (qEnvironmentVariableIsSet("PDF_EDITOR_WORKER_DIAGNOSTICS"))
         qWarning().noquote() << "PDF timing: reply"
                              << (loading_ ? QString("startup")

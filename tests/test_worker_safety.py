@@ -42,6 +42,32 @@ class WorkerSafetyTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         return [json.loads(line) for line in result.stdout.splitlines()]
 
+    def test_warm_worker_loads_bounded_pipe_input(self):
+        fixture = ROOT / "tests/pdfs/normal/single-page.pdf"
+        command = self.command(WORKER, fixture) + ["--warm"]
+        with subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE) as process:
+            self.assertEqual(json.loads(process.stdout.readline()), {"warm": True})
+            self.assertIsNone(process.poll())
+            # Exercise binary framing across multiple 64KiB transport chunks.
+            pdf = fixture.read_bytes() + b" " * 131072
+            payload = json.dumps({"op": "load", "bytes": len(pdf)}).encode() + b"\n" + pdf
+            payload += b'{"id":1,"page":0,"width":612}\n'
+            output, diagnostics = process.communicate(payload, timeout=10)
+            self.assertEqual(process.returncode, 0, diagnostics.decode(errors="replace"))
+            replies = [json.loads(line) for line in output.splitlines()]
+            self.assertEqual(len(replies[0]["pages"]), 1)
+            self.assertIn("png", replies[1])
+
+    def test_warm_worker_rejects_invalid_and_truncated_input(self):
+        fixture = ROOT / "tests/pdfs/normal/single-page.pdf"
+        for payload in (b'{"op":"load","bytes":67108865}\n',
+                        b'{"op":"load","bytes":10}\nshort', b'{"op":"load"'):
+            with self.subTest(payload=payload):
+                result = subprocess.run(self.command(WORKER, fixture) + ["--warm"],
+                                        input=payload, capture_output=True, timeout=10)
+                self.assertNotEqual(result.returncode, 0)
+
     def test_kernel_denies_access_even_without_javascript_api_checks(self):
         secret = self.directory / "host-secret"
         secret.write_text("host-only sentinel")

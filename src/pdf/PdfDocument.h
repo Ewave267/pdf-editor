@@ -91,6 +91,8 @@ class PdfDocument : public QObject
     bool fitting() const { return fitting_; }
     Q_INVOKABLE void open(const QUrl& url);
     Q_INVOKABLE void close();
+    void prepareWindowsWorker();
+    bool windowsWorkerPrepared() const { return warmReady_; }
     Q_INVOKABLE void fitToPage();
     Q_INVOKABLE void updateViewport(double width, double height);
     void setCurrentPage(int page);
@@ -125,6 +127,10 @@ class PdfDocument : public QObject
     void fail(const QString& message);
     void receive();
     void nextRequest();
+    void launchWorker(const QStringList& args);
+    void loadPreparedInput();
+    bool warming_ = false, warmReady_ = false;
+    std::unique_ptr<QTemporaryDir> warmRuntime_;
     void updateFit();
     void startSaveWorker(const QByteArray& baseline);
     void finishSave(const QString& error);

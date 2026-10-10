@@ -48,7 +48,8 @@ void reply(const QJsonObject& result)
 class PdfDocument
 {
   public:
-    explicit PdfDocument(const QString& inputPath)
+    explicit PdfDocument(const QString& inputPath) : PdfDocument(readInput(inputPath)) {}
+    explicit PdfDocument(QByteArray inputBytes) : bytes_(std::move(inputBytes))
     {
         host_.lookupPage = [this](int index) -> FPDF_PAGE
         {
@@ -80,14 +81,19 @@ class PdfDocument
         };
         host_.FFI_GetRotation = [](FPDF_FORMFILLINFO*, FPDF_PAGE page)
         { return FPDFPage_GetRotation(page); };
-        QFile input(inputPath);
-        require(input.open(QIODevice::ReadOnly), "Cannot read the selected PDF.");
-        require(input.size() > 0 && input.size() <= 64 * 1024 * 1024,
-                "The viewer currently supports PDF files up to 64 MiB.");
-        bytes_ = input.readAll();
+        require(!bytes_.isEmpty() && bytes_.size() <= 64 * 1024 * 1024, "Invalid PDF input size.");
         document_ = FPDF_LoadMemDocument64(bytes_.data(), bytes_.size(), nullptr);
         require(document_, "Cannot open this PDF. It may be damaged or require a password.");
     }
+    static QByteArray readInput(const QString& path)
+    {
+        QFile input(path);
+        require(input.open(QIODevice::ReadOnly), "Cannot read the selected PDF.");
+        require(input.size() > 0 && input.size() <= 64 * 1024 * 1024,
+                "The viewer currently supports PDF files up to 64 MiB.");
+        return input.readAll();
+    }
+    const QByteArray& openingBytes() const { return bytes_; }
     ~PdfDocument()
     {
         if (form_)
@@ -898,6 +904,7 @@ int main(int argc, char** argv)
         const auto arguments = app.arguments();
         QString inputPath = "/input.pdf";
         bool save = false;
+        bool warm = false;
         for (int index = 1; index < arguments.size(); ++index)
         {
             const QString argument = arguments[index];
@@ -910,6 +917,8 @@ int main(int argc, char** argv)
 #endif
             if (argument == "--save")
                 save = true;
+            else if (argument == "--warm")
+                warm = true;
 #if !defined(Q_OS_LINUX)
             else if (argument == "--input" && index + 1 < arguments.size())
                 inputPath = arguments[++index];
@@ -921,8 +930,32 @@ int main(int argc, char** argv)
 #ifndef Q_OS_MACOS
         pdf::detail::Library library;
 #endif
-        stage("opening document snapshot");
-        auto document = std::make_unique<PdfDocument>(inputPath);
+        require(!warm || !save, "Warm-up cannot be combined with saving.");
+        std::unique_ptr<PdfDocument> document;
+        if (warm)
+        {
+            reply({{"warm", true}});
+            stage("warm worker ready; awaiting first PDF");
+            char header[1024];
+            if (!std::cin.getline(header, sizeof(header)))
+                return std::cin.eof() && std::cin.gcount() == 0 ? 0 : 2;
+            QJsonParseError error;
+            const auto request = QJsonDocument::fromJson(QByteArray(header), &error).object();
+            const double length = request["bytes"].toDouble(-1);
+            require(error.error == QJsonParseError::NoError && request["op"] == "load" &&
+                        length > 0 && length <= 64 * 1024 * 1024 && std::floor(length) == length,
+                    "Invalid warm worker input header.");
+            QByteArray bytes(static_cast<qsizetype>(length), Qt::Uninitialized);
+            std::cin.read(bytes.data(), bytes.size());
+            require(std::cin.gcount() == bytes.size(), "Incomplete warm worker PDF input.");
+            stage("received first PDF; initializing document");
+            document = std::make_unique<PdfDocument>(std::move(bytes));
+        }
+        else
+        {
+            stage("opening document snapshot");
+            document = std::make_unique<PdfDocument>(inputPath);
+        }
         if (save)
         {
             document->initialize();
@@ -964,7 +997,7 @@ int main(int argc, char** argv)
                 {
                     // Recreate the native environment from the immutable opening
                     // snapshot. Never rewrite XFA XML or bypass its scripts.
-                    auto replacement = std::make_unique<PdfDocument>(inputPath);
+                    auto replacement = std::make_unique<PdfDocument>(document->openingBytes());
                     result = replacement->initialize();
                     document = std::move(replacement);
                     result.insert("handled", true);

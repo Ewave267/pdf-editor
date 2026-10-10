@@ -292,10 +292,13 @@ jobs:
       - name: Independently verify both saved generations
         run: |
           npm ci --prefix tests/reader --ignore-scripts
-          for generation in 1 2; do
-            node tools/check_form_controls.mjs tests/reader/node_modules/pdfjs-dist "dist/native/validation/normal-$generation.pdf" normal
-            node tools/check_form_controls.mjs tests/reader/node_modules/pdfjs-dist "dist/native/validation/acroform-$generation.pdf" acroform
-            node tools/check_form_controls.mjs tests/reader/node_modules/pdfjs-dist "dist/native/validation/xfa-$generation.pdf" xfa
+          for directory in dist/native/validation dist/native/validation/logon-station dist/native/validation/early-open; do
+            if [[ ! -d "$directory" ]]; then continue; fi
+            for generation in 1 2; do
+              node tools/check_form_controls.mjs tests/reader/node_modules/pdfjs-dist "$directory/normal-$generation.pdf" normal
+              node tools/check_form_controls.mjs tests/reader/node_modules/pdfjs-dist "$directory/acroform-$generation.pdf" acroform
+              node tools/check_form_controls.mjs tests/reader/node_modules/pdfjs-dist "$directory/xfa-$generation.pdf" xfa
+            done
           done
       - uses: actions/upload-artifact@v6
         if: matrix.target == 'windows'

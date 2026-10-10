@@ -264,12 +264,14 @@ int wmain(int argc, wchar_t** argv)
     try
     {
         trace("broker entered");
-        require((argc == 3 || argc == 4) && std::wstring(argv[1]) == L"--input" &&
-                    (argc == 3 || std::wstring(argv[3]) == L"--save"),
+        const bool warm = argc == 3 && std::wstring(argv[1]) == L"--prepare";
+        require(warm || ((argc == 3 || argc == 4) && std::wstring(argv[1]) == L"--input" &&
+                         (argc == 3 || std::wstring(argv[3]) == L"--save")),
                 "Invalid sandbox launch arguments");
         const fs::path input = fs::absolute(argv[2]);
-        require(fs::is_regular_file(input) && fs::file_size(input) > 0 &&
-                    fs::file_size(input) <= 64 * 1024 * 1024,
+        require(warm ? fs::is_directory(input)
+                     : (fs::is_regular_file(input) && fs::file_size(input) > 0 &&
+                        fs::file_size(input) <= 64 * 1024 * 1024),
                 "Invalid worker input snapshot");
         std::vector<wchar_t> filename(32768);
         const DWORD length =
@@ -298,7 +300,8 @@ int wmain(int argc, wchar_t** argv)
         require(StringFromGUID2(guid, identity, 40) > 0, "Cannot format runtime identity");
         PrivateDesktop desktop(sid.value, identity);
         trace("private window station and desktop ready");
-        PrivateRuntime runtime{input.parent_path() / (std::wstring(L"runtime-") + identity)};
+        PrivateRuntime runtime{(warm ? input : input.parent_path()) /
+                               (std::wstring(L"runtime-") + identity)};
         require(fs::create_directory(runtime.path), "Cannot create private worker runtime");
         grantRead(runtime.path, sid.value);
         const fs::path worker = runtime.path / L"pdf-render-worker.exe";
@@ -321,8 +324,11 @@ int wmain(int argc, wchar_t** argv)
                 ++copiedDlls;
             }
         }
-        fs::copy_file(input, runtime.path / L"input.pdf");
-        grantRead(runtime.path / L"input.pdf", sid.value);
+        if (!warm)
+        {
+            fs::copy_file(input, runtime.path / L"input.pdf");
+            grantRead(runtime.path / L"input.pdf", sid.value);
+        }
         trace("private runtime and read permissions ready");
         trace(
             ("runtime DLLs=" + std::to_string(copiedDlls) + " bytes=" + std::to_string(copiedBytes))
@@ -374,9 +380,10 @@ int wmain(int argc, wchar_t** argv)
         startup.StartupInfo.hStdOutput = inherited[1];
         startup.StartupInfo.hStdError = inherited[2];
         startup.lpAttributeList = attributes.list;
-        std::wstring command = quote(worker.wstring()) + L" --input " +
-                               quote((runtime.path / L"input.pdf").wstring()) +
-                               (argc == 4 ? L" --save" : L"");
+        std::wstring command = warm ? quote(worker.wstring()) + L" --warm"
+                                    : quote(worker.wstring()) + L" --input " +
+                                          quote((runtime.path / L"input.pdf").wstring()) +
+                                          (argc == 4 ? L" --save" : L"");
         // Do not inherit Qt/plugin configuration or search paths from the GUI.
         wchar_t systemRoot[32768]{};
         require(GetEnvironmentVariableW(L"SystemRoot", systemRoot, 32768) > 0,

@@ -1,6 +1,25 @@
 # MVP Progress
 
-Last updated: 2026-10-08
+Last updated: 2026-10-10
+
+## Windows renderer warm-up on application launch
+
+Added a Windows-only idle renderer started shortly after the app window opens.
+The existing broker creates its reduced private runtime and AppContainer, and
+the worker initializes PDFium/V8 before waiting for a document. A bounded header
+and binary pipe frame deliver the first preflight-validated snapshot; opening
+before readiness keeps the same process. No host PDF is read during warm-up.
+Each worker handles only one document; subsequent opens/save workers remain fresh.
+Idle shutdown and cancellation retain broker job limits and cleanup ordering.
+
+Local worker tests exercise idle readiness, multi-chunk PDF transfer and oversized/
+truncated input rejection. Windows native smoke now covers both ready-before-open
+and open-during-warm-up paths with normal/AcroForm/XFA save/reopen checks and
+independent PDF.js verification. Windows execution and actual speedup await CI.
+All six local CTest gates passed in 117.1 seconds. The warm-pipe tests also
+passed separately, and the compiled native smoke helper passed normal/AcroForm/
+XFA edits with two saved generations plus malformed-PDF recovery. Workflow lint,
+Python compilation and dependency collector tests passed.
 
 ## Startup boundary tracing and redraw optimization
 

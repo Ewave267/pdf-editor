@@ -74,6 +74,21 @@ int main(int argc, char** argv)
         require(arguments.size() == 3, "Usage: native-smoke FIXTURES_DIRECTORY OUTPUT_DIRECTORY");
         const QDir fixtures(arguments[1]), output(arguments[2]);
         require(QDir().mkpath(output.absolutePath()), "Cannot create validation output directory");
+#ifdef Q_OS_WIN
+        if (!qEnvironmentVariable("PDF_EDITOR_TEST_PREWARM").isEmpty())
+        {
+            PdfDocument idle;
+            idle.prepareWindowsWorker();
+            if (qEnvironmentVariable("PDF_EDITOR_TEST_PREWARM") == "ready")
+                wait([&] { return idle.windowsWorkerPrepared() || !idle.error().isEmpty(); },
+                     "warm idle worker before closing", 60000);
+            require(idle.error().isEmpty(), idle.error());
+            require(!idle.ready() && !idle.loading(), "Idle warm-up appeared as an open PDF");
+            idle.close();
+            require(idle.workerPid() == 0 && !idle.windowsWorkerPrepared(),
+                    "Closing retained the idle worker");
+        }
+#endif
         for (const QString& kind : {QString("normal"), QString("acroform"), QString("xfa")})
         {
             const QString source = fixtures.filePath(kind == "normal" ? "normal/single-page.pdf"
@@ -84,8 +99,22 @@ int main(int argc, char** argv)
             const QByteArray originalBytes = original.readAll();
             original.close();
             PdfDocument document;
+            const auto prewarm = qEnvironmentVariable("PDF_EDITOR_TEST_PREWARM");
+            if (!prewarm.isEmpty())
+            {
+                document.prepareWindowsWorker();
+                if (prewarm == "ready")
+                    wait(
+                        [&]
+                        { return document.windowsWorkerPrepared() || !document.error().isEmpty(); },
+                        "prepare idle Windows renderer", 60000);
+                require(document.error().isEmpty(), document.error());
+            }
+            const auto preparedPid = document.workerPid();
             document.open(QUrl::fromLocalFile(source));
             ready(document);
+            if (!prewarm.isEmpty() && preparedPid > 0)
+                require(document.workerPid() == preparedPid, "Open replaced the prepared worker");
             render(document);
             if (kind == "normal")
                 require(document.additions()->addText(0, 40, 120, "Native release smoke test") > 0,

@@ -251,8 +251,12 @@ def main():
                 # repeated opens and the existing-station case.
                 standard_results = smoke_results / "logon-station"
                 standard_results.mkdir(exist_ok=True)
-                standard_env = dict(env, PDF_EDITOR_TEST_LOGON_STATION="1")
+                standard_env = dict(env, PDF_EDITOR_TEST_LOGON_STATION="1", PDF_EDITOR_TEST_PREWARM="ready")
                 run_smoke(test, args.fixtures.resolve(), standard_results, standard_env)
+                early_results = smoke_results / "early-open"
+                early_results.mkdir(exist_ok=True)
+                run_smoke(test, args.fixtures.resolve(), early_results,
+                          dict(standard_env, PDF_EDITOR_TEST_PREWARM="early"))
         except Exception:
             if args.target == "macos":
                 for _ in range(5):
