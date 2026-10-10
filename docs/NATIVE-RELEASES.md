@@ -29,8 +29,9 @@ For Linux/macOS, GitHub wraps the application archives and `SHA256SUMS` in an ex
 | `pdf-editor-macos-x64` | ZIP with `PDF Editor.app` | Extract on an Intel Mac, open the app |
 
 Keep the full extracted application folder together. The current package
-version is `0.1.0-rc.1`. These are test candidates, not an automatically published
-GitHub Release. The first PDFium/V8 build is substantial; later runs cache the
+version is recorded in the root `VERSION` file. These are test candidates;
+complete successful builds also publish a Development preview prerelease.
+The first PDFium/V8 build is substantial; later runs cache the
 patched PDFium library. Linux builds have a three-hour limit; Windows/Mac builds
 have a six-hour limit. XML-tested PDFium is cached before desktop deployment,
 so a later smoke failure does not require recompiling it. Jobs provide separate
@@ -247,6 +248,41 @@ Native Windows/Mac source builds use `tools/build_pdfium.py`, the viewer CMake
 configuration in README and `tools/package_desktop.py`; the workflow contains
 the complete SDK, Qt and packaging commands. They require native platform SDKs.
 
+## Automatic development previews
+
+The **Publish development preview** workflow runs after **Native release
+candidates** succeeds on `native-releases`, `main` or `master`. It reuses the
+validated packages without recompiling. A preview is published only when all
+five platform artifacts and matching Windows/macOS Qt source archives are
+available; failed builds and intentionally partial runs do not publish.
+
+Public downloads are at <https://github.com/Ewave267/pdf-editor/releases>.
+Each release is named **Development preview — build N**, tagged
+`preview-RUN_ID`, marked **Pre-release**, and explicitly excluded from GitHub's
+**Latest** stable designation. Each tag points at the exact binary build commit;
+old previews stay available. The Windows ZIP has `pdf-editor.exe` at its root,
+so it needs only one extraction. Other packages are unwrapped from the Actions
+artifact ZIP. Releases include a combined `SHA256SUMS`, `build-info.json`,
+application source ZIP and the five upstream Qt source archives. Source
+distribution for other dependencies is described below and remains a production
+acceptance gate; the attached Qt sources match the desktop builds, not Rocky's
+distribution-patched Linux Qt packages.
+
+To publish an already successful full build without another compilation, select
+**Actions → Publish development preview → Run workflow** and enter its numeric
+run ID (from the build's URL). Repeating a published run is a no-op. Failed
+uploads leave a draft that can be retried, rather than an incomplete public
+release.
+
+GitHub requires the publishing workflow to exist on the repository's **default
+branch** for automatic `workflow_run` events and manual dispatch. Merge/copy this
+workflow and `tools/publish_preview.py` there, or make this release branch the
+default branch. The workflow uses GitHub's built-in token with `actions: read`
+and `contents: write`; no personal token or signing credentials are needed.
+It downloads artifacts as data and never executes the downloaded binaries.
+Signing/notarization, clean-desktop acceptance and security review remain
+required before a stable production release.
+
 ## Sources and notices
 
 The application is GPL-3.0-only. Packages contain application/PDFium/dependency
@@ -256,8 +292,12 @@ and rebuild tooling are checked into this repository.
 
 Before a public binary release, provide complete corresponding sources and
 build inputs for the exact application and modified bundled dependencies.
-Collected notices alone are not a corresponding-source distribution. No signing
-credentials or release-publishing permissions are committed in this workflow.
+Collected notices alone are not a corresponding-source distribution. The
+preview publisher includes application and desktop Qt sources; a complete
+corresponding-source distribution of modified PDFium/V8 and Linux distribution
+dependencies remains to be assembled before production release. No signing
+credentials are committed. Release write permission is confined to the separate
+preview publishing job.
 
 ## Candidate version and roadmap validation
 

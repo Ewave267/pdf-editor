@@ -934,3 +934,26 @@ lint passed. The fix changes tests and CI diagnostics only; existing native
 artifacts remain current and this push does not trigger their expensive build
 matrix. The integration workflow verifies the supported Qt 6.4.2 baseline and
 the relocated Ubuntu preview package.
+
+## 2026-10-10 — Automatic public development previews
+
+- Added a separate publisher triggered by successful Native release candidates
+  builds, plus manual dispatch to reuse an existing full build's run ID.
+- Complete builds from trusted repository branches publish **Development preview
+  — build N** releases tagged `preview-RUN_ID`, explicitly marked prerelease
+  and excluded from GitHub's Latest stable designation. Partial/expired inputs
+  do not publish. Uploads are staged in a draft before public visibility.
+- Downloads reuse the tested binaries. Windows needs one extraction; macOS and
+  Linux application archives are unwrapped from Actions' outer ZIP. Releases
+  include combined checksums, exact build provenance, application sources and
+  matching desktop Qt sources. Other dependency source distribution and stable
+  production acceptance gates remain documented in the release guide.
+- README and release guides describe public downloads, default-branch setup,
+  manual publishing, source coverage and the unstable preview status.
+
+Local validation: seven publication/packaging tests passed, including trusted
+build rejection, missing/expired artifacts, archive traversal rejection,
+single-extraction Windows packaging, exact commit targeting, checksums and
+draft-to-prerelease commands. Actionlint and whitespace checks passed. No
+application code changed; the first preview reuses native run 38062531097
+instead of recompiling PDFium or starting another native build matrix.

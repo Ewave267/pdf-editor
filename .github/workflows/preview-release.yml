@@ -1,0 +1,43 @@
+name: Publish development preview
+
+on:
+  workflow_run:
+    workflows: [Native release candidates]
+    types: [completed]
+    branches: [native-releases, main, master]
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful full Native release candidates run ID (reuse existing binaries)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: preview-release-${{ github.event.workflow_run.id || inputs.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      # Use the trusted workflow branch, not code downloaded from an artifact.
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Test preview packaging
+        run: python -m unittest discover -s tests -p test_preview_release.py
+      - name: Publish tested native packages as a prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          NATIVE_RUN_ID: ${{ github.event.workflow_run.id || inputs.run_id }}
+        run: python tools/publish_preview.py --run-id "$NATIVE_RUN_ID"

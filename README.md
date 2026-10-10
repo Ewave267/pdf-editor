@@ -38,7 +38,13 @@ with an executable and DLLs, Linux portable tarball and AppImage, and macOS app
 bundle. See [native release status and build instructions](docs/NATIVE-RELEASES.md).
 GitHub Actions builds and tests the real editor on native Windows, macOS and
 Linux runners, then uploads downloadable artifacts. Push this branch to GitHub
-and open **Actions → Native release candidates**. See the linked instructions
+and open **Actions → Native release candidates**. Complete successful builds
+also publish **Development preview** prereleases for public downloads on the
+[Releases page](https://github.com/Ewave267/pdf-editor/releases). These previews
+are explicitly unstable and are not marked as the latest stable release.
+The publisher must be present on GitHub's default branch; see
+[preview setup and publishing an existing build](docs/NATIVE-RELEASES.md#automatic-development-previews).
+See the linked instructions
 for downloading and running each package. Windows and Mac Intel/Apple Silicon
 ZIPs and both Linux formats have passed native CI packaging and save/reopen
 validation. Clean-desktop walkthroughs remain the next release check.

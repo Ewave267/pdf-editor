@@ -5,9 +5,12 @@ download instructions, compatibility baseline and platform limitations.
 
 The workflow produces Windows x64 ZIPs, Linux x86_64 portable tarballs and
 AppImages, and separate Intel and Apple Silicon macOS app ZIPs. Packages include
-the editor and its runtime dependencies. No release is published automatically.
+the editor and its runtime dependencies. Successful complete native builds
+automatically publish a **Development preview** GitHub prerelease. These are
+explicitly unstable and never marked as GitHub's **Latest** stable release.
+See [preview publishing](NATIVE-RELEASES.md#automatic-development-previews).
 
-Before a public release, complete clean-desktop testing and corresponding-source
+Before a stable production release, complete clean-desktop testing and corresponding-source
 distribution for the application and bundled dependencies. Preserve all license
 notices. The application is GPL-3.0-only. Existing compatibility gaps in
 [FORMS](FORMS.md) and [SAVING](SAVING.md) remain release gates.
