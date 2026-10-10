@@ -137,17 +137,17 @@ AcroForm helpers support cross-page navigation and scrolling; XFA navigation
 limits are described above. Committed Unicode input is forwarded as UTF-16,
 but comprehensive complex-script input has not been validated.
 
-The pinned PDFium build retains AcroForm JavaScript actions in saved output,
-but its native keystroke path does not apply the fixture's `event.change`
-uppercase conversion. The local source's `CPDFSDK_Widget::OnAAction` returns
-false after executing the AcroForm action, causing `OnBeforeKeyStroke` to skip
-applying changed action data. A dependency fix and regression gate are needed
-before claiming full AcroForm script behavior. Required XFA calculations and
-exit scripts are verified independently and continue to pass.
+The pinned dependency patch now reports successfully executed AcroForm actions
+back to the form filler. The keystroke conversion regression confirms that
+`event.change` uppercase conversion applies to mixed-case input. Native package
+validation checks conversion and visible values after flattening. Required XFA
+calculations and exit scripts continue to have independent-reader checks.
 
 Dynamic full XFA form edits can be saved without added content. Saving additions
 on full XFA still returns a controlled error and retains the edits/additions.
-There is no autosave or recovery of in-memory form edits after a renderer crash.
+Idle recovery checkpoints retain the last successfully captured native form state
+and editable additions; see [DESKTOP-EXPERIENCE](DESKTOP-EXPERIENCE.md). Edits since
+the last checkpoint can still be lost after a renderer crash.
 Step 7 retains application-owned additions, clears pending operations, and
 explicitly reports native form loss; see [SAFETY](SAFETY.md).
 

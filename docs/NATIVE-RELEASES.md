@@ -258,3 +258,23 @@ Before a public binary release, provide complete corresponding sources and
 build inputs for the exact application and modified bundled dependencies.
 Collected notices alone are not a corresponding-source distribution. No signing
 credentials or release-publishing permissions are committed in this workflow.
+
+## Candidate version and roadmap validation
+
+Edit the root `VERSION` file before building a new candidate. CMake's numeric
+project/bundle version is derived from it; executable version output and archive
+names include the candidate suffix. Packaging rejects a mismatched Linux
+executable/archive version. The native smoke helper checks page order, rotation,
+merge, added-content preservation, AcroForm script conversion, flattening and
+print-to-PDF alongside repeated native form saves. Its `performance.json` records
+open/render timings and platform/Qt information. Physical printing and clean
+native desktops remain separate acceptance checks.
+
+Qt Widgets and PrintSupport are now GUI dependencies. Workers retain their
+smaller Core/Gui dependency closure. Theme preferences use the C++ QSettings backend, retaining compatibility
+with the supported Qt 6.4 baseline without additional QML settings modules. macOS deployment includes
+only the required plugin categories, including printer support.
+
+Patch 0004 changes the PDFium cache key: the first CI run after this update must
+rebuild each platform's dependency. Subsequent builds reuse the new cache. See
+[RELEASE](RELEASE.md) for the outstanding V8 freshness review and production gates.

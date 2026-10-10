@@ -1,0 +1,11 @@
+diff --git a/fpdfsdk/cpdfsdk_widget.cpp b/fpdfsdk/cpdfsdk_widget.cpp
+--- a/fpdfsdk/cpdfsdk_widget.cpp
++++ b/fpdfsdk/cpdfsdk_widget.cpp
+@@ -1100,6 +1100,7 @@ bool CPDFSDK_Widget::OnAAction(CPDF_AAction::AActionType type,
+   CPDF_Action action = GetAAction(type);
+   if (action.GetType() != CPDF_Action::Type::kUnknown) {
+     pFormFillEnv->DoActionField(action, type, GetFormField(), data);
++    return true;
+   }
+   return false;
+ }

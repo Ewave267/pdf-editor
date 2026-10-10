@@ -18,6 +18,7 @@ on:
       - 'src/**'
       - 'qml/**'
       - 'CMakeLists.txt'
+      - 'VERSION'
       - 'tools/**'
       - 'packaging/native/**'
       - 'third_party/pdfium/**'

@@ -1,6 +1,6 @@
 # Probe fixture corpus
 
-All current fixtures are original synthetic test documents created for this
+Except for the separately licensed `upstream-pdfium` corpus, fixtures are original synthetic test documents created for this
 project, contain no personal data or external copyrighted content, and use
 the repository's GPL-3.0-only license. The scripted URL uses the reserved
 `example.invalid` domain and is denied by the embedder callback.
@@ -64,3 +64,14 @@ groups. Both native and mouse/keyboard tests verify edits and save/reopen values
 with the same caption requesting Liberation Sans explicitly, including visibility
 of its final word. These are original GPL-3.0-only synthetic documents; the
 reported maternity form remains outside the repository.
+
+## Upstream compatibility samples
+
+`upstream-pdfium/` contains four small regression samples from the pinned PDFium
+source tree, under its BSD license (`upstream-pdfium/LICENSE`). `SOURCE.json`
+records upstream paths, revision and file checksums. Templates are retained where
+available; their XFA includes refer to the matching upstream source tree. These
+exercise Arabic text, dynamic XFA, foreground/static XFA and controlled rejection
+of an encrypted PDF needing a password. They complement our generated fixtures;
+they do not establish compatibility with arbitrary production forms. Password
+entry is not yet supported. No user documents are redistributed.

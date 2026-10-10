@@ -142,3 +142,13 @@ Licensed under the GNU General Public License version 3 only
 Release archive installation, runtime dependencies and validation are documented
 in [RELEASE](docs/RELEASE.md). Step 8 packaging is implemented; the final MVP
 release gate remains open for the documented step 6 compatibility gaps.
+
+## Document workflow and recovery
+
+The Document menu includes page export, merge, printing, search, recent files,
+recovery, themes and optional full screen. See
+[document operations](docs/DOCUMENT-WORKFLOW.md) and
+[desktop controls/recovery](docs/DESKTOP-EXPERIENCE.md).
+The [roadmap](docs/ROADMAP.md) distinguishes implemented core features from
+remaining production acceptance. Candidate artifacts remain unsigned; the V8
+freshness advisory and clean-desktop checks still require review.

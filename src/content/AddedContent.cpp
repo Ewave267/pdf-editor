@@ -755,11 +755,28 @@ bool AddedContent::paste(int page)
         return reject();
     }
     const auto payload = mime->data("application/vnd.pdf-editor.additions+json");
+    return pastePayload(payload, page, false);
+}
+bool AddedContent::restoreCheckpoint(const QByteArray& payload)
+{
+    if (!document_->ready() || editing_)
+        return false;
+    return pastePayload(payload, 0, true);
+}
+bool AddedContent::pastePayload(const QByteArray& payload, int page, bool recovery)
+{
+    auto reject = [this]
+    {
+        error_ = "Invalid saved additions.";
+        emit changed();
+        return false;
+    };
     if (payload.size() > 64 * 1024 * 1024)
         return reject();
     const auto parsed = QJsonDocument::fromJson(payload).object();
     const auto values = parsed["objects"].toArray();
-    if (parsed["version"].toInt() != 1 || values.isEmpty() || values.size() > 100)
+    if (parsed["version"].toInt() != 1 || (!recovery && values.isEmpty()) ||
+        values.size() > (recovery ? 1000 : 100))
         return reject();
     QList<Object> copied;
     QRectF bounds;
@@ -772,6 +789,9 @@ bool AddedContent::paste(int page)
     {
         const auto json = value.toObject();
         Object object{};
+        object.page = recovery ? json["page"].toInt(-1) : page;
+        if (object.page < 0 || object.page >= document_->pageCount())
+            return reject();
         object.type = json["type"].toString();
         object.text = json["text"].toString();
         object.rect = {json["x"].toDouble(invalid), json["y"].toDouble(invalid),
@@ -825,22 +845,36 @@ bool AddedContent::paste(int page)
                 return reject();
             imageBytes += object.image.sizeInBytes();
         }
+        if (recovery)
+        {
+            const auto dimensions = document_->pages()[object.page].toMap();
+            if (object.rect.right() > dimensions["width"].toDouble() ||
+                object.rect.bottom() > dimensions["height"].toDouble())
+                return reject();
+        }
         bounds = bounds.isNull() ? object.rect : bounds.united(object.rect);
         copied.append(object);
     }
     const auto dimensions = document_->pages()[page].toMap();
     const double width = dimensions["width"].toDouble(), height = dimensions["height"].toDouble();
-    if (bounds.width() > width || bounds.height() > height)
+    if (!recovery && (bounds.width() > width || bounds.height() > height))
         return reject();
-    const QPointF offset(std::clamp(bounds.x() + 20, 0., width - bounds.width()) - bounds.x(),
+    QPointF offset;
+    if (!recovery)
+        offset = QPointF(std::clamp(bounds.x() + 20, 0., width - bounds.width()) - bounds.x(),
                          std::clamp(bounds.y() + 20, 0., height - bounds.height()) - bounds.y());
     recordEdit();
+    if (recovery)
+        objects_.clear();
     selection_.clear();
     for (auto& object : copied)
     {
         object.id = ++nextId_;
-        object.page = page;
-        object.rect.translate(offset);
+        if (!recovery)
+        {
+            object.page = page;
+            object.rect.translate(offset);
+        }
         selection_.insert(object.id);
         selected_ = object.id;
         objects_.append(object);
@@ -849,6 +883,38 @@ bool AddedContent::paste(int page)
     emit changed();
     return true;
 }
+QByteArray AddedContent::checkpoint() const
+{
+    if (objects_.size() > 1000)
+        return {};
+    QJsonArray values;
+    qsizetype estimated = 0;
+    for (const auto& o : objects_)
+    {
+        QJsonObject value = QJsonObject::fromVariantMap(object(o.id));
+        value["page"] = o.page;
+        QJsonArray points;
+        for (const auto& p : o.points)
+            points.append(QJsonArray{p.x(), p.y()});
+        value["points"] = points;
+        if (!o.image.isNull())
+        {
+            QByteArray png;
+            QBuffer buffer(&png);
+            buffer.open(QIODevice::WriteOnly);
+            if (!o.image.save(&buffer, "PNG"))
+                return {};
+            value["image"] = QString::fromLatin1(png.toBase64());
+        }
+        estimated += QJsonDocument(value).toJson(QJsonDocument::Compact).size();
+        if (estimated > 64 * 1024 * 1024)
+            return {};
+        values.append(value);
+    }
+    return QJsonDocument(QJsonObject{{"version", 1}, {"objects", values}})
+        .toJson(QJsonDocument::Compact);
+}
+
 void AddedContent::removeSelected()
 {
     if (!selection_.isEmpty())

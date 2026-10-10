@@ -5,6 +5,7 @@
 #include "ui/PdfPageItem.h"
 #include <QDir>
 #include <QGuiApplication>
+#include <QApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
@@ -58,13 +59,13 @@ int main(int argc, char** argv)
 {
     if (argc == 2 && std::string(argv[1]) == "--version")
     {
-        std::cout << "PDF Form Editor 0.1.0\n";
+        std::cout << "PDF Form Editor " PDF_EDITOR_VERSION "\n";
         return 0;
     }
 #ifdef Q_OS_WIN
     initializeStartupLog();
 #endif
-    QGuiApplication app(argc, argv);
+    QApplication app(argc, argv);
     app.setApplicationName("PDF Form Editor");
     app.setOrganizationName("PDF Form Editor");
     QQuickStyle::setStyle("Basic");

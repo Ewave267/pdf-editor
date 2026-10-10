@@ -827,3 +827,56 @@ A local link test with the pinned compiler produced a valid AArch64 ELF.
 Added architecture selection and desktop opt-out for manual workflow runs;
 `[linux-aarch64]` commits retry ARM without canceling or repeating other targets.
 Mac ARM and integration passed in the preceding run. ARM validation pending.
+
+## Production roadmap implementation batch — 2026-10-10
+
+Scope agreed: implement the core roadmap (phases 1–7) and evaluate phase 8.
+
+- Phase 1: fixed the pinned AcroForm action-result bug (patch 0004), verified
+  mixed-case keystroke conversion, and corrected high-resolution PNG transport
+  memory use. Added licensed upstream Arabic/static-XFA/dynamic-XFA/encrypted
+  samples and platform timing reports. Representative production documents,
+  large-document baselines and formal clean-desktop acceptance remain open.
+- Phase 4: new-file page export supports rotation, reorder/remove/extract,
+  blank-page insertion and appending ordinary/previously flattened PDFs. Native
+  AcroForm flattening and application-addition export preserve visible content.
+  Added native printing and atomic print-to-PDF. XFA page changes are rejected;
+  AcroForm append inputs must be flattened in an earlier export to avoid losing
+  unprepared field appearances. Exports/printing do not clear source dirty state.
+- Phase 5: added recent files, file dropping, bounded text search, fit width,
+  optional F11 full screen, persisted light/dark themes and idle recovery.
+  Recovery retains native form values and editable application additions; it
+  does not restore undo history or edits after the latest successful checkpoint.
+- Phase 6: added a reproducible 32-case malformed-input mutation campaign,
+  framed-export/merge limits, high-resolution transport checks, host ASan/UBSan
+  integration checks, Dependabot and a scheduled OSV advisory report. Qt and
+  PDFium/V8 remain outside the host instrumentation; broader parser fuzzing and
+  platform accessibility/printer checks remain additional hardening work.
+- Phase 7: VERSION now controls candidate/archive/executable versioning
+  (`0.1.0-rc.2`). Native smoke validation covers export/merge/rotation, form
+  conversion/flattening and printing, and records open/render timing metadata.
+  GUI packages include Widgets/PrintSupport; the worker keeps its smaller runtime.
+- Phase 8: evaluated OCR, form creation, cryptographic signatures, redaction,
+  PDF/A, accessibility work and plugins in ADR 0007. No optional engine is added.
+
+Local validation: foundation, adversarial viewer/worker safety, viewer integration,
+XFA regressions and independent-reader round trips passed, with focused reruns
+following new worker limits. All 39 relocated viewer cases passed in the Linux
+portable tarball; the AppImage passed native edit/save/reopen/export/flatten and
+print validation. Host ASan/UBSan viewer integration and Windows dependency-closure
+unit tests passed. Workflow lint and Python compilation passed. The cached
+PDFium build was rebuilt incrementally and passed native XML tests.
+Local packages use this Fedora host's glibc 2.39; distributed generic Linux
+candidates must still be produced by the workflow's RHEL 9/glibc 2.34 baseline.
+
+Production acceptance is **not complete**. The public advisory check reports
+`V8-FRESHNESS`, an upstream freshness/update-policy finding for the pinned engine;
+it requires review before production release. Signing/notarization, physical
+printers, representative production-form compatibility and clean native desktops
+also remain explicit acceptance gates. New Windows/macOS/ARM candidate CI checks
+must pass for this batch. Patch 0004 intentionally refreshes the PDFium cache key,
+so the next native CI run rebuilds the dependency once per target.
+
+Docs: DOCUMENT-WORKFLOW, DESKTOP-EXPERIENCE, ROADMAP, RELEASE, NATIVE-RELEASES,
+FORMS, SAVING, SAFETY, MVP, README and ADR 0007 were updated to distinguish
+implemented functionality from the remaining production acceptance.

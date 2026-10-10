@@ -1,0 +1,22 @@
+{
+  "revision": "2fd6cff57d9412cc42ef1a7e4e0a59b13a1e7cec",
+  "origin": "https://pdfium.googlesource.com/pdfium/",
+  "files": {
+    "arabic.pdf": {
+      "source": "testing/resources/arabic.pdf",
+      "sha256": "f84f1c4129811257c8160d36947a754a616ab564a243ff628540e86508932c6f"
+    },
+    "simple_xfa.pdf": {
+      "source": "testing/resources/simple_xfa.pdf",
+      "sha256": "82e0af732b472b023b3c50940cac0d76b6a84c25dab2b4a8de79fd0a6b7cdb89"
+    },
+    "encrypted_hello_world_r6.pdf": {
+      "source": "testing/resources/encrypted_hello_world_r6.pdf",
+      "sha256": "a5bcee67d2731547d8e6956cbb0d41eddeef4ca80c378c9dba8bc97961ece064"
+    },
+    "static_password_field_rotate.pdf": {
+      "source": "testing/resources/pixel/xfa_specific/static_password_field_rotate.pdf",
+      "sha256": "464aa3780a3db1e001ead9fd14be46fd1a470bbfe4daf41f4e51ee6278ee13e3"
+    }
+  }
+}

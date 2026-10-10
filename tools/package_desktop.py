@@ -98,7 +98,7 @@ def main():
     parser.add_argument("--smoke", type=Path, required=True)
     parser.add_argument("--fixtures", type=Path, default=ROOT / "tests/pdfs")
     parser.add_argument("--output", type=Path, default=ROOT / "dist/native")
-    parser.add_argument("--version", default="0.1.0-rc.1")
+    parser.add_argument("--version", default=(ROOT / "VERSION").read_text().strip())
     args = parser.parse_args()
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", args.version):
         parser.error("invalid release version")
@@ -194,7 +194,7 @@ def main():
             # Deploy only editor plugins. Copying every SQL driver drags in
             # optional database client libraries absent from hosted runners.
             plugins = []
-            for category in ("platforms", "imageformats", "iconengines", "styles"):
+            for category in ("platforms", "imageformats", "iconengines", "styles", "printsupport"):
                 destination = contents / "PlugIns" / category
                 destination.mkdir(parents=True, exist_ok=True)
                 for plugin in sorted((args.qt_prefix / "plugins" / category).glob("*.dylib")):

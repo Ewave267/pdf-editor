@@ -171,7 +171,7 @@ def stage(args, directory):
     (directory / "release-info.json").write_text(json.dumps(manifest, indent=2) + "\n")
     # Resolve the package with its own dependencies; no SDK/Qt directory needed.
     env = dict(os.environ, LD_LIBRARY_PATH=str(runtime) + ":" + str(directory / "lib/pdf-form-editor"))
-    if run([binary, "--version"], env=env, capture_output=True, text=True).stdout.strip() != "PDF Form Editor 0.1.0":
+    if run([binary, "--version"], env=env, capture_output=True, text=True).stdout.strip() != f"PDF Form Editor {args.version}":
         raise RuntimeError("Unexpected viewer version")
     for seed in seeds:
         result = run(["ldd", seed], env=env, capture_output=True, text=True).stdout
@@ -189,7 +189,7 @@ def main():
     parser.add_argument("--libgcc-notices", type=Path, help="Notices for the overridden libgcc runtime")
     parser.add_argument("--qt-runtime", type=Path, help="Qt directory containing plugins/ and qml/")
     parser.add_argument("--font-dir", type=Path, help="Liberation fonts directory")
-    parser.add_argument("--version", default="0.1.0-rc.1")
+    parser.add_argument("--version", default=(ROOT / "VERSION").read_text().strip())
     parser.add_argument("--max-glibc", default="2.34", help="Maximum permitted glibc requirement (RHEL 9 baseline)")
     parser.add_argument("--output", type=Path, default=ROOT / "dist/native")
     parser.add_argument("--appimage-runtime", type=Path, help="Official runtime matching the checked-in SHA-256 pin")

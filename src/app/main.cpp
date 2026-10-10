@@ -5,7 +5,7 @@
 
 int main()
 {
-    std::cout << "PDF Form Editor 0.1.0\n"
+    std::cout << "PDF Form Editor " PDF_EDITOR_VERSION "\n"
                  "Repository foundation; PDF support is not implemented yet.\n";
     return 0;
 }

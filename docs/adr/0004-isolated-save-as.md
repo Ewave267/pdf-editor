@@ -50,3 +50,7 @@ baseline with a live native form snapshot. Additions still enter only the
 independent save worker. Form input, calculations and exact saved values are
 now tested in the viewer; full XFA additions and the pinned AcroForm script
 conversion limitation remain outstanding.
+
+Follow-up (2026-10-10): the AcroForm conversion limitation is fixed by patch 0004
+and a mixed-case input regression. Idle recovery and page/print exports have
+separate documented contracts; see DESKTOP-EXPERIENCE and DOCUMENT-WORKFLOW.

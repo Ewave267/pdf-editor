@@ -84,11 +84,14 @@ class AddedContent : public QObject
     Q_INVOKABLE bool setAppearance(int id, const QString& color, double lineWidth);
     Q_INVOKABLE bool appendStroke(int id, double x, double y);
     Q_INVOKABLE bool setLine(int id, double x0, double y0, double x1, double y1);
+    QByteArray checkpoint() const;
+    bool restoreCheckpoint(const QByteArray& payload);
     void clear();
   signals:
     void changed();
 
   private:
+    bool pastePayload(const QByteArray& payload, int page, bool recovery);
     int insert(int page, double x, double y, const QString& type, const QString& text,
                const QImage& image);
     QRectF bounded(int page, const QRectF& rect) const;

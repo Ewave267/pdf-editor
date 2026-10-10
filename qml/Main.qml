@@ -16,12 +16,110 @@ ApplicationWindow {
     flags: Qt.Window | Qt.WindowTitleHint | Qt.WindowSystemMenuHint
            | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint | Qt.WindowCloseButtonHint
     title: pdfDocument.fileName ? pdfDocument.fileName + " — PDF Form Editor" : "PDF Form Editor"
-    color: "#e9edf2"
+    readonly property color backgroundColor: pdfDocument.darkTheme ? "#20252d" : "#e9edf2"
+    readonly property color surfaceColor: pdfDocument.darkTheme ? "#2b323c" : "#ffffff"
+    readonly property color panelColor: pdfDocument.darkTheme ? "#343d49" : "#f5f7fa"
+    readonly property color textColor: pdfDocument.darkTheme ? "#edf1f7" : "#243342"
+    readonly property color mutedColor: pdfDocument.darkTheme ? "#bdc9d8" : "#596878"
+    color: backgroundColor
+    palette.text: textColor
+    palette.windowText: textColor
+    palette.buttonText: textColor
+    palette.base: surfaceColor
     font.family: "Sans Serif"
     palette.highlight: "#225a91"
-    palette.button: "#f5f7fa"
-    palette.window: "#ffffff"
+    palette.button: panelColor
+    palette.window: surfaceColor
 
+    DropArea {
+        anchors.fill: parent
+        onDropped: function(drop) {
+            if (drop.hasUrls && drop.urls.length === 1) {
+                root.openFile(drop.urls[0])
+                drop.acceptProposedAction()
+            }
+        }
+    }
+    Shortcut { sequence: "F11"; onActivated: root.visibility = root.visibility === Window.FullScreen ? Window.Windowed : Window.FullScreen }
+    Shortcut { sequence: "Ctrl+F"; enabled: pdfDocument.ready && !pdfDocument.saving; onActivated: searchDialog.open() }
+    Dialog {
+        id: searchDialog
+        objectName: "searchDialog"
+        title: "Find text"
+        anchors.centerIn: parent
+        width: Math.min(420, root.width - 40)
+        modal: true
+        standardButtons: Dialog.Close
+        onOpened: query.forceActiveFocus()
+        ColumnLayout {
+            width: parent.width
+            RowLayout {
+                TextField { id: query; Layout.fillWidth: true; maximumLength: 256; Accessible.name: "Search text"; onAccepted: pdfDocument.search(text) }
+                Button { text: pdfDocument.searching ? "Searching…" : "Find"; enabled: !pdfDocument.searching; onClicked: pdfDocument.search(query.text) }
+            }
+            Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: pdfDocument.searchError || (pdfDocument.searching ? "Searching PDF text…" : pdfDocument.searchResults.length + " matching pages. Added content and image-only text are not included.") }
+            ListView {
+                Layout.fillWidth: true; Layout.preferredHeight: 220
+                clip: true; model: pdfDocument.searchResults
+                delegate: Button {
+                    required property var modelData
+                    width: ListView.view.width
+                    text: "Page " + modelData.page
+                    onClicked: { root.goToPage(modelData.page); searchDialog.close() }
+                }
+            }
+        }
+    }
+    Menu {
+        id: documentMenu
+        MenuItem { text: "Recent documents"; onTriggered: recentMenu.popup() }
+        MenuItem { objectName: "pagesButton"; text: "Export pages…"; enabled: pdfDocument.ready && !pdfDocument.saving && !pdfDocument.additions.editing && pdfDocument.formType !== "XFA"; onTriggered: pagesDialog.open() }
+        MenuItem { text: "Print…"; enabled: pdfDocument.ready && !pdfDocument.saving && !pdfDocument.formBusy && !pdfDocument.additions.editing; onTriggered: pdfDocument.print() }
+        MenuItem { text: "Print to PDF…"; enabled: pdfDocument.ready && !pdfDocument.saving && !pdfDocument.formBusy && !pdfDocument.additions.editing; onTriggered: printSaveDialog.open() }
+        MenuItem { text: "Find text…"; enabled: pdfDocument.ready && !pdfDocument.saving; onTriggered: searchDialog.open() }
+        MenuItem { text: "Recover previous session…"; enabled: !pdfDocument.ready && !pdfDocument.loading; onTriggered: recoveryDialog.open() }
+        MenuSeparator {}
+        MenuItem { text: pdfDocument.darkTheme ? "Light theme" : "Dark theme"; onTriggered: pdfDocument.darkTheme = !pdfDocument.darkTheme }
+        MenuItem { text: "Full screen (F11)"; onTriggered: root.visibility = root.visibility === Window.FullScreen ? Window.Windowed : Window.FullScreen }
+    }
+    Shortcut { sequence: "Ctrl+P"; enabled: pdfDocument.ready && !pdfDocument.saving; onActivated: pdfDocument.print() }
+    Dialog {
+        id: recoveryDialog
+        title: "Recover previous session"
+        anchors.centerIn: parent
+        width: Math.min(520, root.width - 40)
+        modal: true
+        standardButtons: Dialog.Close
+        ColumnLayout {
+            width: parent.width
+            Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: "Unsaved work is checkpointed locally once a minute while idle. Recovery keeps form values and editable additions, but does not restore undo history. Closing or discarding a session removes its checkpoint. Dynamic XFA layout may change when its saved values are reopened." }
+            Label { text: pdfDocument.recoveryError || (pdfDocument.recoveryDocuments.length ? "Select a checkpoint:" : "No previous checkpoints found."); Layout.fillWidth: true; wrapMode: Text.WordWrap }
+            ListView {
+                Layout.fillWidth: true; Layout.preferredHeight: 200; clip: true
+                model: pdfDocument.recoveryDocuments
+                delegate: RowLayout {
+                    required property var modelData
+                    width: ListView.view.width
+                    Button { text: "Recover " + modelData.name; Layout.fillWidth: true; onClicked: { pdfDocument.recover(modelData.path); recoveryDialog.close() } }
+                    Button { text: "Discard"; onClicked: pdfDocument.discardRecovery(modelData.path) }
+                }
+            }
+        }
+    }
+    Menu {
+        id: recentMenu
+        Instantiator {
+            model: pdfDocument.recentDocuments
+            delegate: MenuItem {
+                required property var modelData
+                text: modelData.name
+                onTriggered: root.openFile(modelData.url)
+            }
+            onObjectAdded: function(index, object) { recentMenu.insertItem(index, object) }
+            onObjectRemoved: function(index, object) { recentMenu.removeItem(object) }
+        }
+        MenuItem { enabled: false; visible: pdfDocument.recentDocuments.length === 0; text: "No recent documents" }
+    }
     function goToPage(page) {
         pdfDocument.currentPage = page
         pageView.positionViewAtIndex(pdfDocument.currentPage - 1, ListView.Beginning)
@@ -194,7 +292,7 @@ ApplicationWindow {
         nameFilters: ["Images (*.png *.jpg *.jpeg *.webp *.bmp)"]
         onAccepted: { root.pendingImage = selectedFile; root.placement = signature ? "signature" : "image" }
     }
-    Shortcut { sequence: "Escape"; enabled: !root.formPopupVisible && !textDialog.visible && !graphicDialog.visible && !imageDialog.visible && !saveDialog.visible && !discardDialog.visible && !fileDialog.visible && !saveFailure.visible && !(root.activeFocusItem instanceof FormInput); onActivated: { root.placement = ""; pdfDocument.additions.cancelEdit(); pdfDocument.additions.select(-1) } }
+    Shortcut { sequence: "Escape"; enabled: !root.formPopupVisible && !root.workflowPopupVisible && !textDialog.visible && !graphicDialog.visible && !imageDialog.visible && !saveDialog.visible && !discardDialog.visible && !fileDialog.visible && !saveFailure.visible && !(root.activeFocusItem instanceof FormInput); onActivated: { root.placement = ""; pdfDocument.additions.cancelEdit(); pdfDocument.additions.select(-1) } }
     Connections {
         target: pdfDocument.additions
         function onChanged() { root.selectedObject = pdfDocument.additions.object(pdfDocument.additions.selected) }
@@ -360,6 +458,53 @@ ApplicationWindow {
         onAccepted: pdfDocument.saveAs(selectedFile)
     }
     Dialog {
+        id: pagesDialog
+        objectName: "pagesDialog"
+        property var mergeFiles: []
+        title: "Export pages"
+        anchors.centerIn: parent
+        width: Math.min(520, root.width - 40)
+        modal: true
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        onOpened: { pageOrder.text = "1-" + pdfDocument.pageCount; mergeFiles = [] }
+        onAccepted: pagesSaveDialog.open()
+        ColumnLayout {
+            width: parent.width
+            Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: "Export a new PDF. List pages in the order you want, omit pages to remove them, or select a range to extract it. Example: 3,1-2,blank. Blank pages are US Letter size. The open document keeps its edits." }
+            TextField { id: pageOrder; objectName: "exportPageOrder"; Layout.fillWidth: true; placeholderText: "1-3,5,blank"; maximumLength: 16000; Accessible.name: "Page order" }
+            ComboBox { id: pageRotation; model: ["No rotation", "90° clockwise", "180°", "270° clockwise"]; Accessible.name: "Rotate exported pages" }
+            Button { text: "Append PDFs… (" + pagesDialog.mergeFiles.length + ")"; onClicked: mergeDialog.open() }
+            CheckBox { id: flattenForms; text: "Flatten annotations and forms"; checked: pdfDocument.formType === "AcroForm" }
+            Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: "Flattening makes visible form values and annotations permanent. Interactive fields, document scripts, bookmarks and document-level metadata are not carried into the export." }
+        }
+    }
+    FileDialog {
+        id: mergeDialog
+        currentFolder: root.initialFolder
+        title: "Append PDFs in selection order"
+        fileMode: FileDialog.OpenFiles
+        nameFilters: ["PDF documents (*.pdf)"]
+        onAccepted: pagesDialog.mergeFiles = selectedFiles
+    }
+    FileDialog {
+        id: printSaveDialog
+        currentFolder: root.initialFolder
+        title: "Print to a new PDF"
+        fileMode: FileDialog.SaveFile
+        nameFilters: ["PDF documents (*.pdf)"]
+        defaultSuffix: "pdf"
+        onAccepted: pdfDocument.printToPdf(selectedFile)
+    }
+    FileDialog {
+        id: pagesSaveDialog
+        currentFolder: root.initialFolder
+        title: "Export to a new PDF"
+        fileMode: FileDialog.SaveFile
+        nameFilters: ["PDF documents (*.pdf)"]
+        defaultSuffix: "pdf"
+        onAccepted: pdfDocument.exportPages(selectedFile, pageOrder.text, pageRotation.currentIndex * 90, flattenForms.checked, pagesDialog.mergeFiles)
+    }
+    Dialog {
         id: saveFailure
         title: "Couldn't save the PDF"
         anchors.centerIn: parent
@@ -378,9 +523,10 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl++"; onActivated: pdfDocument.zoom *= 1.2 }
     Shortcut { sequence: "Ctrl+-"; onActivated: pdfDocument.zoom /= 1.2 }
     Shortcut { sequence: "Ctrl+0"; onActivated: pdfDocument.fitToPage() }
+    property bool workflowPopupVisible: pagesDialog.visible || pagesSaveDialog.visible || mergeDialog.visible || printSaveDialog.visible || searchDialog.visible || recoveryDialog.visible
     property bool formPopupVisible: fieldsDialog.visible || validationDialog.visible || resetDialog.visible || choiceDialog.visible || dateDialog.visible || signDialog.visible
     property bool additionHistoryShortcuts: pdfDocument.ready && !pdfDocument.saving
-        && !pdfDocument.additions.editing && !graphicDialog.visible && !root.formPopupVisible
+        && !pdfDocument.additions.editing && !graphicDialog.visible && !root.formPopupVisible && !root.workflowPopupVisible
         && !textDialog.visible && !imageDialog.visible && !saveDialog.visible && !discardDialog.visible && !fileDialog.visible && !saveFailure.visible
         && !(root.activeFocusItem instanceof FormInput)
         && !(root.activeFocusItem && typeof root.activeFocusItem.undo === "function")
@@ -402,35 +548,37 @@ ApplicationWindow {
 
     header: ToolBar {
         implicitHeight: 56
-        background: Rectangle { color: "#ffffff"; border.color: "#d5dce5" }
+        background: Rectangle { color: root.surfaceColor; border.color: "#d5dce5" }
         RowLayout {
             anchors.fill: parent
             anchors.margins: 10
             spacing: 10
-            Label { text: "PDF FORM EDITOR"; font.pixelSize: 13; font.bold: true; color: "#354a60"; Layout.rightMargin: 12 }
+            Label { text: "PDF FORM EDITOR"; font.pixelSize: 13; font.bold: true; color: root.textColor; Layout.rightMargin: 12 }
             Button { objectName: "openButton"; text: "Open PDF"; enabled: !pdfDocument.saving; onClicked: fileDialog.open(); Accessible.name: "Open PDF" }
             Button { objectName: "saveButton"; text: pdfDocument.saving ? "Saving…" : "Save As"; enabled: pdfDocument.ready && !pdfDocument.saving && !pdfDocument.additions.editing; onClicked: saveDialog.open() }
+            Button { text: "Document…"; onClicked: documentMenu.popup() }
             Button { objectName: "closeButton"; text: "Close"; enabled: !pdfDocument.saving && (pdfDocument.ready || pdfDocument.loading || pdfDocument.error || pdfDocument.dirty); onClicked: root.closeDocument() }
             Item { Layout.fillWidth: true }
             Button { objectName: "zoomOutButton"; text: "−"; enabled: pdfDocument.ready && pdfDocument.zoom > 0.25; onClicked: pdfDocument.zoom /= 1.2; Accessible.name: "Zoom out" }
             Label { objectName: "zoomLabel"; text: Math.round(pdfDocument.zoom * 100) + "%"; horizontalAlignment: Text.AlignHCenter; Layout.preferredWidth: 48; visible: pdfDocument.ready }
             Button { objectName: "zoomInButton"; text: "+"; enabled: pdfDocument.ready && pdfDocument.zoom < 3; onClicked: pdfDocument.zoom *= 1.2; Accessible.name: "Zoom in" }
             Button { objectName: "fitButton"; text: "Fit page"; enabled: pdfDocument.ready; highlighted: pdfDocument.fitting; onClicked: pdfDocument.fitToPage() }
+            Button { text: "Fit width"; enabled: pdfDocument.ready; onClicked: pdfDocument.fitToWidth() }
         }
     }
     footer: ToolBar {
         implicitHeight: 52
-        background: Rectangle { color: "#ffffff"; border.color: "#d5dce5" }
+        background: Rectangle { color: root.surfaceColor; border.color: "#d5dce5" }
         RowLayout {
             anchors.fill: parent
             anchors.margins: 8
-            Label { textFormat: Text.PlainText; text: pdfDocument.loading ? "Opening PDF…" : pdfDocument.ready ? pdfDocument.fileName : "Ready"; color: "#596878"; elide: Text.ElideMiddle; Layout.fillWidth: true }
-            Label { text: pdfDocument.formType; visible: pdfDocument.ready; color: "#596878" }
+            Label { textFormat: Text.PlainText; text: pdfDocument.loading ? "Opening PDF…" : pdfDocument.ready ? pdfDocument.fileName : "Ready"; color: root.mutedColor; elide: Text.ElideMiddle; Layout.fillWidth: true }
+            Label { text: pdfDocument.formType; visible: pdfDocument.ready; color: root.mutedColor }
             ToolButton { objectName: "undoAdditionsButton"; text: "Undo"; enabled: pdfDocument.ready && !pdfDocument.saving && pdfDocument.additions.canUndo; Accessible.name: "Undo added content"; onClicked: pdfDocument.additions.undo() }
             ToolButton { objectName: "redoAdditionsButton"; text: "Redo"; enabled: pdfDocument.ready && !pdfDocument.saving && pdfDocument.additions.canRedo; Accessible.name: "Redo added content"; onClicked: pdfDocument.additions.redo() }
             Button { objectName: "previousButton"; text: "Previous"; enabled: pdfDocument.ready && pdfDocument.currentPage > 1; onClicked: root.goToPage(pdfDocument.currentPage - 1) }
             SpinBox { objectName: "pageNumber"; from: 1; to: Math.max(1, pdfDocument.pageCount); value: pdfDocument.currentPage; editable: true; enabled: pdfDocument.ready; onValueModified: root.goToPage(value); Accessible.name: "Page number" }
-            Label { text: "of " + pdfDocument.pageCount; color: "#596878" }
+            Label { text: "of " + pdfDocument.pageCount; color: root.mutedColor }
             Button { objectName: "nextButton"; text: "Next"; enabled: pdfDocument.ready && pdfDocument.currentPage < pdfDocument.pageCount; onClicked: root.goToPage(pdfDocument.currentPage + 1) }
         }
     }
@@ -441,12 +589,12 @@ ApplicationWindow {
             visible: pdfDocument.ready
             Layout.preferredWidth: 170
             Layout.fillHeight: true
-            color: "#f5f7fa"
+            color: root.panelColor
             border.color: "#d5dce5"
             ColumnLayout {
                 anchors.fill: parent
                 anchors.margins: 12
-                Label { text: "PAGES"; font.bold: true; font.pixelSize: 11; color: "#63758a"; Layout.topMargin: 4; Layout.bottomMargin: 6 }
+                Label { text: "PAGES"; font.bold: true; font.pixelSize: 11; color: root.mutedColor; Layout.topMargin: 4; Layout.bottomMargin: 6 }
                 ListView {
                     id: thumbnails
                     objectName: "thumbnailView"
@@ -467,7 +615,7 @@ ApplicationWindow {
                             width: 120
                             height: parent.height - 22
                             radius: 4
-                            color: pdfDocument.currentPage === index + 1 ? "#dceaf8" : "#e8edf3"
+                            color: pdfDocument.currentPage === index + 1 ? (pdfDocument.darkTheme ? "#365373" : "#dceaf8") : root.panelColor
                             border.color: pdfDocument.currentPage === index + 1 ? "#225a91" : "#cbd4df"
                             PdfPage {
                                 thumbnail: true
@@ -481,7 +629,7 @@ ApplicationWindow {
                             }
                             AddedOverlay { anchors.fill: thumbnailPage; content: pdfDocument.additions; page: index; selection: false }
                         }
-                        Label { anchors.bottom: parent.bottom; anchors.horizontalCenter: parent.horizontalCenter; text: index + 1; color: "#526579"; font.pixelSize: 12 }
+                        Label { anchors.bottom: parent.bottom; anchors.horizontalCenter: parent.horizontalCenter; text: index + 1; color: root.mutedColor; font.pixelSize: 12 }
                         MouseArea { anchors.fill: parent; onClicked: root.goToPage(index + 1); cursorShape: Qt.PointingHandCursor }
                     }
                 }
@@ -503,7 +651,7 @@ ApplicationWindow {
                 Button { objectName: "addSignatureButton"; text: "Signature"; onClicked: { imageDialog.signature = true; imageDialog.open() } }
                 Button { objectName: "editTextButton"; text: "Edit text"; visible: pdfDocument.additions.selectionCount === 1 && (root.selectedObject.type === "text" || root.selectedObject.type === "stamp"); onClicked: { textDialog.editing = true; textInput.text = root.selectedObject.text; textDialog.loadStyle(root.selectedObject); textDialog.open() } }
                 Button { objectName: "deleteObjectButton"; text: "Delete"; enabled: pdfDocument.additions.selected >= 0; onClicked: pdfDocument.additions.removeSelected() }
-                Label { Layout.fillWidth: true; elide: Text.ElideRight; textFormat: Text.PlainText; text: pdfDocument.error || pdfDocument.formError || (root.placement ? "Click a page to place " + root.placement + " · Esc cancels" : pdfDocument.additions.error || (pdfDocument.dirty ? "Unsaved changes · Save As keeps edits" : pdfDocument.savedPath ? "Saved · " + pdfDocument.savedPath : pdfDocument.formType !== "PDF" ? "Click a field · Tab moves focus · Save As keeps edits" : "Add content to a page")); color: "#596878" }
+                Label { Layout.fillWidth: true; elide: Text.ElideRight; textFormat: Text.PlainText; text: pdfDocument.error || pdfDocument.formError || (root.placement ? "Click a page to place " + root.placement + " · Esc cancels" : pdfDocument.additions.error || (pdfDocument.dirty ? "Unsaved changes · Save As keeps edits" : pdfDocument.savedPath ? "Saved · " + pdfDocument.savedPath : pdfDocument.formType !== "PDF" ? "Click a field · Tab moves focus · Save As keeps edits" : "Add content to a page")); color: root.mutedColor }
             }
             Flickable {
                 id: extraToolView
@@ -557,7 +705,7 @@ ApplicationWindow {
                         inkColor.currentIndex = Math.max(0, root.inkColors.indexOf(root.selectedObject.color.substring(0, 1) + root.selectedObject.color.substring(3)))
                         inkWidth.value = root.selectedObject.lineWidth; stampText.text = root.selectedObject.text; graphicDialog.open()
                     } }
-                    Label { text: "Shift-click to select several"; color: "#596878" }
+                    Label { text: "Shift-click to select several"; color: root.mutedColor }
                 }
             }
             Flickable {
@@ -585,7 +733,7 @@ ApplicationWindow {
                         dateYear.value = date.getFullYear(); dateMonth.value = date.getMonth()+1; dateDay.value = date.getDate(); dateDialog.open()
                     } }
                     ToolButton { objectName: "signFormButton"; text: "Sign…"; onClicked: signDialog.open() }
-                    Label { textFormat: Text.PlainText; text: pdfDocument.formHelpersAvailable ? (pdfDocument.focusedField.label || "Tab moves to the next field") : "Native form controls · Tab moves focus"; color: "#596878" }
+                    Label { textFormat: Text.PlainText; text: pdfDocument.formHelpersAvailable ? (pdfDocument.focusedField.label || "Tab moves to the next field") : "Native form controls · Tab moves focus"; color: root.mutedColor }
                 }
             }
             ListView {
@@ -787,8 +935,8 @@ ApplicationWindow {
                 visible: !pdfDocument.ready
                 spacing: 20
                 BusyIndicator { running: pdfDocument.loading; visible: running; Layout.alignment: Qt.AlignHCenter }
-                Label { textFormat: Text.PlainText; text: pdfDocument.loading ? "Opening your document" : pdfDocument.error ? "Couldn't open this document" : "Your documents, in view"; font.pixelSize: 27; color: "#2d4259"; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap; Layout.fillWidth: true }
-                Label { objectName: "errorLabel"; textFormat: Text.PlainText; text: pdfDocument.error || (pdfDocument.loading ? "" : "Open a PDF to browse its pages, zoom in, and navigate with thumbnails."); color: "#63758a"; font.pixelSize: 15; wrapMode: Text.WordWrap; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
+                Label { textFormat: Text.PlainText; text: pdfDocument.loading ? "Opening your document" : pdfDocument.error ? "Couldn't open this document" : "Your documents, in view"; font.pixelSize: 27; color: root.textColor; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+                Label { objectName: "errorLabel"; textFormat: Text.PlainText; text: pdfDocument.error || (pdfDocument.loading ? "" : "Open a PDF to browse its pages, zoom in, and navigate with thumbnails."); color: root.mutedColor; font.pixelSize: 15; wrapMode: Text.WordWrap; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
                 Button { text: "Open PDF"; visible: !pdfDocument.loading; Layout.alignment: Qt.AlignHCenter; highlighted: true; onClicked: fileDialog.open() }
             }
         }

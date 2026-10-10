@@ -44,8 +44,8 @@ been validated with representative fixtures.
 Step 4 verifies viewer edits, checked and unchecked states, radio selections,
 dropdown values, XFA calculations, and independent saved values in both form
 types. AcroForm fields remain editable after saving with additions. AcroForm
-JavaScript actions survive structurally, but the pinned PDFium native keystroke
-path does not apply the fixture's text conversion; see [FORMS](FORMS.md).
+JavaScript actions survive structurally; the patched native keystroke path now
+applies the conversion fixture, with a mixed-case input regression; see [FORMS](FORMS.md).
 The existing native XFA probe also verifies calculation and repeated saving of
 a viewer-saved XFA copy.
 
@@ -91,3 +91,8 @@ These checks run with the combined viewer/XFA build. The independent-reader and
 native XFA probe checks require `PDF_EDITOR_BUILD_XFA_PROBE=ON` and the pinned
 reader dependencies. See [VIEWER](VIEWER.md) for build commands. Remote CI has
 not been run in this session.
+
+Page export and printing are described in [DOCUMENT-WORKFLOW](DOCUMENT-WORKFLOW.md).
+Idle local recovery checkpoints are described in
+[DESKTOP-EXPERIENCE](DESKTOP-EXPERIENCE.md). They do not overwrite the source or
+replace Save As.

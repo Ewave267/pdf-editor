@@ -3,6 +3,7 @@
 #include "ui/AddedOverlay.h"
 #include "ui/FormInput.h"
 #include "ui/PdfPageItem.h"
+#include <QApplication>
 #include <QClipboard>
 #include <QDir>
 #include <QFile>
@@ -12,11 +13,15 @@
 #include <QJsonDocument>
 #include <QMimeData>
 #include <QPainter>
+#include <QPrintDialog>
+#include <QPrinter>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
 #include <QQuickWindow>
+#include <QSettings>
 #include <QSignalSpy>
+#include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QtTest>
 #include <cmath>
@@ -84,6 +89,156 @@ class ViewerTests : public QObject
 #endif
     }
   private slots:
+    void printToPdfRetainsEdits()
+    {
+        QTemporaryDir directory;
+        const auto output = directory.filePath("printed.pdf");
+        PdfDocument document;
+        document.open(fixture("normal/single-page.pdf"));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        document.additions()->addText(0, 50, 50, "Printed addition");
+        document.printToPdf(QUrl::fromLocalFile(output));
+        QTRY_VERIFY_WITH_TIMEOUT(!document.saving(), 30000);
+        QVERIFY2(document.saveError().isEmpty(),
+                 qPrintable(document.saveError() + " " + document.error()));
+        QVERIFY(QFile::exists(output));
+        QVERIFY(document.dirty());
+        PdfDocument result;
+        result.open(QUrl::fromLocalFile(output));
+        QTRY_VERIFY_WITH_TIMEOUT(result.ready(), 15000);
+        QCOMPARE(result.pageCount(), 1);
+        result.search("Printed addition");
+        QTRY_VERIFY_WITH_TIMEOUT(!result.searching(), 15000);
+        QCOMPARE(result.searchResults().size(), 1);
+    }
+
+    void acroformKeystrokeConversion()
+    {
+        PdfDocument document;
+        document.open(fixture("acroform/text.pdf"));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        auto event = [&](const QString& action, const QString& text = {})
+        {
+            QSignalSpy done(&document, &PdfDocument::formEventFinished);
+            document.formEvent(0, action, 100, 152, 0, text);
+            return done.wait(10000) && done.first()[1].toBool();
+        };
+        QVERIFY(event("click"));
+        QVERIFY(event("selectAll"));
+        QVERIFY(event("text", "mixed Case"));
+        QCOMPARE(document.formText(), QString("MIXED CASE"));
+    }
+
+    void searchAndRecovery()
+    {
+        QStandardPaths::setTestModeEnabled(true);
+        PdfDocument document;
+        document.open(fixture("normal/single-page.pdf"));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        document.search("synthetic");
+        QTRY_VERIFY_WITH_TIMEOUT(!document.searching(), 15000);
+        QCOMPARE(document.searchResults().size(), 1);
+        QCOMPARE(document.searchResults()[0].toMap()["page"].toInt(), 1);
+        document.setDarkTheme(true);
+        QVERIFY(document.darkTheme());
+        document.setDarkTheme(false);
+        QVERIFY(!document.darkTheme());
+        document.updateViewport(1000, 400);
+        document.fitToPage();
+        const auto fitPage = document.zoom();
+        document.fitToWidth();
+        QVERIFY(document.zoom() > fitPage);
+        const auto id = document.additions()->addText(0, 40, 50, "Recovered résumé");
+        QVERIFY(id > 0);
+        QVERIFY(document.additions()->setTextStyle(id, "Serif", 24, true, true, false));
+        document.checkpoint();
+        const QString directory =
+            QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/recovery";
+        QTRY_VERIFY_WITH_TIMEOUT(!QDir(directory).entryList({"*.json"}, QDir::Files).isEmpty(),
+                                 15000);
+        QVERIFY2(document.recoveryError().isEmpty(), qPrintable(document.recoveryError()));
+        const QString original = QDir(directory)
+                                     .entryInfoList({"*.json"}, QDir::Files, QDir::Time)
+                                     .first()
+                                     .absoluteFilePath();
+        const QString copy = directory + "/test-retained.json";
+        QFile::remove(copy);
+        QVERIFY(QFile::copy(original, copy));
+        document.close();
+        QVERIFY(!QFile::exists(original));
+        document.recover(copy);
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        QCOMPARE(document.additions()->count(), 1);
+        const auto object = document.additions()->objects().first();
+        QCOMPARE(object.text, QString("Recovered résumé"));
+        QCOMPARE(object.rect.topLeft(), QPointF(40, 50));
+        QCOMPARE(object.fontSize, 24);
+        QVERIFY(object.bold && object.italic);
+        QVERIFY(document.dirty());
+        document.saveAs(fixture("normal/single-page.pdf"));
+        QVERIFY(!document.saveError().isEmpty());
+        document.close();
+        QVERIFY(!QFile::exists(copy));
+    }
+
+    void pageWorkflowExport()
+    {
+        QTemporaryDir directory;
+        PdfDocument document;
+        document.open(fixture("normal/single-page.pdf"));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        const int id = document.additions()->addText(0, 40, 40, "Export retained");
+        QVERIFY(id > 0);
+        const auto output = QUrl::fromLocalFile(directory.filePath("export.pdf"));
+        QSignalSpy saved(&document, &PdfDocument::saveFinished);
+        document.exportPages(output, "1,blank,1", 90, false, {fixture("normal/single-page.pdf")});
+        QTRY_COMPARE_WITH_TIMEOUT(saved.count(), 1, 30000);
+        QVERIFY2(document.saveError().isEmpty(), qPrintable(document.saveError()));
+        QVERIFY(document.dirty());
+        QCOMPARE(document.additions()->count(), 1);
+        PdfDocument result;
+        result.open(output);
+        QTRY_VERIFY_WITH_TIMEOUT(result.ready(), 15000);
+        QCOMPARE(result.pageCount(), 4);
+        const auto first = result.pages()[0].toMap();
+        const auto original = document.pages()[0].toMap();
+        QCOMPARE(first["width"].toDouble(), original["height"].toDouble());
+        QCOMPARE(first["height"].toDouble(), original["width"].toDouble());
+        QCOMPARE(result.formType(), QString("PDF"));
+        result.search("retained");
+        QTRY_VERIFY_WITH_TIMEOUT(!result.searching(), 15000);
+        QCOMPARE(result.searchResults().size(), 2);
+        document.exportPages(output, "0", 0, false);
+        QVERIFY(!document.saveError().isEmpty());
+        QVERIFY(document.ready());
+        document.exportPages(fixture("normal/single-page.pdf"), "1", 0, false);
+        QVERIFY(!document.saveError().isEmpty());
+    }
+
+    void pageWorkflowFlattensForms()
+    {
+        QTemporaryDir directory;
+        PdfDocument document;
+        document.open(fixture("acroform/phase3.pdf"));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        const auto output = QUrl::fromLocalFile(directory.filePath("flat.pdf"));
+        document.exportPages(output, "1", 0, false);
+        QVERIFY(!document.saveError().isEmpty());
+        QSignalSpy saved(&document, &PdfDocument::saveFinished);
+        document.exportPages(output, "1", 0, true);
+        QTRY_COMPARE_WITH_TIMEOUT(saved.count(), 1, 30000);
+        QVERIFY2(document.saveError().isEmpty(), qPrintable(document.saveError()));
+        PdfDocument result;
+        result.open(output);
+        QTRY_VERIFY_WITH_TIMEOUT(result.ready(), 15000);
+        QCOMPARE(result.formType(), QString("PDF"));
+        QCOMPARE(result.pageCount(), 1);
+        QSignalSpy rendered(&result, &PdfDocument::rendered);
+        result.requestRender(0, 612);
+        QTRY_VERIFY_WITH_TIMEOUT(!rendered.isEmpty(), 15000);
+        QVERIFY(!qvariant_cast<QImage>(rendered.first()[1]).isNull());
+    }
+
     void xfaCrossPageNavigation()
     {
         PdfDocument document;
@@ -2032,7 +2187,13 @@ class ViewerTests : public QObject
 };
 int main(int argc, char** argv)
 {
-    QGuiApplication app(argc, argv);
+    QApplication app(argc, argv);
+    QStandardPaths::setTestModeEnabled(true);
+    QTemporaryDir settings;
+    QSettings::setDefaultFormat(QSettings::IniFormat);
+    QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, settings.path());
+    app.setOrganizationName("PDF Editor Tests");
+    app.setApplicationName("Viewer Tests");
     QQuickStyle::setStyle("Basic");
     qmlRegisterType<FormInput>("PdfEditor", 1, 0, "FormInput");
     qmlRegisterType<AddedOverlay>("PdfEditor", 1, 0, "AddedOverlay");

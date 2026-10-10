@@ -261,9 +261,10 @@ AcroForm values, widgets, and script actions. Dynamic XFA copies preserve
 values and pass the native calculation/edit/save probe, but additions on full
 XFA are refused safely. Step 4 now verifies live viewer form edits, checked/unchecked states, native
 focus traversal and independent saved values for AcroForm and dynamic XFA.
-AcroForm widgets remain editable after saving, but the pinned native keystroke
-path does not apply script text conversion; full AcroForm script behavior and
-representative foreground XFA remain outstanding.
+AcroForm widgets remain editable after saving. The later roadmap dependency
+patch fixes native keystroke text conversion; a mixed-case regression and native
+flattening check verify it. A licensed upstream foreground XFA sample complements
+the synthetic corpus; arbitrary production-form compatibility remains unproven.
 See [SAVING](SAVING.md).
 
 ## Step 7 — Safety

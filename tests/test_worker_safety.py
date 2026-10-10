@@ -2,9 +2,11 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Native kernel policy, hostile scripts, protocol limits and corpus regression."""
 import hashlib
+import base64
 import json
 import os
 import resource
+import random
 from pathlib import Path
 import socket
 import subprocess
@@ -41,6 +43,66 @@ class WorkerSafetyTests(unittest.TestCase):
                                 text=True, capture_output=True, timeout=10, env=environment)
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         return [json.loads(line) for line in result.stdout.splitlines()]
+
+    def test_merge_rejects_unprepared_form_appearances(self):
+        fixture = ROOT / "tests/pdfs/normal/single-page.pdf"
+        source = (ROOT / "tests/pdfs/acroform/phase3.pdf").read_bytes()
+        options = {"pages": [0], "rotation": 0, "flatten": True, "mergeLengths": [len(source)]}
+        payload = b"PDFEDITOR-EXPORT\n" + json.dumps(options).encode() + b"\n" + source
+        result = subprocess.run(self.command(WORKER, fixture) + ["--save"], input=payload,
+                                capture_output=True, timeout=10)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(b"Flatten AcroForm", result.stderr)
+
+    def test_high_resolution_transport_is_compressed(self):
+        responses = self.run_worker(ROOT / "tests/pdfs/normal/single-page.pdf",
+                                    [{"id": 1, "page": 0, "width": 2400}])
+        self.assertLess(len(base64.b64decode(responses[1]["png"])), 1024 * 1024)
+
+    def test_upstream_compatibility_corpus(self):
+        for name, expected in (("arabic.pdf", 0), ("simple_xfa.pdf", 2),
+                               ("static_password_field_rotate.pdf", 3)):
+            fixture = ROOT / "tests/pdfs/upstream-pdfium" / name
+            responses = self.run_worker(fixture, [{"id": 1, "page": 0, "width": 300}])
+            self.assertEqual(responses[0]["formType"], expected, name)
+            self.assertIn("png", responses[1], name)
+        fixture = ROOT / "tests/pdfs/upstream-pdfium/encrypted_hello_world_r6.pdf"
+        result = subprocess.run(self.command(WORKER, fixture), input=b"", capture_output=True, timeout=10)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(b"password", result.stderr)
+
+    def test_deterministic_mutation_corpus(self):
+        """Small reproducible malformed-input campaign under the real sandbox."""
+        randomizer = random.Random(20261010)
+        original = (ROOT / "tests/pdfs/acroform/controls.pdf").read_bytes()
+        for iteration in range(32):
+            data = bytearray(original)
+            if iteration % 3 == 0:
+                del data[randomizer.randrange(5, len(data)):]
+            else:
+                for _ in range(1 + iteration % 12):
+                    data[randomizer.randrange(5, len(data))] = randomizer.randrange(256)
+            fixture = self.directory / f"mutation-{iteration}.pdf"
+            fixture.write_bytes(data)
+            result = subprocess.run(self.command(WORKER, fixture),
+                                    input=b'{"id":1,"page":0,"width":96}\n',
+                                    capture_output=True, timeout=10)
+            self.assertIn(result.returncode, (0, 1, 2),
+                          f"mutation {iteration}: {result.returncode} {result.stderr!r}")
+            self.assertNotIn(b"AddressSanitizer", result.stderr)
+            self.assertLess(len(result.stdout), 4 * 1024 * 1024)
+
+    def test_export_rejects_unbounded_and_invalid_options(self):
+        fixture = ROOT / "tests/pdfs/normal/single-page.pdf"
+        for options in ({"pages": [5000], "rotation": 0},
+                        {"pages": [0], "rotation": 8},
+                        {"pages": [0] * 2001, "rotation": 0},
+                        {"pages": [0], "rotation": 0, "mergeLengths": [1000]}):
+            payload = b"PDFEDITOR-EXPORT\n" + json.dumps(options).encode() + b"\n"
+            result = subprocess.run(self.command(WORKER, fixture) + ["--save"],
+                                    input=payload, capture_output=True, timeout=10)
+            self.assertEqual(result.returncode, 1, result.stderr)
+            self.assertFalse(result.stdout.startswith(b"%PDF-"))
 
     def test_warm_worker_loads_bounded_pipe_input(self):
         fixture = ROOT / "tests/pdfs/normal/single-page.pdf"

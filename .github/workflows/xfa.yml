@@ -66,6 +66,18 @@ jobs:
         run: cmake --build build-xfa --parallel
       - name: Validate regressions, isolation, and independent-reader round trips
         run: ctest --test-dir build-xfa --output-on-failure
+      - name: Instrument host document and UI code
+        run: >-
+          cmake -S . -B build-host-sanitized -DCMAKE_BUILD_TYPE=Debug
+          -DPDF_EDITOR_BUILD_VIEWER=ON -DPDF_EDITOR_HOST_SANITIZERS=ON
+          -DPDFium_DIR="$PWD/.deps/pdfium-patched"
+      - name: Build host sanitizer tests
+        run: cmake --build build-host-sanitized --parallel 2 --target viewer-tests pdf-render-worker
+      - name: Host memory and undefined-behavior regression gate
+        env:
+          ASAN_OPTIONS: detect_leaks=0:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: ctest --test-dir build-host-sanitized --output-on-failure -R '^viewer-integration$'
       - name: Build Linux preview archive
         run: |
           cpack --config build-xfa/CPackConfig.cmake -B dist

@@ -3,8 +3,10 @@
 #include "WorkerPolicy.h"
 #include <fpdf_annot.h>
 #include <fpdf_edit.h>
+#include <fpdf_flatten.h>
 #include <fpdf_ppo.h>
 #include <fpdf_save.h>
+#include <fpdf_text.h>
 
 #include <QBuffer>
 #include <QCoreApplication>
@@ -42,6 +44,125 @@ void reply(const QJsonObject& result)
     const auto bytes = QJsonDocument(result).toJson(QJsonDocument::Compact);
     std::cout.write(bytes.data(), bytes.size());
     std::cout << '\n' << std::flush;
+}
+
+QByteArray exportPages(const QByteArray& bytes, const QJsonObject& options,
+                       const QList<QByteArray>& mergeSources)
+{
+    const auto order = options["pages"].toArray();
+    const int rotation = options["rotation"].toInt(-1);
+    require(!order.isEmpty() && order.size() <= 2000 && rotation >= 0 && rotation <= 3,
+            "Invalid export options.");
+    struct DocumentGuard
+    {
+        FPDF_DOCUMENT value;
+        ~DocumentGuard()
+        {
+            if (value)
+                FPDF_CloseDocument(value);
+        }
+    } source{FPDF_LoadMemDocument64(bytes.constData(), bytes.size(), nullptr)},
+        destination{FPDF_CreateNewDocument()};
+    require(source.value && destination.value, "Cannot prepare page export.");
+    const int formType = FPDF_GetFormType(source.value);
+    require(formType != FORMTYPE_XFA_FULL && formType != FORMTYPE_XFA_FOREGROUND,
+            "XFA page export is not supported.");
+    require(formType != FORMTYPE_ACRO_FORM || options["flatten"].toBool(),
+            "AcroForm page export requires flattening.");
+    const int pageCount = FPDF_GetPageCount(source.value);
+    if (options["flatten"].toBool())
+        for (int index = 0; index < pageCount; ++index)
+        {
+            FPDF_PAGE page = FPDF_LoadPage(source.value, index);
+            require(page, "Cannot load a page for flattening.");
+            const int result = FPDFPage_Flatten(page, FLAT_NORMALDISPLAY);
+            FPDF_ClosePage(page);
+            require(result != FLATTEN_FAIL, "Cannot safely flatten this page.");
+        }
+    int outputIndex = 0;
+    for (const auto& value : order)
+    {
+        const double number = value.toDouble(-2);
+        require(number >= -1 && number < pageCount && std::floor(number) == number,
+                "Invalid export page.");
+        const int index = static_cast<int>(number);
+        if (index == -1)
+        {
+            FPDF_PAGE blank = FPDFPage_New(destination.value, outputIndex, 612, 792);
+            require(blank, "Cannot insert a blank page.");
+            const bool generated = FPDFPage_GenerateContent(blank);
+            FPDF_ClosePage(blank);
+            require(generated, "Cannot generate a blank page.");
+        }
+        else
+            require(
+                FPDF_ImportPagesByIndex(destination.value, source.value, &index, 1, outputIndex),
+                "Cannot import an export page.");
+        FPDF_PAGE page = FPDF_LoadPage(destination.value, outputIndex++);
+        require(page, "Cannot rotate an export page.");
+        FPDFPage_SetRotation(page, (FPDFPage_GetRotation(page) + rotation) % 4);
+        FPDF_ClosePage(page);
+    }
+    for (const auto& input : mergeSources)
+    {
+        DocumentGuard merged{FPDF_LoadMemDocument64(input.constData(), input.size(), nullptr)};
+        require(merged.value, "Cannot open a merged PDF.");
+        const int type = FPDF_GetFormType(merged.value);
+        require(type != FORMTYPE_XFA_FULL && type != FORMTYPE_XFA_FOREGROUND,
+                "XFA PDFs cannot be merged safely.");
+        require(type != FORMTYPE_ACRO_FORM,
+                "Flatten AcroForm inputs with Export pages before merging.");
+        const int count = FPDF_GetPageCount(merged.value);
+        require(count > 0 && count <= 2000 - outputIndex, "Merged output exceeds the page limit.");
+        for (int index = 0; index < count; ++index)
+        {
+            FPDF_PAGE boundsPage = FPDF_LoadPage(merged.value, index);
+            require(boundsPage, "Cannot load a merged page.");
+            const double width = FPDF_GetPageWidth(boundsPage),
+                         height = FPDF_GetPageHeight(boundsPage);
+            FPDF_ClosePage(boundsPage);
+            require(std::isfinite(width) && std::isfinite(height) && width >= 1 && height >= 1 &&
+                        width <= 14400 && height <= 14400,
+                    "Merged page dimensions exceed the document limit.");
+            if (options["flatten"].toBool())
+            {
+                FPDF_PAGE page = FPDF_LoadPage(merged.value, index);
+                require(page, "Cannot load a merged page.");
+                const int result = FPDFPage_Flatten(page, FLAT_NORMALDISPLAY);
+                FPDF_ClosePage(page);
+                require(result != FLATTEN_FAIL, "Cannot flatten a merged page.");
+            }
+            require(
+                FPDF_ImportPagesByIndex(destination.value, merged.value, &index, 1, outputIndex++),
+                "Cannot merge a PDF page.");
+        }
+    }
+    struct Writer : FPDF_FILEWRITE
+    {
+        QByteArray bytes;
+        Writer()
+        {
+            version = 1;
+            WriteBlock = [](FPDF_FILEWRITE* base, const void* data, unsigned long size)
+            {
+                auto& self = *static_cast<Writer*>(base);
+                if (size > 64 * 1024 * 1024 - static_cast<unsigned long>(self.bytes.size()))
+                    return 0;
+                try
+                {
+                    self.bytes.append(static_cast<const char*>(data), size);
+                    return 1;
+                }
+                catch (...)
+                {
+                    return 0;
+                }
+            };
+        }
+    } writer;
+    require(FPDF_SaveAsCopy(destination.value, &writer, FPDF_NO_INCREMENTAL),
+            "Page export failed.");
+    return writer.bytes;
 }
 
 // All PDFium handles stay in this isolated process, on its single request thread.
@@ -544,7 +665,7 @@ class PdfDocument
             if (type_ != FORMTYPE_XFA_FULL)
             {
                 const double width = FPDF_GetPageWidth(page), height = FPDF_GetPageHeight(page);
-                double x0, y0, x1, y1, x2, y2;
+                double x0 = 0, y0 = 0, x1 = 0, y1 = 0, x2 = 0, y2 = 0;
                 require(FPDF_DeviceToPage(page, 0, 0, 10000, 10000, 0, 0, 0, &x0, &y0) &&
                             FPDF_DeviceToPage(page, 0, 0, 10000, 10000, 0, 10000, 0, &x1, &y1) &&
                             FPDF_DeviceToPage(page, 0, 0, 10000, 10000, 0, 0, 10000, &x2, &y2),
@@ -751,7 +872,7 @@ class PdfDocument
                 const double ow = FPDF_GetPageWidth(overlayPage),
                              oh = FPDF_GetPageHeight(overlayPage);
                 FPDF_ClosePage(overlayPage);
-                double x0, y0, x1, y1, x2, y2;
+                double x0 = 0, y0 = 0, x1 = 0, y1 = 0, x2 = 0, y2 = 0;
                 require(
                     FPDF_DeviceToPage(page, 0, 0, 10000, 10000, 0, 0, 10000, &x0, &y0) &&
                         FPDF_DeviceToPage(page, 0, 0, 10000, 10000, 0, 10000, 10000, &x1, &y1) &&
@@ -798,6 +919,41 @@ class PdfDocument
         return writer.bytes;
     }
 
+    QJsonObject search(const QString& text)
+    {
+        require(!text.isEmpty() && text.size() <= 256 && !text.contains(QChar(0)),
+                "Invalid search text.");
+        QJsonArray matches;
+        QElapsedTimer timer;
+        timer.start();
+        bool limited = false;
+        for (int index = 0; index < FPDF_GetPageCount(document_); ++index)
+        {
+            if (matches.size() >= 200 || timer.elapsed() > 5000)
+            {
+                limited = true;
+                break;
+            }
+            FPDF_PAGE page = FPDF_LoadPage(document_, index);
+            require(page, "Cannot load a page for search.");
+            FPDF_TEXTPAGE content = FPDFText_LoadPage(page);
+            if (content)
+            {
+                auto find = FPDFText_FindStart(
+                    content, reinterpret_cast<FPDF_WIDESTRING>(text.utf16()), 0, 0);
+                if (find)
+                {
+                    if (FPDFText_FindNext(find))
+                        matches.append(QJsonObject{{"page", index + 1}});
+                    FPDFText_FindClose(find);
+                }
+                FPDFText_ClosePage(content);
+            }
+            FPDF_ClosePage(page);
+        }
+        return {{"matches", matches}, {"limited", limited}};
+    }
+
     QJsonObject render(int index, int width)
     {
         QElapsedTimer renderTimer;
@@ -827,7 +983,7 @@ class PdfDocument
         QBuffer buffer(&encoded);
         buffer.open(QIODevice::WriteOnly);
         QImageWriter writer(&buffer, "PNG");
-        writer.setCompression(10); // Fast, lossless compression for interactive redraws.
+        writer.setCompression(20); // Qt maps 20 to zlib level 1; bound transport memory.
         require(writer.write(image), "Cannot encode the rendered page.");
         if (std::getenv("PDF_EDITOR_WORKER_DIAGNOSTICS"))
             std::cerr << "Native render: page=" << index << " width=" << width
@@ -965,10 +1121,43 @@ int main(int argc, char** argv)
             {
                 std::cin.read(block, sizeof(block));
                 overlay.append(block, std::cin.gcount());
-                require(overlay.size() <= 32 * 1024 * 1024,
+                require(overlay.size() <= 96 * 1024 * 1024 + 65536,
                         "Added content exceeds the save limit.");
             }
-            const QByteArray saved = document->save(overlay);
+            QJsonObject exportOptions;
+            QList<QByteArray> mergeSources;
+            if (overlay.startsWith("PDFEDITOR-EXPORT\n"))
+            {
+                constexpr int prefixSize = sizeof("PDFEDITOR-EXPORT\n") - 1;
+                const int end = overlay.indexOf('\n', prefixSize);
+                require(end >= prefixSize && end - prefixSize <= 65536, "Invalid export header.");
+                QJsonParseError error;
+                const auto header =
+                    QJsonDocument::fromJson(overlay.mid(prefixSize, end - prefixSize), &error);
+                require(error.error == QJsonParseError::NoError && header.isObject() &&
+                            !header.object().isEmpty(),
+                        "Invalid export header.");
+                exportOptions = header.object();
+                overlay.remove(0, end + 1);
+                const auto lengths = exportOptions["mergeLengths"].toArray();
+                require(lengths.size() <= 16, "Too many merge sources.");
+                qsizetype total = 0;
+                for (const auto& value : lengths)
+                {
+                    const double size = value.toDouble(-1);
+                    require(size > 0 && size <= 64 * 1024 * 1024 - total &&
+                                size <= overlay.size() && std::floor(size) == size,
+                            "Invalid merge input length.");
+                    const auto length = static_cast<qsizetype>(size);
+                    mergeSources.append(overlay.first(length));
+                    overlay.remove(0, length);
+                    total += length;
+                }
+            }
+            require(overlay.size() <= 32 * 1024 * 1024, "Added content exceeds the save limit.");
+            QByteArray saved = document->save(overlay);
+            if (!exportOptions.isEmpty())
+                saved = exportPages(saved, exportOptions, mergeSources);
             std::cout.write(saved.constData(), saved.size());
             std::cout.flush();
             require(static_cast<bool>(std::cout), "Cannot return the saved PDF.");
@@ -1009,7 +1198,9 @@ int main(int argc, char** argv)
                 }
                 else if (op == "event")
                     result = document->event(request);
-                else if (op == "snapshot")
+                else if (op == "search")
+                    result = document->search(request["text"].toString());
+                else if (op == "snapshot" || op == "checkpoint")
                     result = document->snapshot();
                 else if (op.isEmpty() || op == "render")
                     result = document->render(request.value("page").toInt(-1),

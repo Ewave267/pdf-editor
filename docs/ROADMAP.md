@@ -30,11 +30,12 @@ Build a growing regression corpus from real documents.
   cached deliveries after native form input.
 - [x] Cover rejected opens, continued rendering/saving and render cancellation
   with local integration regressions.
-- [ ] Diagnose the reported Windows Explorer startup exit using startup logs;
-  verify a native desktop launch, beyond the offscreen CI check.
+- [x] Diagnose the reported Windows Explorer startup exit using startup logs;
+  the user confirmed the sandbox fix opens the document. Formal clean-desktop
+  release walkthroughs remain a separate gate.
 - [ ] Add redistributable real-document fixtures and broader static/dynamic XFA
   coverage, including layout changes and representative Unicode fonts.
-- [ ] Fix and verify the documented AcroForm JavaScript keystroke conversion
+- [x] Fix and verify the documented AcroForm JavaScript keystroke conversion
   limitation in the pinned dependency.
 - [ ] Establish rendering/interaction latency baselines on large documents and
   clean-desktop walkthroughs on each supported operating system.
@@ -87,7 +88,10 @@ Preserve the behavior of dynamic XFA documents wherever possible.
 
 ## Phase 4 — Document Workflow
 
-Add common operations that complement form completion:
+Implemented through new-file page export and native printing. See
+[DOCUMENT-WORKFLOW](DOCUMENT-WORKFLOW.md) for controls and explicit format limits.
+
+Common operations that complement form completion:
 
 - Rotate pages.
 - Reorder pages.
@@ -104,9 +108,10 @@ Existing document text editing remains outside the core scope.
 
 ## Phase 5 — User Experience
 
-Build a polished desktop experience.
+Implemented controls and bounded local recovery. See
+[DESKTOP-EXPERIENCE](DESKTOP-EXPERIENCE.md) for behavior, storage and limits.
 
-Add:
+Delivered:
 
 - Recent documents.
 - Drag-and-drop opening.
@@ -123,6 +128,13 @@ Add:
 The interface should expose PDF complexity only when the user actually needs it.
 
 ## Phase 6 — Compatibility and Security
+
+Implemented regression gates, seeded malformed-input mutation cases, host
+ASan/UBSan checks, upstream static/dynamic/Arabic/encrypted-rejection samples,
+recovery and scheduled dependency monitoring. Password entry remains unsupported;
+parser/library sanitizer coverage and larger fuzz campaigns remain further
+hardening work. Production release requires advisory review and native desktop
+validation; see [RELEASE](RELEASE.md).
 
 Maintain compatibility suites for:
 
@@ -150,6 +162,12 @@ Security regressions block releases.
 
 ## Phase 7 — Cross-Platform Releases
 
+Native candidate workflows build, validate and package Windows, Linux x86_64/
+aarch64 and Intel/Apple Silicon macOS. `VERSION` drives executable/archive
+versioning; dependency revisions, patches, notices, checksums and timing reports
+are tracked. Signing, notarization and final clean-desktop acceptance remain
+production release gates rather than completed candidate checks.
+
 Provide reproducible builds for:
 
 ```text
@@ -168,6 +186,10 @@ Automate:
 - Dependency tracking.
 
 ## Phase 8 — Advanced Capabilities
+
+Evaluation complete for the requested scope. Decisions and prerequisites are
+recorded in [ADR 0007](adr/0007-advanced-feature-evaluation.md); these optional
+features are deferred pending concrete user needs and individual designs.
 
 Evaluate separately rather than automatically adding them to the core product:
 
@@ -193,3 +215,13 @@ The project succeeds when completing a PDF feels like completing a normal docume
 6. Send it.
 
 The complexity of PDF, AcroForm, XFA, and JavaScript should remain behind that experience.
+
+## Remaining production acceptance
+
+The core feature implementation does not close every production acceptance item.
+Remaining: representative licensed production-form/Unicode/layout corpus,
+large-document timing baselines and Windows/macOS/Linux clean-desktop checks;
+review of the V8 freshness finding and dependency coverage; platform signing/
+notarization and physical-printer/accessibility validation. Keep these open until
+there is evidence from the actual platforms. Do not equate offscreen CI with
+production acceptance.

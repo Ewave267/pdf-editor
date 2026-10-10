@@ -19,6 +19,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 DEPS = ROOT / ".deps"
 PDFIUM_REVISION = "2fd6cff57d9412cc42ef1a7e4e0a59b13a1e7cec"
+V8_REVISION = "0d546234ecf0af2032e958300ef8aeb14bc716c9"
 DEPOT_REVISION = "f7ea32ec994dbfd43c61edfcf276af6f98662878"
 DISTRIBUTOR_REVISION = "5325fa6d0d9379329f10f98fdc4839b4e40f2e79"
 VERSION = "157.0.8086.0"
@@ -140,6 +141,9 @@ def main():
     actual = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=source, text=True).strip()
     if actual != PDFIUM_REVISION or not (workspace / ".gclient_entries").exists():
         raise RuntimeError("source sync is incomplete or not at the pinned revision")
+    actual_v8 = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=source / "v8", text=True).strip()
+    if actual_v8 != V8_REVISION:
+        raise RuntimeError("V8 source revision differs from the tracked security pin")
     run([*gclient, "runhooks"], workspace, environment, "hooks")
     for name, directory in [
         ("shared_library.patch", source), ("public_headers.patch", source),
@@ -153,6 +157,8 @@ def main():
                 source, environment)
     if target_os in ("win", "mac"):
         apply_patch(distributor / "patches" / target_os / "build.patch", source / "build", environment)
+    apply_patch(ROOT / "third_party/pdfium/patches/0004-acroform-action-result.patch",
+                source, environment)
     if target_os == "win":
         resources = (distributor / "patches/win/resources.rc").read_text()
         resources = resources.replace("$VERSION_CSV", VERSION.replace(".", ","))
@@ -224,10 +230,10 @@ set_target_properties(pdfium PROPERTIES
     (package / "build-info.json").write_text(json.dumps({
         "version": VERSION, "pdfium_revision": PDFIUM_REVISION,
         "target_os": target_os, "target_cpu": target_cpu,
-        "v8_revision": subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], cwd=source / "v8", text=True).strip(),
+        "v8_revision": V8_REVISION,
         "depot_tools_revision": DEPOT_REVISION, "distributor_revision": DISTRIBUTOR_REVISION,
         "patch_sha256": hashlib.sha256(PATCH.read_bytes()).hexdigest(),
+        "acroform_action_patch_sha256": hashlib.sha256((ROOT / "third_party/pdfium/patches/0004-acroform-action-result.patch").read_bytes()).hexdigest(),
         "radio_font_patch_sha256": hashlib.sha256((ROOT / "third_party/pdfium/patches/0003-xfa-radio-and-font-fallback.patch").read_bytes()).hexdigest(),
         "v8_tls_patch_sha256": hashlib.sha256((ROOT / "third_party/pdfium/patches/0002-v8-shared-library-tls.patch").read_bytes()).hexdigest(),
         "library_sha256": hashlib.sha256((package / library_relative).read_bytes()).hexdigest(),

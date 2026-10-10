@@ -64,7 +64,7 @@ user-selected destination directory or unrestricted host filesystem access.
 | Worker file output | 64 MiB per file; renderer/save writable opens are denied |
 | Private `/tmp` | 64 MiB tmpfs |
 | Worker CPU | 300 seconds cumulatively; probe launcher lowers this to 15 seconds |
-| Host deadlines | Startup 15 seconds; render/form request 10 seconds; snapshot/save stage 30 seconds |
+| Host deadlines | Startup 15 seconds (60 on Windows); prepared-worker first load 15 seconds; render/form request 10 seconds; snapshot/save stage 30 seconds |
 | Core dumps | Disabled in native workers |
 
 The data limit bounds writable heap/anonymous mappings, including tested
@@ -78,8 +78,9 @@ terminated without blocking the host event loop. Busy/saving state clears,
 source files remain unchanged, and a fresh document can subsequently open.
 Application-owned additions survive a renderer failure until the document is
 explicitly closed or replaced. Native in-memory form edits cannot be recovered
-after that worker dies; the error explicitly reports this loss. Autosave and
-crash recovery are not included.
+after that worker dies; the error explicitly reports this loss. Idle recovery
+checkpoints retain the last successful native form snapshot and editable
+additions; newer work can still be lost. See [DESKTOP-EXPERIENCE](DESKTOP-EXPERIENCE.md).
 
 The GUI presents document errors and paths as plain text. Snapshot copying opens
 and checks the actual regular-file descriptor, uses nonblocking open to avoid a
@@ -145,3 +146,12 @@ intentionally visible inside the sandbox. Broader production documents,
 continuous fuzzing, dependency vulnerability monitoring, kernel/architecture
 coverage and crash recovery remain release work. Existing full-XFA additions
 and AcroForm script-conversion limits are unchanged; see [FORMS](FORMS.md).
+
+## Additional roadmap gates
+
+The worker regression suite includes a fixed-seed 32-case mutation campaign,
+invalid page-export frames and high-resolution compressed transport. This is a
+bounded smoke campaign, not coverage-guided or continuous parser fuzzing. A
+separate ASan/UBSan build instruments host document/UI code; its Qt and
+PDFium/V8 dependencies remain uninstrumented. Dependency monitoring and remaining
+production acceptance gates are described in [RELEASE](RELEASE.md).

@@ -17,12 +17,18 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QProcessEnvironment>
+#include <QSaveFile>
+#include <QSettings>
 #include <QStandardPaths>
+#include <QUuid>
 #include <algorithm>
 #include <cmath>
 
 PdfDocument::PdfDocument(QObject* parent) : QObject(parent), additions_(new AddedContent(this))
 {
+    recoveryTimer_.setInterval(60000);
+    connect(&recoveryTimer_, &QTimer::timeout, this, &PdfDocument::checkpoint);
+    recoveryTimer_.start();
     performanceClock_.start();
     savedRevision_ = additions_->revision();
     connect(additions_, &AddedContent::changed, this, &PdfDocument::saveStateChanged);
@@ -37,6 +43,8 @@ PdfDocument::~PdfDocument()
 {
     if (saving_)
         finishSave("Save cancelled.");
+    if (ready_ && !dirty() && !recoveryPath_.isEmpty())
+        QFile::remove(recoveryPath_);
     stopWorker();
 }
 
@@ -128,6 +136,13 @@ void PdfDocument::close()
 {
     if (saving_)
         finishSave("Save cancelled.");
+    if (!recoveryPath_.isEmpty())
+        QFile::remove(recoveryPath_);
+    recoveryPath_.clear();
+    checkpointPending_ = false;
+    recoveryAdditions_.clear();
+    pendingRecoveryAdditions_.clear();
+    emit recoveryChanged();
     additions_->clear();
     savedRevision_ = additions_->revision();
     formRevision_ = savedFormRevision_ = saveFormRevision_ = 0;
@@ -142,6 +157,10 @@ void PdfDocument::close()
     emit formsChanged();
     saveError_.clear();
     savedPath_.clear();
+    searching_ = false;
+    searchResults_.clear();
+    searchError_.clear();
+    emit searchChanged();
     sourcePath_.clear();
     emit saveStateChanged();
     stopWorker();
@@ -158,6 +177,9 @@ void PdfDocument::close()
 
 void PdfDocument::fail(const QString& message)
 {
+    searching_ = false;
+    searchError_ = message;
+    emit searchChanged();
     const bool lostFormEdits = ready_ && (formRevision_ != savedFormRevision_ || formBusy());
     if (saving_)
         finishSave(message);
@@ -468,7 +490,19 @@ void PdfDocument::receive()
         const auto id = active_.id;
         const auto op = active_.command.value("op").toString();
         active_ = {};
-        if (op == "snapshot")
+        if (op == "checkpoint")
+        {
+            checkpointPending_ = false;
+            recoveryError_ = response["error"].toString();
+            emit recoveryChanged();
+        }
+        else if (op == "search")
+        {
+            searching_ = false;
+            searchError_ = response["error"].toString();
+            emit searchChanged();
+        }
+        else if (op == "snapshot")
             finishSave(response["error"].toString());
         else
         {
@@ -526,7 +560,23 @@ void PdfDocument::receive()
         emit formsChanged();
         loading_ = false;
         ready_ = true;
+        if (!pendingRecoveryAdditions_.isEmpty())
+        {
+            if (!additions_->restoreCheckpoint(pendingRecoveryAdditions_))
+                recoveryError_ = "The PDF was recovered, but its saved additions are invalid.";
+            ++formRevision_;
+            pendingRecoveryAdditions_.clear();
+            emit recoveryChanged();
+            emit saveStateChanged();
+        }
         updateFit();
+        QSettings settings;
+        auto recent = settings.value("recentDocuments").toStringList();
+        recent.removeAll(sourcePath_);
+        recent.prepend(sourcePath_);
+        while (recent.size() > 10)
+            recent.removeLast();
+        settings.setValue("recentDocuments", recent);
         emit stateChanged();
         return;
     }
@@ -540,7 +590,18 @@ void PdfDocument::receive()
         const auto command = active_.command;
         const auto id = active_.id;
         active_ = {};
-        if (command["op"].toString() == "snapshot")
+        if (command["op"].toString() == "checkpoint")
+            writeCheckpoint(response);
+        else if (command["op"].toString() == "search")
+        {
+            searching_ = false;
+            searchResults_ = response["matches"].toArray().toVariantList();
+            searchError_ = response["limited"].toBool()
+                               ? "Search stopped at its result or time limit."
+                               : QString();
+            emit searchChanged();
+        }
+        else if (command["op"].toString() == "snapshot")
         {
             const QByteArray baseline =
                 QByteArray::fromBase64(response["pdf"].toString().toLatin1());
@@ -821,6 +882,7 @@ void PdfDocument::setZoom(double zoom)
 void PdfDocument::fitToPage()
 {
     fitting_ = true;
+    fitWidth_ = false;
     updateFit();
 }
 void PdfDocument::updateViewport(double width, double height)
@@ -835,8 +897,171 @@ void PdfDocument::updateFit()
     double maxHeight = 1;
     for (const auto& page : pages_)
         maxHeight = std::max(maxHeight, page.toMap().value("height").toDouble());
-    zoom_ = std::clamp(
-        std::min((viewportWidth_ - 48) / maxPageWidth(), (viewportHeight_ - 32) / maxHeight), 0.1,
-        3.0);
+    zoom_ = std::clamp((fitWidth_ ? (viewportWidth_ - 48) / maxPageWidth()
+                                  : std::min((viewportWidth_ - 48) / maxPageWidth(),
+                                             (viewportHeight_ - 32) / maxHeight)),
+                       0.1, 3.0);
     emit zoomChanged();
+}
+
+void PdfDocument::fitToWidth()
+{
+    fitting_ = true;
+    fitWidth_ = true;
+    updateFit();
+}
+QVariantList PdfDocument::recentDocuments() const
+{
+    QVariantList result;
+    for (const auto& path : QSettings().value("recentDocuments").toStringList())
+        result.append(
+            QVariantMap{{"name", QFileInfo(path).fileName()}, {"url", QUrl::fromLocalFile(path)}});
+    return result;
+}
+void PdfDocument::search(const QString& text)
+{
+    if (!ready_ || saving_ || searching_)
+        return;
+    searchResults_.clear();
+    searchError_.clear();
+    if (text.isEmpty() || text.size() > 256 || text.contains(QChar(0)))
+    {
+        searchError_ = "Enter between 1 and 256 characters.";
+        emit searchChanged();
+        return;
+    }
+    searching_ = true;
+    queue_.append({++nextId_, 0, 0, {}, QJsonObject{{"op", "search"}, {"text", text}}});
+    emit searchChanged();
+    nextRequest();
+}
+
+namespace
+{
+QString recoveryDirectory()
+{
+    return QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/recovery";
+}
+bool isRecoveryPath(const QString& path)
+{
+    const QFileInfo file(path);
+    return file.absolutePath() == QDir(recoveryDirectory()).absolutePath() &&
+           file.suffix() == "json" && !file.isSymLink();
+}
+} // namespace
+QVariantList PdfDocument::recoveryDocuments() const
+{
+    QVariantList result;
+    const QDir directory(recoveryDirectory());
+    for (const auto& file : directory.entryInfoList({"*.json"}, QDir::Files, QDir::Time))
+        if (!ready_ || file.absoluteFilePath() != recoveryPath_)
+            result.append(QVariantMap{{"path", file.absoluteFilePath()},
+                                      {"name", file.lastModified().toString(Qt::ISODate)}});
+    return result;
+}
+void PdfDocument::checkpoint()
+{
+    if (!ready_ || !dirty() || saving_ || additions_->editing() || formBusy() || active_.id ||
+        !queue_.isEmpty() || checkpointPending_)
+        return;
+    recoveryAdditions_ = additions_->checkpoint();
+    if (recoveryAdditions_.isEmpty())
+    {
+        recoveryError_ = "Recovery checkpoint exceeds the addition limit.";
+        emit recoveryChanged();
+        return;
+    }
+    checkpointPending_ = true;
+    queue_.append({++nextId_, 0, 0, {}, QJsonObject{{"op", "checkpoint"}}});
+    nextRequest();
+}
+void PdfDocument::writeCheckpoint(const QJsonObject& response)
+{
+    checkpointPending_ = false;
+    const auto pdf = QByteArray::fromBase64(response["pdf"].toString().toLatin1());
+    const QByteArray payload =
+        QJsonDocument(
+            QJsonObject{{"version", 1},
+                        {"pdf", response["pdf"]},
+                        {"source", sourcePath_},
+                        {"additions", QString::fromLatin1(recoveryAdditions_.toBase64())}})
+            .toJson(QJsonDocument::Compact);
+    recoveryAdditions_.clear();
+    if (!pdf.startsWith("%PDF-") || pdf.size() > 64 * 1024 * 1024 ||
+        payload.size() > 64 * 1024 * 1024 || !QDir().mkpath(recoveryDirectory()))
+        recoveryError_ = "Cannot create a recovery checkpoint within the 64 MiB limit.";
+    else
+    {
+        QFile::setPermissions(recoveryDirectory(), QFileDevice::ReadOwner |
+                                                       QFileDevice::WriteOwner |
+                                                       QFileDevice::ExeOwner);
+        if (recoveryPath_.isEmpty())
+            recoveryPath_ = recoveryDirectory() + "/" +
+                            QUuid::createUuid().toString(QUuid::WithoutBraces) + ".json";
+        QSaveFile output(recoveryPath_);
+        output.setDirectWriteFallback(false);
+        if (!output.open(QIODevice::WriteOnly) ||
+            !output.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner) ||
+            output.write(payload) != payload.size() || !output.commit())
+            recoveryError_ = "Cannot write a recovery checkpoint.";
+        else
+            recoveryError_.clear();
+    }
+    if (response["changed"].toBool())
+    {
+        ++formRevision_;
+        cache_.clear();
+        emit formRepaint();
+        emit saveStateChanged();
+    }
+    emit recoveryChanged();
+}
+void PdfDocument::discardRecovery(const QString& path)
+{
+    if (isRecoveryPath(path) && path != recoveryPath_)
+        QFile::remove(path);
+    emit recoveryChanged();
+}
+void PdfDocument::recover(const QString& path)
+{
+    if (ready_ || loading_ || saving_ || !isRecoveryPath(path))
+        return;
+    QFile input;
+    if (!pdf::detail::openRegularInput(input, path))
+        return;
+    const auto payload = input.read(64 * 1024 * 1024 + 1);
+    if (payload.size() > 64 * 1024 * 1024)
+        return;
+    const auto root = QJsonDocument::fromJson(payload).object();
+    const auto pdf = QByteArray::fromBase64(root["pdf"].toString().toLatin1());
+    const auto additions = QByteArray::fromBase64(root["additions"].toString().toLatin1());
+    if (root["version"].toInt() != 1 || !pdf.startsWith("%PDF-") || pdf.size() > 64 * 1024 * 1024 ||
+        additions.isEmpty())
+        return;
+    QTemporaryDir temporary;
+    const auto file = temporary.filePath("Recovered.pdf");
+    QFile output(file);
+    if (!output.open(QIODevice::WriteOnly) || output.write(pdf) != pdf.size())
+        return;
+    output.close();
+    recoveryPath_.clear();
+    open(QUrl::fromLocalFile(file));
+    if (loading_)
+    {
+        pendingRecoveryAdditions_ = additions;
+        const auto original = root["source"].toString();
+        if (QFileInfo(original).isAbsolute() && original.size() <= 4096)
+            sourcePath_ = original;
+    }
+    // Keep the previous checkpoint until this recovered session is explicitly closed.
+    recoveryPath_ = path;
+}
+
+bool PdfDocument::darkTheme() const { return QSettings().value("darkMode", false).toBool(); }
+void PdfDocument::setDarkTheme(bool dark)
+{
+    if (dark == darkTheme())
+        return;
+    QSettings().setValue("darkMode", dark);
+    emit themeChanged();
 }

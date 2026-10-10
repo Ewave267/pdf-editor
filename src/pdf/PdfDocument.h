@@ -45,6 +45,13 @@ class PdfDocument : public QObject
     Q_PROPERTY(int currentPage READ currentPage WRITE setCurrentPage NOTIFY currentPageChanged)
     Q_PROPERTY(double zoom READ zoom WRITE setZoom NOTIFY zoomChanged)
     Q_PROPERTY(bool fitting READ fitting NOTIFY zoomChanged)
+    Q_PROPERTY(bool darkTheme READ darkTheme WRITE setDarkTheme NOTIFY themeChanged)
+    Q_PROPERTY(QVariantList searchResults READ searchResults NOTIFY searchChanged)
+    Q_PROPERTY(bool searching READ searching NOTIFY searchChanged)
+    Q_PROPERTY(QString searchError READ searchError NOTIFY searchChanged)
+    Q_PROPERTY(QVariantList recentDocuments READ recentDocuments NOTIFY stateChanged)
+    Q_PROPERTY(QVariantList recoveryDocuments READ recoveryDocuments NOTIFY recoveryChanged)
+    Q_PROPERTY(QString recoveryError READ recoveryError NOTIFY recoveryChanged)
   public:
     explicit PdfDocument(QObject* parent = nullptr);
     ~PdfDocument() override;
@@ -78,6 +85,8 @@ class PdfDocument : public QObject
     Q_INVOKABLE quint64 setFormFieldText(int id, const QString& text);
     Q_INVOKABLE void commitForm();
     Q_INVOKABLE void saveAs(const QUrl& url);
+    Q_INVOKABLE void exportPages(const QUrl& url, const QString& pages, int rotation,
+                                 bool flattenForms, const QVariantList& mergeFiles = {});
     bool ready() const { return ready_; }
     bool loading() const { return loading_; }
     QString error() const { return error_; }
@@ -94,6 +103,21 @@ class PdfDocument : public QObject
     void prepareWindowsWorker();
     bool windowsWorkerPrepared() const { return warmReady_; }
     Q_INVOKABLE void fitToPage();
+    Q_INVOKABLE void fitToWidth();
+    Q_INVOKABLE void print();
+    Q_INVOKABLE void printToPdf(const QUrl& url);
+    Q_INVOKABLE void checkpoint();
+    Q_INVOKABLE void recover(const QString& path);
+    Q_INVOKABLE void discardRecovery(const QString& path);
+    QVariantList recoveryDocuments() const;
+    QString recoveryError() const { return recoveryError_; }
+    Q_INVOKABLE void search(const QString& text);
+    QVariantList searchResults() const { return searchResults_; }
+    bool searching() const { return searching_; }
+    QString searchError() const { return searchError_; }
+    QVariantList recentDocuments() const;
+    bool darkTheme() const;
+    void setDarkTheme(bool dark);
     Q_INVOKABLE void updateViewport(double width, double height);
     void setCurrentPage(int page);
     void setZoom(double zoom);
@@ -110,6 +134,9 @@ class PdfDocument : public QObject
     void stateChanged();
     void currentPageChanged();
     void zoomChanged();
+    void searchChanged();
+    void recoveryChanged();
+    void themeChanged();
     void rendered(quint64 request, const QImage& image);
 
   private:
@@ -129,6 +156,12 @@ class PdfDocument : public QObject
     void nextRequest();
     void launchWorker(const QStringList& args);
     void loadPreparedInput();
+    void printDocument(const QUrl& destination);
+    void writeCheckpoint(const QJsonObject& response);
+    QString recoveryPath_, recoveryError_;
+    QByteArray recoveryAdditions_, pendingRecoveryAdditions_;
+    QTimer recoveryTimer_;
+    bool checkpointPending_ = false;
     bool warming_ = false, warmReady_ = false;
     std::unique_ptr<QTemporaryDir> warmRuntime_;
     void updateFit();
@@ -138,6 +171,9 @@ class PdfDocument : public QObject
     QProcess* saveWorker_ = nullptr;
     QTimer saveDeadline_;
     QByteArray saveBytes_, saveOverlay_;
+    QJsonObject exportOptions_;
+    QByteArray exportSources_;
+    QStringList exportSourcePaths_;
     QString sourcePath_, saveDestination_, saveError_, savedPath_;
     QStringList sandboxArgs_;
     QString sandboxProgram_;
@@ -164,7 +200,9 @@ class PdfDocument : public QObject
     quint64 generation_ = 0;
     bool ready_ = false;
     bool loading_ = false;
-    bool fitting_ = true;
+    bool fitting_ = true, fitWidth_ = false, searching_ = false;
+    QVariantList searchResults_;
+    QString searchError_;
     QString error_, fileName_, formType_;
     int currentPage_ = 1;
     double zoom_ = 1;
