@@ -42,7 +42,7 @@ jobs:
             sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           fi
           bwrap --unshare-all --die-with-parent --ro-bind / / /usr/bin/true
-      - uses: actions/cache/restore@v5
+      - uses: actions/cache/restore@v6
         id: pdfium
         with:
           path: .deps/pdfium-patched
@@ -52,7 +52,7 @@ jobs:
         run: python3 tools/build_pdfium.py --jobs 4
       - name: Cache the independently tested PDFium build
         if: steps.pdfium.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@v6
         with:
           path: .deps/pdfium-patched
           key: ${{ steps.pdfium.outputs.cache-primary-key }}

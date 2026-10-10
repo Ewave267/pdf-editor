@@ -44,7 +44,7 @@ jobs:
       - uses: actions/checkout@v6
       - name: Install baseline build tools
         run: bash tools/setup_native_linux.sh
-      - uses: actions/cache/restore@v5
+      - uses: actions/cache/restore@v6
         id: pdfium
         with:
           path: .deps/pdfium-patched
@@ -82,7 +82,7 @@ jobs:
       - uses: actions/checkout@v6
       - name: Install baseline SDK and packaging dependencies
         run: bash tools/setup_native_linux.sh
-      - uses: actions/cache/restore@v5
+      - uses: actions/cache/restore@v6
         id: pdfium
         with:
           path: .deps/pdfium-patched
@@ -99,7 +99,7 @@ jobs:
           .deps/pdfium-patched/build-tests/pdfium_unittests --gtest_filter='CFXXML*'
       - name: Cache native-tested ARM PDFium
         if: matrix.cpu == 'arm64' && steps.pdfium.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@v6
         with:
           path: .deps/pdfium-patched
           key: ${{ steps.pdfium.outputs.cache-primary-key }}
@@ -113,7 +113,7 @@ jobs:
           cp build-native/native-smoke ci-linux/
       - name: Cache tested x86_64 PDFium
         if: matrix.cpu == 'x64' && steps.pdfium.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@v6
         with:
           path: .deps/pdfium-patched
           key: ${{ steps.pdfium.outputs.cache-primary-key }}
@@ -258,7 +258,7 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      - uses: actions/cache/restore@v5
+      - uses: actions/cache/restore@v6
         id: pdfium
         with:
           path: .deps/pdfium-patched
@@ -268,7 +268,7 @@ jobs:
         run: python tools/build_pdfium.py --jobs ${{ matrix.build-jobs }}
       - name: Cache XML-tested PDFium before application deployment
         if: steps.pdfium.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@v6
         with:
           path: .deps/pdfium-patched
           key: ${{ steps.pdfium.outputs.cache-primary-key }}
