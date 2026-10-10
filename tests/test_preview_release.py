@@ -35,6 +35,29 @@ class PreviewReleaseTests(unittest.TestCase):
             with self.subTest(changes=changes), self.assertRaises(ValueError):
                 preview.select_artifacts(dict(self.run, **changes), self.artifacts, "owner/editor")
 
+    def test_cleanup_keeps_newest_preview_and_preserves_other_releases(self):
+        releases = [
+            {"tag_name": "preview-100", "prerelease": True, "draft": False},
+            {"tag_name": "preview-300", "prerelease": True, "draft": False},
+            {"tag_name": "preview-200", "prerelease": True, "draft": True},
+            {"tag_name": "preview-400", "prerelease": True, "draft": True},
+            {"tag_name": "v1.0", "prerelease": False, "draft": False},
+            {"tag_name": "preview-50", "prerelease": False, "draft": False},
+            {"tag_name": "beta-1", "prerelease": True, "draft": False},
+        ]
+        with patch.object(preview, "list_releases", return_value=releases), patch.object(preview, "gh") as gh:
+            preview.cleanup_previews("owner/editor")
+        self.assertEqual([call.args for call in gh.call_args_list], [
+            ("release", "delete", "preview-100", "--cleanup-tag", "--yes"),
+            ("release", "delete", "preview-200", "--cleanup-tag", "--yes"),
+        ])
+
+    def test_cleanup_never_deletes_without_a_published_replacement(self):
+        releases = [{"tag_name": "preview-100", "prerelease": True, "draft": True}]
+        with patch.object(preview, "list_releases", return_value=releases), patch.object(preview, "gh") as gh:
+            preview.cleanup_previews("owner/editor")
+        gh.assert_not_called()
+
     def collect(self, name, files):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)

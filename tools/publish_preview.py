@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 from pathlib import Path, PurePosixPath
 import shutil
 import subprocess
@@ -24,6 +25,31 @@ def gh(*arguments, **kwargs):
 
 def api(endpoint):
     return json.loads(gh("api", endpoint, capture_output=True, text=True).stdout)
+
+
+def list_releases(repository):
+    pages = json.loads(gh("api", "--paginate", "--slurp", f"repos/{repository}/releases?per_page=100",
+                          capture_output=True, text=True).stdout)
+    return [release for page in pages for release in page]
+
+
+def preview_id(release):
+    match = re.fullmatch(r"preview-(\d+)", release["tag_name"])
+    return int(match[1]) if match and release["prerelease"] else None
+
+
+def cleanup_previews(repository):
+    releases = list_releases(repository)
+    published = [preview_id(release) for release in releases
+                 if not release["draft"] and preview_id(release) is not None]
+    if not published:
+        return
+    newest = max(published)
+    for release in releases:
+        number = preview_id(release)
+        if number is not None and number < newest:
+            gh("release", "delete", release["tag_name"], "--cleanup-tag", "--yes")
+            print("Removed superseded development preview: " + release["tag_name"])
 
 
 def select_artifacts(run, artifacts, repository):
@@ -89,11 +115,15 @@ def main():
         return
     # One immutable build identity per preview: no moving tags or mixed builds.
     tag = f"preview-{args.run_id}"
-    releases = json.loads(gh("api", "--paginate", "--slurp", f"repos/{repository}/releases?per_page=100",
-                            capture_output=True, text=True).stdout)
-    existing = next((release for page in releases for release in page if release["tag_name"] == tag), None)
+    releases = list_releases(repository)
+    existing = next((release for release in releases if release["tag_name"] == tag), None)
     if existing and not existing["draft"]:
         print("Already published: " + existing["html_url"])
+        cleanup_previews(repository)
+        return
+    if any(not release["draft"] and (preview_id(release) or 0) > args.run_id for release in releases):
+        print("No preview published: a newer development preview is already available")
+        cleanup_previews(repository)
         return
     with tempfile.TemporaryDirectory(prefix="pdf-editor-preview-") as temporary:
         folder = Path(temporary)
@@ -135,6 +165,8 @@ def main():
         gh("release", "edit", tag, "--draft=false", "--prerelease", "--latest=false",
            "--notes-file", notes)
         print(f"Published development preview: https://github.com/{repository}/releases/tag/{tag}")
+        # Only clean up after all uploads and the public publication succeeded.
+        cleanup_previews(repository)
 
 
 if __name__ == "__main__":

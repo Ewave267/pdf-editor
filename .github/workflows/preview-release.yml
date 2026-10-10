@@ -16,7 +16,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: preview-release-${{ github.event.workflow_run.id || inputs.run_id }}
+  # Serialize publishing and retention so concurrent builds cannot delete
+  # another run's release while it is uploading.
+  group: preview-release
   cancel-in-progress: false
 
 jobs:

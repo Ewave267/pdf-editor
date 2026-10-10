@@ -260,7 +260,12 @@ Public downloads are at <https://github.com/Ewave267/pdf-editor/releases>.
 Each release is named **Development preview — build N**, tagged
 `preview-RUN_ID`, marked **Pre-release**, and explicitly excluded from GitHub's
 **Latest** stable designation. Each tag points at the exact binary build commit;
-old previews stay available. The Windows ZIP has `pdf-editor.exe` at its root,
+only the newest development preview remains available. Once a new preview is
+successfully published, older `preview-RUN_ID` prereleases and their tags are
+deleted. Stable releases and other release channels remain untouched. Failed
+publication preserves the previous preview; retrying an older build cannot
+replace a newer preview. Publishing and cleanup run serially.
+The Windows ZIP has `pdf-editor.exe` at its root,
 so it needs only one extraction. Other packages are unwrapped from the Actions
 artifact ZIP. Releases include a combined `SHA256SUMS`, `build-info.json`,
 application source ZIP and the five upstream Qt source archives. Source
@@ -270,7 +275,7 @@ distribution-patched Linux Qt packages.
 
 To publish an already successful full build without another compilation, select
 **Actions → Publish development preview → Run workflow** and enter its numeric
-run ID (from the build's URL). Repeating a published run is a no-op. Failed
+run ID (from the build's URL). Repeating a published run also performs cleanup. Failed
 uploads leave a draft that can be retried, rather than an incomplete public
 release.
 
