@@ -910,3 +910,27 @@ recent files, menus, saving before close, cancellation/failure retention and
 controls at 700×480. Reviewed welcome, document, selected-text, compact and dark
 mode screenshots locally. Native Windows/macOS usability still needs desktop
 checks; the previous roadmap batch's native candidate workflow passed.
+
+## 2026-10-10 — Integration CI mouse-test synchronization
+
+The UI batch's native Windows/macOS/Linux candidates passed. PDF Integration
+failed on Ubuntu's Qt 6.4.2 while selecting two added objects: the mouse test
+observed only one selected object. Control visibility alone did not ensure that
+the changing toolbar layout had been polished before click coordinates were read.
+
+- UI mouse-click helpers now wait for a rendered frame before
+  mapping toolbar coordinates. Placement gestures also wait for the frame, and
+  area selection explicitly verifies the tool and drag state before proceeding.
+- Replaced the familiar-controls test's fixed 30 ms delay with frame
+  synchronization. Selection, editing and persistence assertions remain intact.
+- Failed integration/sanitizer runs upload their CTest logs as
+  `pdf-integration-diagnostics` for later inspection.
+
+Local validation: all 40 viewer checks passed in both the normal and host
+ASan/UBSan builds; the affected mouse/selection test also passed five repeated
+runs. The sanitizer check exposed the same race for a newly shown form-choice
+button; frame synchronization now covers every control-click helper. Workflow
+lint passed. The fix changes tests and CI diagnostics only; existing native
+artifacts remain current and this push does not trigger their expensive build
+matrix. The integration workflow verifies the supported Qt 6.4.2 baseline and
+the relocated Ubuntu preview package.

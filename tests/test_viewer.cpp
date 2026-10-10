@@ -43,6 +43,14 @@ QQuickItem* item(QQuickItem* root, const QString& name)
             return found;
     return nullptr;
 }
+bool waitForFrame(QQuickWindow* window)
+{
+    // Controls can be visible before a conditional layout has been polished.
+    // Wait for a rendered frame before mapping their positions for mouse input.
+    QSignalSpy frames(window, &QQuickWindow::frameSwapped);
+    window->update();
+    return !frames.isEmpty() || frames.wait(2000);
+}
 } // namespace
 
 class ViewerTests : public QObject
@@ -307,6 +315,8 @@ class ViewerTests : public QObject
         QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
         auto click = [&](const QString& name)
         {
+            if (!waitForFrame(window))
+                return false;
             auto* target = item(window->contentItem(), name);
             if (!target)
                 return false;
@@ -586,8 +596,10 @@ class ViewerTests : public QObject
         auto* content = document.additions();
         auto click = [&](const QString& name)
         {
+            if (!waitForFrame(window))
+                return false;
             auto* target = item(window->contentItem(), name);
-            if (!target)
+            if (!target || !target->isVisible() || !target->isEnabled())
                 return false;
             QTest::mouseClick(
                 window, Qt::LeftButton, Qt::NoModifier,
@@ -616,6 +628,7 @@ class ViewerTests : public QObject
             }
             QVERIFY(QMetaObject::invokeMethod(dialog, "accept"));
             QTRY_COMPARE(window->property("placement").toString(), kind);
+            QVERIFY(waitForFrame(window));
             const double x = row % 2 ? 280 : 40;
             const double y = 40 + (row / 2) * 110;
             QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, scene(x, y));
@@ -638,7 +651,10 @@ class ViewerTests : public QObject
             QVERIFY(window->grabWindow().save(qEnvironmentVariable("PDF_PHASE2_SCREENSHOT")));
         }
         QVERIFY(click("selectAreaButton"));
+        QTRY_COMPARE(window->property("placement").toString(), QString("selection"));
+        QVERIFY(waitForFrame(window));
         QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, scene(30, 30));
+        QVERIFY(mouse->property("selectingArea").toBool());
         QTest::mouseMove(window, scene(400, 100), 20);
         QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, scene(400, 100));
         QTRY_COMPARE(content->selectionCount(), 2);
@@ -1860,6 +1876,8 @@ class ViewerTests : public QObject
         auto* content = document.additions();
         auto click = [&](QString name)
         {
+            if (!waitForFrame(window))
+                return false;
             auto* target = item(window->contentItem(), name);
             if (!target)
                 return false;
@@ -2147,7 +2165,8 @@ class ViewerTests : public QObject
         };
         auto click = [&](const QString& name)
         {
-            QTest::qWait(30); // Let conditional toolbar controls finish their layout.
+            if (!waitForFrame(window))
+                return false;
             auto* control = item(window->contentItem(), name);
             if (!visibleControl(name))
                 return false;
@@ -2313,6 +2332,8 @@ class ViewerTests : public QObject
         QVERIFY(QTest::qWaitForWindowExposed(window));
         auto click = [window](const QString& name)
         {
+            if (!waitForFrame(window))
+                return false;
             auto* control = item(window->contentItem(), name);
             if (!control)
                 return false;

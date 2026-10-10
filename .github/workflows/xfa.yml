@@ -93,3 +93,14 @@ jobs:
           path: |
             dist/*.tar.gz
             dist/SHA256SUMS
+      - name: Keep failed integration and sanitizer test logs
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: pdf-integration-diagnostics
+          if-no-files-found: ignore
+          path: |
+            build-xfa/Testing/Temporary/LastTest.log
+            build-xfa/Testing/Temporary/LastTestsFailed.log
+            build-host-sanitized/Testing/Temporary/LastTest.log
+            build-host-sanitized/Testing/Temporary/LastTestsFailed.log
