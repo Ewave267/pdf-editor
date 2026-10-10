@@ -87,7 +87,7 @@ jobs:
         with:
           path: .deps/pdfium-patched
           key: pdfium-native-rhel9-${{ matrix.cpu }}-${{ hashFiles('tools/build_pdfium.py', 'third_party/pdfium/patches/*.patch', 'tools/setup_native_linux.sh', 'tools/build_pdfium_linux_arm64.sh', 'LICENSE') }}
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         if: matrix.cpu == 'arm64' && steps.pdfium.outputs.cache-hit != 'true'
         with:
           name: pdfium-linux-arm64-build-inputs
@@ -152,7 +152,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: linux-validation-inputs-${{ matrix.arch }}
           path: .
