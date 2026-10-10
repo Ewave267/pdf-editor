@@ -401,6 +401,25 @@ class ViewerTests : public QObject
         QCOMPARE(document.additions()->count(), 2);
         QCOMPARE(document.additions()->object(document.additions()->selected())["type"].toString(),
                  QString("drawing"));
+        // Form helpers wrap and remain clickable at the smallest supported window.
+        window->resize(700, 480);
+        QTest::qWait(100);
+        auto* view = item(window->contentItem(), "pageView");
+        const double pageTop = view->mapToScene(QPointF(0, 0)).y();
+        for (const QString name :
+             {"highlightFieldsButton", "formFieldsButton", "previousFieldButton", "nextFieldButton",
+              "validateFormButton", "resetWholeFormButton", "signFormButton"})
+        {
+            auto* control = item(window->contentItem(), name);
+            QVERIFY2(control && control->isVisible(), qPrintable(name));
+            const QRectF rect(control->mapToScene(QPointF(0, 0)), control->size());
+            QVERIFY2(rect.left() >= 0 && rect.right() <= window->width() && rect.top() >= 0 &&
+                         rect.bottom() <= pageTop,
+                     qPrintable(name));
+        }
+        QVERIFY(click("formFieldsButton"));
+        QTRY_VERIFY(dialog("fieldsDialog")->property("visible").toBool());
+        QVERIFY(QMetaObject::invokeMethod(dialog("fieldsDialog"), "close"));
         document.close();
     }
 
@@ -1922,6 +1941,12 @@ class ViewerTests : public QObject
                 picker->setProperty("currentFolder", QUrl::fromLocalFile(dir.path()));
                 picker->setProperty("selectedFile", QUrl::fromLocalFile(path));
                 QVERIFY(click(type == "signature" ? "addSignatureButton" : "addImageButton"));
+                if (type == "signature")
+                {
+                    auto* sign = window->findChild<QObject*>("signDialog");
+                    QTRY_VERIFY(sign->property("visible").toBool());
+                    QVERIFY(click("importSignatureButton"));
+                }
                 QTRY_VERIFY(picker->property("visible").toBool());
                 QTest::qWait(100);
                 QVERIFY(QMetaObject::invokeMethod(picker, "accept"));
@@ -2102,6 +2127,180 @@ class ViewerTests : public QObject
             QCOMPARE(dialog->property("currentFolder").toUrl(), folder);
         }
     }
+    void familiarEditorControls()
+    {
+        PdfDocument document;
+        QQmlApplicationEngine engine;
+        engine.rootContext()->setContextProperty("pdfDocument", &document);
+        engine.load(QUrl("qrc:/qml/Main.qml"));
+        QVERIFY(!engine.rootObjects().isEmpty());
+        auto* window = qobject_cast<QQuickWindow*>(engine.rootObjects().first());
+        QVERIFY(QTest::qWaitForWindowExposed(window));
+        auto visibleControl = [&](const QString& name)
+        {
+            auto* control = item(window->contentItem(), name);
+            if (!control || !control->isVisible() || !control->isEnabled())
+                return false;
+            const QRectF rect(control->mapToScene(QPointF(0, 0)), control->size());
+            return rect.left() >= 0 && rect.right() <= window->width() && rect.top() >= 0 &&
+                   rect.bottom() <= window->height();
+        };
+        auto click = [&](const QString& name)
+        {
+            QTest::qWait(30); // Let conditional toolbar controls finish their layout.
+            auto* control = item(window->contentItem(), name);
+            if (!visibleControl(name))
+                return false;
+            QTest::mouseClick(
+                window, Qt::LeftButton, Qt::NoModifier,
+                control->mapToScene(QPointF(control->width() / 2, control->height() / 2))
+                    .toPoint());
+            return true;
+        };
+        if (qEnvironmentVariableIsSet("PDF_WELCOME_SCREENSHOT"))
+            QVERIFY(window->grabWindow().save(qEnvironmentVariable("PDF_WELCOME_SCREENSHOT")));
+        QVERIFY(click("welcomeOpenButton"));
+        auto* open = window->findChild<QObject*>("openDialog");
+        QTRY_VERIFY(open->property("visible").toBool());
+        QVERIFY(QMetaObject::invokeMethod(open, "reject"));
+        QVERIFY(click("welcomeHelpButton"));
+        auto* help = window->findChild<QObject*>("helpDialog");
+        QTRY_VERIFY(help->property("visible").toBool());
+        QVERIFY(QMetaObject::invokeMethod(help, "close"));
+        document.open(fixture("normal/multi-page.pdf"));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        auto* content = document.additions();
+        const auto first = content->addText(0, 50, 90, "A familiar editor");
+        QTRY_VERIFY(visibleControl("selectionBold"));
+        QVERIFY(click("selectionBold"));
+        QTRY_VERIFY(content->object(first)["bold"].toBool());
+        QVERIFY(click("selectionItalic"));
+        QVERIFY(click("selectionUnderline"));
+        QVERIFY(content->object(first)["italic"].toBool());
+        QVERIFY(content->object(first)["underline"].toBool());
+        QVERIFY(click("undoAdditionsButton"));
+        QTRY_VERIFY(!content->object(first)["underline"].toBool());
+        QVERIFY(click("redoAdditionsButton"));
+        QTRY_VERIFY(content->object(first)["underline"].toBool());
+        auto* size = item(window->contentItem(), "selectionFontSize");
+        auto* sizeInput =
+            qobject_cast<QQuickItem*>(size->property("contentItem").value<QObject*>());
+        QVERIFY(sizeInput);
+        window->requestActivate();
+        QTRY_VERIFY(window->isActive());
+        sizeInput->forceActiveFocus();
+        QTRY_VERIFY(sizeInput->hasActiveFocus());
+        QVERIFY(QMetaObject::invokeMethod(sizeInput, "selectAll"));
+        QTest::keyClick(window, Qt::Key_2);
+        QTest::keyClick(window, Qt::Key_4);
+        QTest::keyClick(window, Qt::Key_Return);
+        QTRY_COMPARE(content->object(first)["fontSize"].toInt(), 24);
+        const auto second = content->addText(0, 60, 150, "Another text box");
+        QTRY_VERIFY(!item(window->contentItem(), "selectionBold")->property("checked").toBool());
+        content->select(first);
+        QTRY_VERIFY(item(window->contentItem(), "selectionBold")->property("checked").toBool());
+        QCOMPARE(size->property("value").toInt(), 24);
+        content->select(second);
+        QTRY_COMPARE(size->property("value").toInt(), 18);
+        content->select(first);
+        if (qEnvironmentVariableIsSet("PDF_FORMATTING_SCREENSHOT"))
+        {
+            QTest::qWait(150);
+            QVERIFY(window->grabWindow().save(qEnvironmentVariable("PDF_FORMATTING_SCREENSHOT")));
+        }
+        QVERIFY(click("menuFile"));
+        QTRY_VERIFY(visibleControl("pagesButton"));
+        QVERIFY(click("pagesButton"));
+        auto* pages = window->findChild<QObject*>("pagesDialog");
+        QTRY_VERIFY(pages->property("visible").toBool());
+        QVERIFY(QMetaObject::invokeMethod(pages, "reject"));
+        window->requestActivate();
+        window->contentItem()->forceActiveFocus();
+        QTest::keyClick(window, Qt::Key_S, Qt::ControlModifier);
+        auto* save = window->findChild<QObject*>("saveDialog");
+        QTRY_VERIFY(save->property("visible").toBool());
+        QVERIFY(QMetaObject::invokeMethod(save, "reject"));
+        window->resize(700, 480);
+        QTest::qWait(100);
+        for (const QString name :
+             {"openButton", "saveButton", "findButton", "addTextButton", "addImageButton",
+              "addSignatureButton", "drawToolsButton", "selectionBold", "editTextButton",
+              "deleteObjectButton", "pageNumber", "fitButton"})
+            QVERIFY2(visibleControl(name), qPrintable(name));
+        QVERIFY(!item(window->contentItem(), "selectionFontFamily")->isVisible());
+        QVERIFY(click("editTextButton")); // The complete formatting dialog remains available.
+        auto* text = window->findChild<QObject*>("textDialog");
+        QTRY_VERIFY(text->property("visible").toBool());
+        QCOMPARE(item(window->contentItem(), "textFontSize")->property("value").toInt(), 24);
+        QTest::keyClick(window, Qt::Key_S, Qt::ControlModifier);
+        QVERIFY(!save->property("visible").toBool()); // Do not open another dialog while editing.
+        QVERIFY(QMetaObject::invokeMethod(text, "reject"));
+        QVERIFY(click("addTextButton"));
+        QTRY_VERIFY(text->property("visible").toBool());
+        item(window->contentItem(), "addedTextInput")->setProperty("text", "A new box");
+        QVERIFY(QMetaObject::invokeMethod(text, "accept"));
+        QTRY_COMPARE(window->property("placement").toString(), QString("text"));
+        QVERIFY(click("cancelToolButton"));
+        QTRY_COMPARE(window->property("placement").toString(), QString());
+        QCOMPARE(content->count(), 2);
+        QVERIFY(click("thumbnailsButton"));
+        QTRY_VERIFY(!item(window->contentItem(), "thumbnailView")->isVisible());
+        QVERIFY(click("thumbnailsButton"));
+        QTRY_VERIFY(item(window->contentItem(), "thumbnailView")->isVisible());
+        if (qEnvironmentVariableIsSet("PDF_COMPACT_SCREENSHOT"))
+            QVERIFY(window->grabWindow().save(qEnvironmentVariable("PDF_COMPACT_SCREENSHOT")));
+        // Closing offers a save path; cancelling that path must retain the edits.
+        window->resize(1160, 820);
+        QVERIFY(click("closeButton"));
+        auto* discard = window->findChild<QObject*>("discardDialog");
+        QTRY_VERIFY(discard->property("visible").toBool());
+        QVERIFY(QMetaObject::invokeMethod(discard, "accept"));
+        QTRY_VERIFY(save->property("visible").toBool());
+        QVERIFY(QMetaObject::invokeMethod(save, "reject"));
+        QVERIFY(document.ready());
+        QVERIFY(document.dirty());
+        // A failed save also keeps the document open, then a successful save closes it.
+        QVERIFY(click("closeButton"));
+        QTRY_VERIFY(discard->property("visible").toBool());
+        QVERIFY(QMetaObject::invokeMethod(discard, "accept"));
+        QTRY_VERIFY(save->property("visible").toBool());
+        save->setProperty("selectedFile", fixture("normal/multi-page.pdf"));
+        QVERIFY(QMetaObject::invokeMethod(save, "accept"));
+        QTRY_VERIFY(!document.saveError().isEmpty());
+        QVERIFY(document.ready());
+        QVERIFY(document.dirty());
+        auto* failure = window->findChild<QObject*>("saveFailureDialog");
+        QVERIFY(failure);
+        QTRY_VERIFY(failure->property("visible").toBool());
+        QVERIFY(QMetaObject::invokeMethod(failure, "close"));
+        QTemporaryDir output;
+        const auto savedCopy = output.filePath("saved-copy.pdf");
+        save->setProperty("currentFolder", QUrl::fromLocalFile(output.path()));
+        save->setProperty("selectedFile", QUrl::fromLocalFile(savedCopy));
+        QVERIFY(click("closeButton"));
+        QTRY_VERIFY(discard->property("visible").toBool());
+        QVERIFY(QMetaObject::invokeMethod(discard, "accept"));
+        QTRY_VERIFY(save->property("visible").toBool());
+        QTRY_VERIFY(window->property("saveBeforeContinuing").toBool());
+        QTest::qWait(100);
+        QTRY_COMPARE(save->property("selectedFile").toUrl(), QUrl::fromLocalFile(savedCopy));
+        QVERIFY(QMetaObject::invokeMethod(save, "accept"));
+        QTRY_VERIFY2_WITH_TIMEOUT(!document.ready(), qPrintable(document.saveError()), 15000);
+        QVERIFY(QFileInfo::exists(savedCopy));
+        QTest::qWait(50);
+        QTRY_VERIFY(visibleControl("welcomeRecentFile"));
+        QVERIFY(click("welcomeRecentFile"));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        document.setDarkTheme(true);
+        if (qEnvironmentVariableIsSet("PDF_DARK_SCREENSHOT"))
+        {
+            QTest::qWait(100);
+            QVERIFY(window->grabWindow().save(qEnvironmentVariable("PDF_DARK_SCREENSHOT")));
+        }
+        document.setDarkTheme(false);
+        document.close();
+    }
+
     void qmlControlsAndScrolling()
     {
         PdfDocument document;

@@ -15,7 +15,7 @@ ApplicationWindow {
     visible: true
     flags: Qt.Window | Qt.WindowTitleHint | Qt.WindowSystemMenuHint
            | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint | Qt.WindowCloseButtonHint
-    title: pdfDocument.fileName ? pdfDocument.fileName + " — PDF Form Editor" : "PDF Form Editor"
+    title: pdfDocument.fileName ? pdfDocument.fileName + " — PDF Editor" : "PDF Editor"
     readonly property color backgroundColor: pdfDocument.darkTheme ? "#20252d" : "#e9edf2"
     readonly property color surfaceColor: pdfDocument.darkTheme ? "#2b323c" : "#ffffff"
     readonly property color panelColor: pdfDocument.darkTheme ? "#343d49" : "#f5f7fa"
@@ -27,9 +27,146 @@ ApplicationWindow {
     palette.buttonText: textColor
     palette.base: surfaceColor
     font.family: "Sans Serif"
+    font.pixelSize: 13
     palette.highlight: "#225a91"
     palette.button: panelColor
     palette.window: surfaceColor
+
+    readonly property color borderColor: pdfDocument.darkTheme ? "#45505e" : "#dce2ea"
+    readonly property color accentColor: pdfDocument.darkTheme ? "#91bfff" : "#185abc"
+    readonly property color accentSurface: pdfDocument.darkTheme ? "#263f61" : "#e8f0fe"
+    property bool showThumbnails: true
+    readonly property bool canEdit: pdfDocument.ready && !pdfDocument.saving && !pdfDocument.additions.editing
+    readonly property bool selectedText: pdfDocument.additions.selectionCount === 1 && root.selectedObject.type === "text"
+    function addText() { textDialog.editing = false; textInput.text = ""; textDialog.loadStyle({}); textDialog.open() }
+    function editText() { textDialog.editing = true; textInput.text = root.selectedObject.text; textDialog.loadStyle(root.selectedObject); textDialog.open() }
+    function applyTextStyle(family, size, bold, italic, underline) {
+        if (canEdit && selectedText)
+            pdfDocument.additions.setTextStyle(pdfDocument.additions.selected, family, size, bold, italic, underline)
+    }
+    component EditorButton: ToolButton {
+        id: control
+        property string hint: text
+        property bool primary: false
+        implicitHeight: 36
+        implicitWidth: Math.max(36, implicitContentWidth + 24)
+        font.pixelSize: 13
+        hoverEnabled: true
+        Accessible.name: hint
+        ToolTip.visible: hovered
+        ToolTip.delay: 600
+        ToolTip.text: Qt.platform.os === "osx" ? hint.replace("Ctrl+", "Command+") : hint
+        contentItem: Text {
+            text: control.text
+            font: control.font
+            color: !control.enabled ? root.mutedColor : control.primary ? "white" : control.checked ? root.accentColor : root.textColor
+            opacity: control.enabled ? 1 : 0.45
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+        }
+        background: Rectangle {
+            radius: 6
+            color: control.primary ? (control.down ? "#174a95" : "#185abc")
+                 : control.checked ? root.accentSurface : control.down || control.hovered ? root.panelColor : "transparent"
+            border.color: control.activeFocus ? root.accentColor : "transparent"
+            opacity: control.enabled ? 1 : 0.55
+        }
+    }
+    menuBar: MenuBar {
+        objectName: "mainMenuBar"
+        delegate: MenuBarItem { objectName: "menu" + text.replace("&", ""); font.pixelSize: 13 }
+        background: Rectangle { color: root.surfaceColor }
+        Menu {
+            objectName: "fileMenu"; title: "&File"
+            MenuItem { text: "Open PDF…"; enabled: !pdfDocument.saving; onTriggered: fileDialog.open() }
+            Menu {
+                id: recentMenu
+                title: "Recent files"
+                Instantiator {
+                    model: pdfDocument.recentDocuments
+                    delegate: MenuItem {
+                        required property var modelData
+                        text: modelData.name
+                        onTriggered: root.openFile(modelData.url)
+                    }
+                    onObjectAdded: function(index, object) { recentMenu.insertItem(index, object) }
+                    onObjectRemoved: function(index, object) { recentMenu.removeItem(object) }
+                }
+                MenuItem { enabled: false; visible: pdfDocument.recentDocuments.length === 0; text: "No recent documents" }
+            }
+            MenuSeparator {}
+            MenuItem { text: "Save a copy…"; enabled: root.canEdit; onTriggered: saveDialog.open() }
+            MenuItem { objectName: "pagesButton"; text: "Organize / export pages…"; enabled: root.canEdit && pdfDocument.formType !== "XFA"; onTriggered: pagesDialog.open() }
+            MenuSeparator {}
+            MenuItem { text: "Print…"; enabled: root.canEdit && !pdfDocument.formBusy; onTriggered: pdfDocument.print() }
+            MenuItem { text: "Print to PDF…"; enabled: root.canEdit && !pdfDocument.formBusy; onTriggered: printSaveDialog.open() }
+            MenuSeparator {}
+            MenuItem { text: "Recover unsaved work…"; enabled: !pdfDocument.ready && !pdfDocument.loading; onTriggered: recoveryDialog.open() }
+            MenuItem { text: "Close document"; enabled: !pdfDocument.saving && (pdfDocument.ready || pdfDocument.loading || pdfDocument.error || pdfDocument.dirty); onTriggered: root.closeDocument() }
+        }
+        Menu {
+            objectName: "editMenu"; title: "&Edit"
+            MenuItem { text: "Undo added content"; enabled: root.canEdit && pdfDocument.additions.canUndo; onTriggered: pdfDocument.additions.undo() }
+            MenuItem { text: "Redo added content"; enabled: root.canEdit && pdfDocument.additions.canRedo; onTriggered: pdfDocument.additions.redo() }
+            MenuSeparator {}
+            MenuItem { objectName: "cutObjectsButton"; text: "Cut added content"; enabled: root.canEdit && pdfDocument.additions.selectionCount > 0; onTriggered: pdfDocument.additions.cutSelection() }
+            MenuItem { objectName: "copyObjectsButton"; text: "Copy added content"; enabled: root.canEdit && pdfDocument.additions.selectionCount > 0; onTriggered: pdfDocument.additions.copySelection() }
+            MenuItem { objectName: "pasteObjectsButton"; text: "Paste"; enabled: root.canEdit; onTriggered: pdfDocument.additions.paste(pdfDocument.currentPage - 1) }
+            MenuItem { objectName: "selectAllObjectsButton"; text: "Select all added content on this page"; enabled: root.canEdit; onTriggered: pdfDocument.additions.selectAll(pdfDocument.currentPage - 1) }
+            MenuSeparator {}
+            MenuItem { text: "Find text…"; enabled: root.canEdit; onTriggered: searchDialog.open() }
+        }
+        Menu {
+            objectName: "viewMenu"; title: "&View"
+            MenuItem { text: "Page thumbnails"; checkable: true; checked: root.showThumbnails; onTriggered: root.showThumbnails = checked }
+            MenuItem { text: "Fit page"; enabled: pdfDocument.ready; onTriggered: pdfDocument.fitToPage() }
+            MenuItem { text: "Fit width"; enabled: pdfDocument.ready; onTriggered: pdfDocument.fitToWidth() }
+            MenuSeparator {}
+            MenuItem { text: "Dark appearance"; checkable: true; checked: pdfDocument.darkTheme; onTriggered: pdfDocument.darkTheme = checked }
+            MenuItem { text: "Full screen"; checkable: true; checked: root.visibility === Window.FullScreen; onTriggered: root.visibility = checked ? Window.FullScreen : Window.Windowed }
+        }
+        Menu {
+            title: "&Insert"; enabled: root.canEdit
+            MenuItem { text: "Text box…"; onTriggered: root.addText() }
+            MenuItem { text: "Image…"; onTriggered: { imageDialog.signature = false; imageDialog.open() } }
+            MenuItem { text: "Signature…"; onTriggered: signDialog.open() }
+            MenuSeparator {}
+            MenuItem { text: "Checkmark…"; onTriggered: root.chooseGraphic("checkmark") }
+            MenuItem { text: "Highlight area…"; onTriggered: root.chooseGraphic("highlight") }
+            MenuItem { text: "Shape or drawing…"; onTriggered: drawMenu.popup() }
+        }
+        Menu {
+            title: "F&orm"; enabled: root.canEdit && pdfDocument.formType !== "PDF"
+            MenuItem { text: "All fields…"; enabled: pdfDocument.formHelpersAvailable; onTriggered: fieldsDialog.open() }
+            MenuItem { text: "Check required fields…"; enabled: pdfDocument.formHelpersAvailable; onTriggered: { root.showValidation = true; pdfDocument.validateForm() } }
+            MenuSeparator {}
+            MenuItem { objectName: "resetFieldButton"; text: "Reset selected field…"; enabled: pdfDocument.formHelpersAvailable && pdfDocument.focusedField.id !== undefined && !pdfDocument.focusedField.readOnly && pdfDocument.focusedField.type >= 2 && pdfDocument.focusedField.type <= 6; onTriggered: { resetDialog.fieldId = pdfDocument.focusedField.id; resetDialog.open() } }
+            MenuItem { text: "Reset form…"; enabled: pdfDocument.canResetForm; onTriggered: { resetDialog.fieldId = -1; resetDialog.open() } }
+        }
+        Menu {
+            title: "&Help"
+            MenuItem { text: "How to edit a PDF"; onTriggered: helpDialog.open() }
+        }
+    }
+    Dialog {
+        id: helpDialog
+        objectName: "helpDialog"
+        title: "Editing your PDF"
+        anchors.centerIn: parent
+        width: Math.min(480, root.width - 40)
+        modal: true
+        standardButtons: Dialog.Close
+        ColumnLayout {
+            width: parent.width; spacing: 16
+            Label { text: "Fill a form"; font.bold: true }
+            Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: "Click a highlighted field and type. Tab moves to the next field. Use Check form to review required fields." }
+            Label { text: "Add something to a page"; font.bold: true }
+            Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: "Choose Add text, Image, Sign or Draw, then click the page. Select added content to move, resize or format it. Original PDF text stays as it is." }
+            Label { text: "Keep your changes"; font.bold: true }
+            Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: "Save a copy writes a new PDF and keeps your original safe. You can move and format added objects during this session; after reopening a saved PDF they are part of the page." }
+            Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; color: root.mutedColor; text: "Shortcuts: Ctrl+O open · Ctrl+S save a copy · Ctrl+F find · Ctrl+P print. Use Command instead of Ctrl on Mac. Undo/redo applies to added content; signatures are visual marks." }
+        }
+    }
 
     DropArea {
         anchors.fill: parent
@@ -41,7 +178,7 @@ ApplicationWindow {
         }
     }
     Shortcut { sequence: "F11"; onActivated: root.visibility = root.visibility === Window.FullScreen ? Window.Windowed : Window.FullScreen }
-    Shortcut { sequence: "Ctrl+F"; enabled: pdfDocument.ready && !pdfDocument.saving; onActivated: searchDialog.open() }
+    Shortcut { sequences: [StandardKey.Find]; enabled: root.canEdit && !root.anyDialogVisible; onActivated: searchDialog.open() }
     Dialog {
         id: searchDialog
         objectName: "searchDialog"
@@ -70,19 +207,7 @@ ApplicationWindow {
             }
         }
     }
-    Menu {
-        id: documentMenu
-        MenuItem { text: "Recent documents"; onTriggered: recentMenu.popup() }
-        MenuItem { objectName: "pagesButton"; text: "Export pages…"; enabled: pdfDocument.ready && !pdfDocument.saving && !pdfDocument.additions.editing && pdfDocument.formType !== "XFA"; onTriggered: pagesDialog.open() }
-        MenuItem { text: "Print…"; enabled: pdfDocument.ready && !pdfDocument.saving && !pdfDocument.formBusy && !pdfDocument.additions.editing; onTriggered: pdfDocument.print() }
-        MenuItem { text: "Print to PDF…"; enabled: pdfDocument.ready && !pdfDocument.saving && !pdfDocument.formBusy && !pdfDocument.additions.editing; onTriggered: printSaveDialog.open() }
-        MenuItem { text: "Find text…"; enabled: pdfDocument.ready && !pdfDocument.saving; onTriggered: searchDialog.open() }
-        MenuItem { text: "Recover previous session…"; enabled: !pdfDocument.ready && !pdfDocument.loading; onTriggered: recoveryDialog.open() }
-        MenuSeparator {}
-        MenuItem { text: pdfDocument.darkTheme ? "Light theme" : "Dark theme"; onTriggered: pdfDocument.darkTheme = !pdfDocument.darkTheme }
-        MenuItem { text: "Full screen (F11)"; onTriggered: root.visibility = root.visibility === Window.FullScreen ? Window.Windowed : Window.FullScreen }
-    }
-    Shortcut { sequence: "Ctrl+P"; enabled: pdfDocument.ready && !pdfDocument.saving; onActivated: pdfDocument.print() }
+    Shortcut { sequences: [StandardKey.Print]; enabled: root.canEdit && !root.anyDialogVisible; onActivated: pdfDocument.print() }
     Dialog {
         id: recoveryDialog
         title: "Recover previous session"
@@ -106,20 +231,6 @@ ApplicationWindow {
             }
         }
     }
-    Menu {
-        id: recentMenu
-        Instantiator {
-            model: pdfDocument.recentDocuments
-            delegate: MenuItem {
-                required property var modelData
-                text: modelData.name
-                onTriggered: root.openFile(modelData.url)
-            }
-            onObjectAdded: function(index, object) { recentMenu.insertItem(index, object) }
-            onObjectRemoved: function(index, object) { recentMenu.removeItem(object) }
-        }
-        MenuItem { enabled: false; visible: pdfDocument.recentDocuments.length === 0; text: "No recent documents" }
-    }
     function goToPage(page) {
         pdfDocument.currentPage = page
         pageView.positionViewAtIndex(pdfDocument.currentPage - 1, ListView.Beginning)
@@ -140,6 +251,7 @@ ApplicationWindow {
     }
     property url pendingImage
     property var selectedObject: ({})
+    property bool saveBeforeContinuing: false
     property var discardAction
     function guarded(action) {
         if (pdfDocument.saving) return
@@ -158,12 +270,16 @@ ApplicationWindow {
     Dialog {
         id: discardDialog
         objectName: "discardDialog"
-        title: "Discard changes?"
+        title: "Save your changes?"
         anchors.centerIn: parent
+        width: Math.min(440, root.width - 40)
         modal: true
-        standardButtons: Dialog.Discard | Dialog.Cancel
-        Label { text: "Form edits or added content have not been saved. Discard changes to continue?" }
-        onDiscarded: { const action = root.discardAction; root.discardAction = null; action() }
+        standardButtons: Dialog.Save | Dialog.Discard | Dialog.Cancel
+        Label { width: parent.width; wrapMode: Text.WordWrap; text: "Your changes haven't been saved. Save a copy to keep them, or discard them to continue." }
+        onOpened: standardButton(Dialog.Save).text = "Save a copy"
+        onAccepted: { root.saveBeforeContinuing = true; saveDialog.open() }
+        onRejected: root.discardAction = null
+        onDiscarded: { const action = root.discardAction; root.discardAction = null; if (action) action() }
     }
     Dialog {
         id: graphicDialog
@@ -223,7 +339,7 @@ ApplicationWindow {
             italicText.checked = object.italic || false
             underlineText.checked = object.underline || false
         }
-        onOpened: { textInput.forceActiveFocus(); validateText() }
+        onOpened: { standardButton(Dialog.Ok).text = editing ? "Apply changes" : "Add to page"; textInput.forceActiveFocus(); validateText() }
         ColumnLayout {
             width: parent.width
             RowLayout {
@@ -249,6 +365,7 @@ ApplicationWindow {
                 CheckBox { id: italicText; objectName: "textItalic"; text: "Italic"; font.italic: true }
                 CheckBox { id: underlineText; objectName: "textUnderline"; text: "Underline"; font.underline: true }
             }
+            Label { text: textDialog.editing ? "Update your text below." : "Enter your text, then click the page to place it."; Layout.fillWidth: true; wrapMode: Text.WordWrap; color: root.mutedColor }
             ScrollView {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 160
@@ -292,7 +409,7 @@ ApplicationWindow {
         nameFilters: ["Images (*.png *.jpg *.jpeg *.webp *.bmp)"]
         onAccepted: { root.pendingImage = selectedFile; root.placement = signature ? "signature" : "image" }
     }
-    Shortcut { sequence: "Escape"; enabled: !root.formPopupVisible && !root.workflowPopupVisible && !textDialog.visible && !graphicDialog.visible && !imageDialog.visible && !saveDialog.visible && !discardDialog.visible && !fileDialog.visible && !saveFailure.visible && !(root.activeFocusItem instanceof FormInput); onActivated: { root.placement = ""; pdfDocument.additions.cancelEdit(); pdfDocument.additions.select(-1) } }
+    Shortcut { sequence: "Escape"; enabled: !helpDialog.visible && !root.formPopupVisible && !root.workflowPopupVisible && !textDialog.visible && !graphicDialog.visible && !imageDialog.visible && !saveDialog.visible && !discardDialog.visible && !fileDialog.visible && !saveFailure.visible && !(root.activeFocusItem instanceof FormInput); onActivated: { root.placement = ""; pdfDocument.additions.cancelEdit(); pdfDocument.additions.select(-1) } }
     Connections {
         target: pdfDocument.additions
         function onChanged() { root.selectedObject = pdfDocument.additions.object(pdfDocument.additions.selected) }
@@ -451,10 +568,11 @@ ApplicationWindow {
         id: saveDialog
         objectName: "saveDialog"
         currentFolder: root.initialFolder
-        title: "Save a new PDF"
+        title: "Save a copy"
         fileMode: FileDialog.SaveFile
         nameFilters: ["PDF documents (*.pdf)"]
         defaultSuffix: "pdf"
+        onRejected: { root.saveBeforeContinuing = false; root.discardAction = null }
         onAccepted: pdfDocument.saveAs(selectedFile)
     }
     Dialog {
@@ -506,6 +624,7 @@ ApplicationWindow {
     }
     Dialog {
         id: saveFailure
+        objectName: "saveFailureDialog"
         title: "Couldn't save the PDF"
         anchors.centerIn: parent
         modal: true
@@ -515,18 +634,27 @@ ApplicationWindow {
     }
     Connections {
         target: pdfDocument
-        function onSaveFinished(success) { if (!success && pdfDocument.saveError) saveFailure.open() }
+        function onSaveFinished(success) {
+            if (root.saveBeforeContinuing) {
+                root.saveBeforeContinuing = false
+                const action = root.discardAction
+                root.discardAction = null
+                if (success && !pdfDocument.dirty && action) action()
+            }
+            if (!success && pdfDocument.saveError) saveFailure.open()
+        }
     }
-    Shortcut { sequence: "Ctrl+Shift+S"; enabled: pdfDocument.ready && !pdfDocument.saving && !pdfDocument.additions.editing && !root.formPopupVisible; onActivated: saveDialog.open() }
-    Shortcut { sequences: [StandardKey.Open]; onActivated: fileDialog.open() }
-    Shortcut { sequences: [StandardKey.Close]; onActivated: root.closeDocument() }
+    Shortcut { sequences: [StandardKey.Save, StandardKey.SaveAs]; enabled: root.canEdit && !root.anyDialogVisible; onActivated: saveDialog.open() }
+    Shortcut { sequences: [StandardKey.Open]; enabled: !pdfDocument.saving && !root.anyDialogVisible; onActivated: fileDialog.open() }
+    Shortcut { sequences: [StandardKey.Close]; enabled: !pdfDocument.saving && !root.anyDialogVisible; onActivated: root.closeDocument() }
     Shortcut { sequence: "Ctrl++"; onActivated: pdfDocument.zoom *= 1.2 }
     Shortcut { sequence: "Ctrl+-"; onActivated: pdfDocument.zoom /= 1.2 }
     Shortcut { sequence: "Ctrl+0"; onActivated: pdfDocument.fitToPage() }
-    property bool workflowPopupVisible: pagesDialog.visible || pagesSaveDialog.visible || mergeDialog.visible || printSaveDialog.visible || searchDialog.visible || recoveryDialog.visible
+    property bool workflowPopupVisible: helpDialog.visible || pagesDialog.visible || pagesSaveDialog.visible || mergeDialog.visible || printSaveDialog.visible || searchDialog.visible || recoveryDialog.visible
     property bool formPopupVisible: fieldsDialog.visible || validationDialog.visible || resetDialog.visible || choiceDialog.visible || dateDialog.visible || signDialog.visible
+    readonly property bool anyDialogVisible: root.formPopupVisible || root.workflowPopupVisible || textDialog.visible || graphicDialog.visible || imageDialog.visible || fileDialog.visible || saveDialog.visible || discardDialog.visible || saveFailure.visible
     property bool additionHistoryShortcuts: pdfDocument.ready && !pdfDocument.saving
-        && !pdfDocument.additions.editing && !graphicDialog.visible && !root.formPopupVisible && !root.workflowPopupVisible
+        && !pdfDocument.additions.editing && !graphicDialog.visible && !helpDialog.visible && !root.formPopupVisible && !root.workflowPopupVisible
         && !textDialog.visible && !imageDialog.visible && !saveDialog.visible && !discardDialog.visible && !fileDialog.visible && !saveFailure.visible
         && !(root.activeFocusItem instanceof FormInput)
         && !(root.activeFocusItem && typeof root.activeFocusItem.undo === "function")
@@ -547,54 +675,54 @@ ApplicationWindow {
     Shortcut { sequence: "Shift+Down"; enabled: root.additionHistoryShortcuts && pdfDocument.additions.selectionCount > 0; onActivated: pdfDocument.additions.nudgeSelection(0, 10) }
 
     header: ToolBar {
-        implicitHeight: 56
-        background: Rectangle { color: root.surfaceColor; border.color: "#d5dce5" }
+        implicitHeight: 58
+        background: Rectangle { color: root.surfaceColor; border.color: root.borderColor }
         RowLayout {
-            anchors.fill: parent
-            anchors.margins: 10
-            spacing: 10
-            Label { text: "PDF FORM EDITOR"; font.pixelSize: 13; font.bold: true; color: root.textColor; Layout.rightMargin: 12 }
-            Button { objectName: "openButton"; text: "Open PDF"; enabled: !pdfDocument.saving; onClicked: fileDialog.open(); Accessible.name: "Open PDF" }
-            Button { objectName: "saveButton"; text: pdfDocument.saving ? "Saving…" : "Save As"; enabled: pdfDocument.ready && !pdfDocument.saving && !pdfDocument.additions.editing; onClicked: saveDialog.open() }
-            Button { text: "Document…"; onClicked: documentMenu.popup() }
-            Button { objectName: "closeButton"; text: "Close"; enabled: !pdfDocument.saving && (pdfDocument.ready || pdfDocument.loading || pdfDocument.error || pdfDocument.dirty); onClicked: root.closeDocument() }
-            Item { Layout.fillWidth: true }
-            Button { objectName: "zoomOutButton"; text: "−"; enabled: pdfDocument.ready && pdfDocument.zoom > 0.25; onClicked: pdfDocument.zoom /= 1.2; Accessible.name: "Zoom out" }
-            Label { objectName: "zoomLabel"; text: Math.round(pdfDocument.zoom * 100) + "%"; horizontalAlignment: Text.AlignHCenter; Layout.preferredWidth: 48; visible: pdfDocument.ready }
-            Button { objectName: "zoomInButton"; text: "+"; enabled: pdfDocument.ready && pdfDocument.zoom < 3; onClicked: pdfDocument.zoom *= 1.2; Accessible.name: "Zoom in" }
-            Button { objectName: "fitButton"; text: "Fit page"; enabled: pdfDocument.ready; highlighted: pdfDocument.fitting; onClicked: pdfDocument.fitToPage() }
-            Button { text: "Fit width"; enabled: pdfDocument.ready; onClicked: pdfDocument.fitToWidth() }
+            anchors.fill: parent; anchors.margins: 10; spacing: 6
+            EditorButton { objectName: "openButton"; text: "Open"; hint: "Open a PDF (Ctrl+O)"; enabled: !pdfDocument.saving; onClicked: fileDialog.open() }
+            Rectangle { Layout.preferredWidth: 1; Layout.preferredHeight: 24; color: root.borderColor }
+            EditorButton { objectName: "undoAdditionsButton"; text: "↶"; font.pixelSize: 22; hint: "Undo added content (Ctrl+Z)"; enabled: root.canEdit && pdfDocument.additions.canUndo; onClicked: pdfDocument.additions.undo() }
+            EditorButton { objectName: "redoAdditionsButton"; text: "↷"; font.pixelSize: 22; hint: "Redo added content"; enabled: root.canEdit && pdfDocument.additions.canRedo; onClicked: pdfDocument.additions.redo() }
+            Label { textFormat: Text.PlainText; text: pdfDocument.ready ? pdfDocument.fileName : "PDF Editor"; color: root.textColor; font.bold: true; elide: Text.ElideMiddle; Layout.fillWidth: true; Layout.leftMargin: 12 }
+            Label { objectName: "documentSaveState"; visible: pdfDocument.ready && root.width >= 900; text: pdfDocument.dirty ? "Unsaved changes" : pdfDocument.savedPath ? "Copy saved" : "Original document"; color: pdfDocument.dirty ? root.accentColor : root.mutedColor; font.pixelSize: 12 }
+            EditorButton { objectName: "findButton"; text: "Find"; hint: "Find text in the PDF (Ctrl+F)"; enabled: root.canEdit; onClicked: searchDialog.open() }
+            EditorButton { objectName: "saveButton"; text: pdfDocument.saving ? "Saving…" : "Save a copy"; hint: "Save your edits to a new PDF (Ctrl+S)"; primary: true; enabled: root.canEdit; onClicked: saveDialog.open() }
+            EditorButton { objectName: "closeButton"; text: "×"; font.pixelSize: 20; hint: "Close document"; enabled: !pdfDocument.saving && (pdfDocument.ready || pdfDocument.loading || pdfDocument.error || pdfDocument.dirty); onClicked: root.closeDocument() }
         }
     }
     footer: ToolBar {
-        implicitHeight: 52
-        background: Rectangle { color: root.surfaceColor; border.color: "#d5dce5" }
+        visible: pdfDocument.ready
+        implicitHeight: 44
+        background: Rectangle { color: root.surfaceColor; border.color: root.borderColor }
         RowLayout {
-            anchors.fill: parent
-            anchors.margins: 8
-            Label { textFormat: Text.PlainText; text: pdfDocument.loading ? "Opening PDF…" : pdfDocument.ready ? pdfDocument.fileName : "Ready"; color: root.mutedColor; elide: Text.ElideMiddle; Layout.fillWidth: true }
-            Label { text: pdfDocument.formType; visible: pdfDocument.ready; color: root.mutedColor }
-            ToolButton { objectName: "undoAdditionsButton"; text: "Undo"; enabled: pdfDocument.ready && !pdfDocument.saving && pdfDocument.additions.canUndo; Accessible.name: "Undo added content"; onClicked: pdfDocument.additions.undo() }
-            ToolButton { objectName: "redoAdditionsButton"; text: "Redo"; enabled: pdfDocument.ready && !pdfDocument.saving && pdfDocument.additions.canRedo; Accessible.name: "Redo added content"; onClicked: pdfDocument.additions.redo() }
-            Button { objectName: "previousButton"; text: "Previous"; enabled: pdfDocument.ready && pdfDocument.currentPage > 1; onClicked: root.goToPage(pdfDocument.currentPage - 1) }
-            SpinBox { objectName: "pageNumber"; from: 1; to: Math.max(1, pdfDocument.pageCount); value: pdfDocument.currentPage; editable: true; enabled: pdfDocument.ready; onValueModified: root.goToPage(value); Accessible.name: "Page number" }
+            anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 4
+            EditorButton { objectName: "thumbnailsButton"; text: "Pages"; hint: "Show or hide page thumbnails"; checkable: true; checked: root.showThumbnails; enabled: pdfDocument.ready; onClicked: root.showThumbnails = checked }
+            Label { objectName: "statusLabel"; textFormat: Text.PlainText; text: pdfDocument.loading ? "Opening…" : pdfDocument.saving ? "Saving…" : pdfDocument.dirty ? "Unsaved changes" : pdfDocument.ready ? "Ready" : "Open a PDF to get started"; color: root.mutedColor; elide: Text.ElideRight; Layout.fillWidth: true }
+            EditorButton { objectName: "previousButton"; text: "‹"; font.pixelSize: 22; hint: "Previous page"; enabled: pdfDocument.ready && pdfDocument.currentPage > 1; onClicked: root.goToPage(pdfDocument.currentPage - 1) }
+            SpinBox { objectName: "pageNumber"; implicitHeight: 32; implicitWidth: 100; from: 1; to: Math.max(1, pdfDocument.pageCount); value: pdfDocument.currentPage; editable: true; enabled: pdfDocument.ready; onValueModified: root.goToPage(value); Accessible.name: "Page number" }
             Label { text: "of " + pdfDocument.pageCount; color: root.mutedColor }
-            Button { objectName: "nextButton"; text: "Next"; enabled: pdfDocument.ready && pdfDocument.currentPage < pdfDocument.pageCount; onClicked: root.goToPage(pdfDocument.currentPage + 1) }
+            EditorButton { objectName: "nextButton"; text: "›"; font.pixelSize: 22; hint: "Next page"; enabled: pdfDocument.ready && pdfDocument.currentPage < pdfDocument.pageCount; onClicked: root.goToPage(pdfDocument.currentPage + 1) }
+            Rectangle { Layout.preferredWidth: 1; Layout.preferredHeight: 22; color: root.borderColor; Layout.leftMargin: 8; Layout.rightMargin: 8 }
+            EditorButton { objectName: "zoomOutButton"; text: "−"; hint: "Zoom out"; enabled: pdfDocument.ready && pdfDocument.zoom > 0.25; onClicked: pdfDocument.zoom /= 1.2 }
+            Label { objectName: "zoomLabel"; text: Math.round(pdfDocument.zoom * 100) + "%"; horizontalAlignment: Text.AlignHCenter; Layout.preferredWidth: 42; color: root.mutedColor }
+            EditorButton { objectName: "zoomInButton"; text: "+"; hint: "Zoom in"; enabled: pdfDocument.ready && pdfDocument.zoom < 3; onClicked: pdfDocument.zoom *= 1.2 }
+            EditorButton { objectName: "fitButton"; text: "Fit page"; enabled: pdfDocument.ready; checked: pdfDocument.fitting; onClicked: pdfDocument.fitToPage() }
+            EditorButton { text: "Fit width"; visible: root.width >= 850; enabled: pdfDocument.ready; onClicked: pdfDocument.fitToWidth() }
         }
     }
     RowLayout {
         anchors.fill: parent
         spacing: 0
         Rectangle {
-            visible: pdfDocument.ready
-            Layout.preferredWidth: 170
+            visible: pdfDocument.ready && root.showThumbnails
+            Layout.preferredWidth: root.width < 900 ? 144 : 170
             Layout.fillHeight: true
             color: root.panelColor
-            border.color: "#d5dce5"
+            border.color: root.borderColor
             ColumnLayout {
                 anchors.fill: parent
                 anchors.margins: 12
-                Label { text: "PAGES"; font.bold: true; font.pixelSize: 11; color: root.mutedColor; Layout.topMargin: 4; Layout.bottomMargin: 6 }
+                Label { text: "Pages"; font.bold: true; font.pixelSize: 13; color: root.mutedColor; Layout.topMargin: 4; Layout.bottomMargin: 6 }
                 ListView {
                     id: thumbnails
                     objectName: "thumbnailView"
@@ -638,40 +766,23 @@ ApplicationWindow {
         Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
+            Rectangle {
+                anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right
+                height: contextTools.y + contextTools.height + 6
+                color: root.surfaceColor; visible: pdfDocument.ready
+            }
             RowLayout {
                 id: contentTools
-                anchors.top: parent.top
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.margins: 8
-                height: 42
-                visible: pdfDocument.ready
-                Button { objectName: "addTextButton"; text: "Text"; onClicked: { textDialog.editing = false; textInput.text = ""; textDialog.loadStyle({}); textDialog.open() } }
-                Button { objectName: "addImageButton"; text: "Image"; onClicked: { imageDialog.signature = false; imageDialog.open() } }
-                Button { objectName: "addSignatureButton"; text: "Signature"; onClicked: { imageDialog.signature = true; imageDialog.open() } }
-                Button { objectName: "editTextButton"; text: "Edit text"; visible: pdfDocument.additions.selectionCount === 1 && (root.selectedObject.type === "text" || root.selectedObject.type === "stamp"); onClicked: { textDialog.editing = true; textInput.text = root.selectedObject.text; textDialog.loadStyle(root.selectedObject); textDialog.open() } }
-                Button { objectName: "deleteObjectButton"; text: "Delete"; enabled: pdfDocument.additions.selected >= 0; onClicked: pdfDocument.additions.removeSelected() }
-                Label { Layout.fillWidth: true; elide: Text.ElideRight; textFormat: Text.PlainText; text: pdfDocument.error || pdfDocument.formError || (root.placement ? "Click a page to place " + root.placement + " · Esc cancels" : pdfDocument.additions.error || (pdfDocument.dirty ? "Unsaved changes · Save As keeps edits" : pdfDocument.savedPath ? "Saved · " + pdfDocument.savedPath : pdfDocument.formType !== "PDF" ? "Click a field · Tab moves focus · Save As keeps edits" : "Add content to a page")); color: root.mutedColor }
-            }
-            Flickable {
-                id: extraToolView
-                anchors.top: contentTools.bottom
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.margins: 8
-                height: 40
-                clip: true
-                contentWidth: extraTools.implicitWidth
-                contentHeight: height
-                visible: pdfDocument.ready
-                enabled: !pdfDocument.saving && !pdfDocument.additions.editing
-                flickableDirection: Flickable.HorizontalFlick
-                ScrollBar.horizontal: ScrollBar {}
-                RowLayout {
-                    id: extraTools
-                    height: parent.height
-                    ToolButton {
-                        objectName: "drawToolsButton"; text: "Draw ▾"; onClicked: drawMenu.popup()
+                anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right
+                anchors.margins: 8; height: 40; spacing: 4
+                visible: pdfDocument.ready; enabled: root.canEdit
+                EditorButton { objectName: "selectToolButton"; text: "Select"; hint: "Select, move or resize added content"; checked: root.placement === ""; onClicked: root.placement = "" }
+                Rectangle { Layout.preferredWidth: 1; Layout.preferredHeight: 22; color: root.borderColor; Layout.leftMargin: 4; Layout.rightMargin: 4 }
+                EditorButton { objectName: "addTextButton"; text: "Add text"; hint: "Add a new text box to the page"; checked: root.placement === "text"; onClicked: root.addText() }
+                EditorButton { objectName: "addImageButton"; text: "Image"; hint: "Add an image"; checked: root.placement === "image"; onClicked: { imageDialog.signature = false; imageDialog.open() } }
+                EditorButton { objectName: "addSignatureButton"; text: "Sign"; hint: "Draw or import a signature"; checked: root.placement === "signature"; onClicked: signDialog.open() }
+                EditorButton {
+                    objectName: "drawToolsButton"; text: "Draw ▾"; hint: "Draw, highlight, add shapes or a checkmark"; onClicked: drawMenu.popup()
                         Menu {
                             id: drawMenu
                             MenuItem { objectName: "checkmarkTool"; text: "Checkmark"; onTriggered: root.chooseGraphic("checkmark") }
@@ -682,14 +793,26 @@ ApplicationWindow {
                             MenuItem { objectName: "lineTool"; text: "Line"; onTriggered: root.chooseGraphic("line") }
                             MenuItem { objectName: "stampTool"; text: "Stamp"; onTriggered: root.chooseGraphic("stamp") }
                         }
-                    }
-                    ToolButton { objectName: "copyObjectsButton"; text: "Copy"; enabled: pdfDocument.additions.selectionCount > 0; onClicked: pdfDocument.additions.copySelection() }
-                    ToolButton { objectName: "cutObjectsButton"; text: "Cut"; enabled: pdfDocument.additions.selectionCount > 0; onClicked: pdfDocument.additions.cutSelection() }
-                    ToolButton { objectName: "pasteObjectsButton"; text: "Paste"; onClicked: pdfDocument.additions.paste(pdfDocument.currentPage - 1) }
-                    ToolButton { objectName: "selectAllObjectsButton"; text: "Select all"; onClicked: pdfDocument.additions.selectAll(pdfDocument.currentPage - 1) }
-                    ToolButton { objectName: "selectAreaButton"; text: "Select area"; onClicked: root.placement = "selection" }
-                    ToolButton {
-                        objectName: "alignObjectsButton"; text: "Align ▾"; enabled: pdfDocument.additions.selectionCount > 1; onClicked: alignMenu.popup()
+                }
+                Item { Layout.fillWidth: true }
+                EditorButton { objectName: "organizePagesButton"; text: "Organize pages"; visible: root.width >= 1000; enabled: pdfDocument.formType !== "XFA"; onClicked: pagesDialog.open() }
+            }
+            RowLayout {
+                id: contextTools
+                anchors.top: contentTools.bottom; anchors.left: parent.left; anchors.right: parent.right
+                anchors.leftMargin: 8; anchors.rightMargin: 8; height: 38; spacing: 4
+                visible: pdfDocument.ready; enabled: root.canEdit
+                EditorButton { objectName: "selectAreaButton"; text: "Select area"; hint: "Drag around added objects to select them together"; visible: !root.placement; checked: root.placement === "selection"; onClicked: root.placement = "selection" }
+                Label { objectName: "toolHint"; textFormat: Text.PlainText; Layout.fillWidth: true; elide: Text.ElideRight; color: root.placement ? root.accentColor : root.mutedColor; font.pixelSize: 12; text: pdfDocument.error || pdfDocument.formError || pdfDocument.additions.error || (root.placement ? (root.placement === "selection" ? "Drag around the objects to select" : root.placement === "text" || root.placement === "image" || root.placement === "signature" || root.placement === "stamp" || root.placement === "checkmark" ? "Click the page to place " + root.placement : "Drag on the page to draw " + root.placement) : pdfDocument.additions.selectionCount > 1 ? pdfDocument.additions.selectionCount + " objects selected" : pdfDocument.additions.selectionCount === 1 ? (root.selectedObject.type === "text" ? "Text box selected" : "Object selected") : pdfDocument.formType !== "PDF" ? "Click a highlighted field to fill in your form" : "Choose a tool above, then click the page") }
+                EditorButton { objectName: "cancelToolButton"; text: "Cancel"; visible: !!root.placement; hint: "Cancel this tool (Esc)"; onClicked: root.placement = "" }
+                ComboBox { objectName: "selectionFontFamily"; visible: root.selectedText && root.width >= 1000 && !root.placement; Layout.preferredWidth: 150; implicitHeight: 32; model: pdfDocument.additions.fontFamilies; currentIndex: Math.max(0, pdfDocument.additions.fontFamilies.indexOf(root.selectedObject.fontFamily || "Sans Serif")); Accessible.name: "Selected text font"; onActivated: root.applyTextStyle(currentText, root.selectedObject.fontSize, root.selectedObject.bold, root.selectedObject.italic, root.selectedObject.underline) }
+                SpinBox { objectName: "selectionFontSize"; visible: root.selectedText && root.width >= 1000 && !root.placement; implicitWidth: 100; implicitHeight: 32; from: 6; to: 144; editable: true; value: root.selectedObject.fontSize || 18; Accessible.name: "Selected text size in points"; onValueModified: root.applyTextStyle(root.selectedObject.fontFamily, value, root.selectedObject.bold, root.selectedObject.italic, root.selectedObject.underline) }
+                EditorButton { objectName: "selectionBold"; text: "B"; hint: "Bold"; font.bold: true; visible: root.selectedText && !root.placement; checkable: true; checked: root.selectedObject.bold || false; onClicked: root.applyTextStyle(root.selectedObject.fontFamily, root.selectedObject.fontSize, checked, root.selectedObject.italic, root.selectedObject.underline) }
+                EditorButton { objectName: "selectionItalic"; text: "I"; hint: "Italic"; font.italic: true; visible: root.selectedText && !root.placement; checkable: true; checked: root.selectedObject.italic || false; onClicked: root.applyTextStyle(root.selectedObject.fontFamily, root.selectedObject.fontSize, root.selectedObject.bold, checked, root.selectedObject.underline) }
+                EditorButton { objectName: "selectionUnderline"; text: "U"; hint: "Underline"; font.underline: true; visible: root.selectedText && !root.placement; checkable: true; checked: root.selectedObject.underline || false; onClicked: root.applyTextStyle(root.selectedObject.fontFamily, root.selectedObject.fontSize, root.selectedObject.bold, root.selectedObject.italic, checked) }
+                EditorButton { objectName: "editTextButton"; text: "Edit text"; visible: !root.placement && pdfDocument.additions.selectionCount === 1 && (root.selectedObject.type === "text" || root.selectedObject.type === "stamp"); onClicked: root.editText() }
+                EditorButton {
+                    objectName: "alignObjectsButton"; text: "Align ▾"; visible: !root.placement && pdfDocument.additions.selectionCount > 1; onClicked: alignMenu.popup()
                         Menu {
                             id: alignMenu
                             MenuItem { objectName: "alignLeft"; text: "Left"; onTriggered: pdfDocument.additions.alignSelection("left") }
@@ -699,48 +822,44 @@ ApplicationWindow {
                             MenuItem { text: "Vertical center"; onTriggered: pdfDocument.additions.alignSelection("middle") }
                             MenuItem { text: "Bottom"; onTriggered: pdfDocument.additions.alignSelection("bottom") }
                         }
-                    }
-                    ToolButton { objectName: "appearanceButton"; text: "Style…"; enabled: pdfDocument.additions.selectionCount === 1 && root.selectedObject.type !== "image" && root.selectedObject.type !== "signature"; onClicked: {
-                        graphicDialog.editing = true; graphicDialog.kind = root.selectedObject.type
-                        inkColor.currentIndex = Math.max(0, root.inkColors.indexOf(root.selectedObject.color.substring(0, 1) + root.selectedObject.color.substring(3)))
-                        inkWidth.value = root.selectedObject.lineWidth; stampText.text = root.selectedObject.text; graphicDialog.open()
-                    } }
-                    Label { text: "Shift-click to select several"; color: root.mutedColor }
                 }
+                EditorButton { objectName: "appearanceButton"; text: "Style…"; visible: !root.placement && pdfDocument.additions.selectionCount === 1 && root.selectedObject.type !== "image" && root.selectedObject.type !== "signature"; onClicked: {
+                    graphicDialog.editing = true; graphicDialog.kind = root.selectedObject.type
+                    inkColor.currentIndex = Math.max(0, root.inkColors.indexOf(root.selectedObject.color.substring(0, 1) + root.selectedObject.color.substring(3)))
+                    inkWidth.value = root.selectedObject.lineWidth; stampText.text = root.selectedObject.text; graphicDialog.open()
+                } }
+                EditorButton { objectName: "deleteObjectButton"; text: "Delete"; visible: !root.placement && pdfDocument.additions.selectionCount > 0; onClicked: pdfDocument.additions.removeSelected() }
             }
-            Flickable {
+            Item {
                 id: formTools
-                anchors.top: extraToolView.bottom; anchors.left: parent.left; anchors.right: parent.right
-                anchors.margins: 8; height: 40; clip: true
+                anchors.top: contextTools.bottom; anchors.left: parent.left; anchors.right: parent.right
+                anchors.margins: 8; height: formToolsRow.implicitHeight
                 visible: pdfDocument.ready && pdfDocument.formType !== "PDF"
                 enabled: !pdfDocument.saving && !pdfDocument.additions.editing
-                contentWidth: formToolsRow.implicitWidth; contentHeight: height
-                flickableDirection: Flickable.HorizontalFlick; ScrollBar.horizontal: ScrollBar {}
-                RowLayout {
-                    id: formToolsRow; height: parent.height
-                    CheckBox { objectName: "highlightFieldsButton"; text: "Show fields"; checked: root.highlightFields; onToggled: { root.highlightFields = checked; pdfDocument.formEvent(pdfDocument.currentPage-1, "highlight", 0, 0, checked ? 1 : 0) } }
-                    ToolButton { objectName: "formFieldsButton"; text: "Fields"; enabled: pdfDocument.formHelpersAvailable; onClicked: fieldsDialog.open() }
-                    ToolButton { objectName: "previousFieldButton"; text: "Previous field"; enabled: pdfDocument.formHelpersAvailable; onClicked: pdfDocument.navigateForm(true) }
-                    ToolButton { objectName: "nextFieldButton"; text: "Next field"; enabled: pdfDocument.formHelpersAvailable; onClicked: pdfDocument.navigateForm() }
-                    ToolButton { objectName: "validateFormButton"; text: "Check form"; enabled: pdfDocument.formHelpersAvailable; onClicked: { root.showValidation = true; pdfDocument.validateForm() } }
-                    ToolButton { objectName: "resetFieldButton"; text: "Reset field"; enabled: pdfDocument.formHelpersAvailable && pdfDocument.focusedField.id !== undefined && !pdfDocument.focusedField.readOnly && pdfDocument.focusedField.type >= 2 && pdfDocument.focusedField.type <= 6; onClicked: { resetDialog.fieldId = pdfDocument.focusedField.id; resetDialog.open() } }
-                    ToolButton { objectName: "resetWholeFormButton"; text: "Reset form"; enabled: pdfDocument.canResetForm; onClicked: { resetDialog.fieldId = -1; resetDialog.open() } }
-                    ToolButton { objectName: "chooseFormValueButton"; text: "Choose value"; visible: (pdfDocument.focusedField.options || []).length > 0; enabled: !!pdfDocument.focusedField.choicesComplete; onClicked: { choiceDialog.field = pdfDocument.focusedField; choiceDialog.open() } }
-                    ToolButton { objectName: "enterFormDateButton"; text: "Date…"; visible: (pdfDocument.focusedField.dateFormat || "").length > 0; onClicked: {
+                Flow {
+                    id: formToolsRow; width: parent.width; spacing: 2
+                    CheckBox { objectName: "highlightFieldsButton"; text: "Highlight fields"; checked: root.highlightFields; onToggled: { root.highlightFields = checked; pdfDocument.formEvent(pdfDocument.currentPage-1, "highlight", 0, 0, checked ? 1 : 0) } }
+                    EditorButton { objectName: "formFieldsButton"; text: "Fields"; enabled: pdfDocument.formHelpersAvailable; onClicked: fieldsDialog.open() }
+                    EditorButton { objectName: "previousFieldButton"; text: "Previous"; enabled: pdfDocument.formHelpersAvailable; onClicked: pdfDocument.navigateForm(true) }
+                    EditorButton { objectName: "nextFieldButton"; text: "Next"; enabled: pdfDocument.formHelpersAvailable; onClicked: pdfDocument.navigateForm() }
+                    EditorButton { objectName: "validateFormButton"; text: "Check form"; enabled: pdfDocument.formHelpersAvailable; onClicked: { root.showValidation = true; pdfDocument.validateForm() } }
+                    EditorButton { objectName: "resetWholeFormButton"; text: "Reset form"; enabled: pdfDocument.canResetForm; onClicked: { resetDialog.fieldId = -1; resetDialog.open() } }
+                    EditorButton { objectName: "chooseFormValueButton"; text: "Choose value"; visible: (pdfDocument.focusedField.options || []).length > 0; enabled: !!pdfDocument.focusedField.choicesComplete; onClicked: { choiceDialog.field = pdfDocument.focusedField; choiceDialog.open() } }
+                    EditorButton { objectName: "enterFormDateButton"; text: "Date…"; visible: (pdfDocument.focusedField.dateFormat || "").length > 0; onClicked: {
                         dateDialog.field = pdfDocument.focusedField
                         const parsed = Date.fromLocaleString(Qt.locale("en_US"), dateDialog.field.value, dateDialog.field.dateFormat.replace("mm", "MM"))
                         const date = isNaN(parsed.getTime()) ? new Date() : parsed
                         dateYear.value = date.getFullYear(); dateMonth.value = date.getMonth()+1; dateDay.value = date.getDate(); dateDialog.open()
                     } }
-                    ToolButton { objectName: "signFormButton"; text: "Sign…"; onClicked: signDialog.open() }
-                    Label { textFormat: Text.PlainText; text: pdfDocument.formHelpersAvailable ? (pdfDocument.focusedField.label || "Tab moves to the next field") : "Native form controls · Tab moves focus"; color: root.mutedColor }
+                    EditorButton { objectName: "signFormButton"; text: "Sign…"; onClicked: signDialog.open() }
+
                 }
             }
             ListView {
                 id: pageView
                 objectName: "pageView"
                 anchors.fill: parent
-                anchors.topMargin: formTools.visible ? 154 : 106
+                anchors.topMargin: formTools.visible ? formTools.y + formTools.height + 8 : contextTools.y + contextTools.height + 8
                 visible: pdfDocument.ready
                 model: pdfDocument.pages
                 clip: true
@@ -929,15 +1048,47 @@ ApplicationWindow {
                     }
                 }
             }
-            ColumnLayout {
+            Rectangle {
                 anchors.centerIn: parent
-                width: Math.min(440, parent.width - 64)
+                width: Math.min(560, parent.width - 48)
+                height: Math.min(parent.height - 32, welcome.implicitHeight + 64)
+                radius: 12; color: root.surfaceColor; border.color: root.borderColor
                 visible: !pdfDocument.ready
-                spacing: 20
-                BusyIndicator { running: pdfDocument.loading; visible: running; Layout.alignment: Qt.AlignHCenter }
-                Label { textFormat: Text.PlainText; text: pdfDocument.loading ? "Opening your document" : pdfDocument.error ? "Couldn't open this document" : "Your documents, in view"; font.pixelSize: 27; color: root.textColor; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap; Layout.fillWidth: true }
-                Label { objectName: "errorLabel"; textFormat: Text.PlainText; text: pdfDocument.error || (pdfDocument.loading ? "" : "Open a PDF to browse its pages, zoom in, and navigate with thumbnails."); color: root.mutedColor; font.pixelSize: 15; wrapMode: Text.WordWrap; horizontalAlignment: Text.AlignHCenter; Layout.fillWidth: true }
-                Button { text: "Open PDF"; visible: !pdfDocument.loading; Layout.alignment: Qt.AlignHCenter; highlighted: true; onClicked: fileDialog.open() }
+                ScrollView {
+                    id: welcomeScroll
+                    anchors.fill: parent; anchors.margins: 32
+                    clip: true
+                    contentWidth: availableWidth
+                    ColumnLayout {
+                        id: welcome
+                        width: welcomeScroll.availableWidth; spacing: 16
+                        BusyIndicator { running: pdfDocument.loading; visible: running; Layout.alignment: Qt.AlignHCenter }
+                        Label { textFormat: Text.PlainText; text: pdfDocument.loading ? "Opening your PDF…" : pdfDocument.error ? "Couldn't open this PDF" : "Make your PDF yours."; font.pixelSize: 28; font.bold: true; color: root.textColor; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+                        Label { objectName: "errorLabel"; textFormat: Text.PlainText; text: pdfDocument.error || (pdfDocument.loading ? "Your document will appear here shortly." : "Fill out a form. Add text, images or a signature.\nSave a copy when you're done."); color: root.mutedColor; font.pixelSize: 15; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+                        RowLayout {
+                            visible: !pdfDocument.loading
+                            EditorButton { objectName: "welcomeOpenButton"; text: "Open a PDF"; primary: true; onClicked: fileDialog.open() }
+                            Label { text: "or drag a PDF into this window"; color: root.mutedColor; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+                        }
+                        Label { text: "Recent files"; font.bold: true; visible: !pdfDocument.loading && pdfDocument.recentDocuments.length > 0; Layout.topMargin: 12 }
+                        Repeater {
+                            model: pdfDocument.loading ? [] : pdfDocument.recentDocuments.slice(0, 3)
+                            delegate: ItemDelegate {
+                                required property var modelData
+                                id: recentFileEntry
+                                objectName: "welcomeRecentFile"
+                                contentItem: Label { text: recentFileEntry.text; textFormat: Text.PlainText; elide: Text.ElideMiddle; verticalAlignment: Text.AlignVCenter }
+                                Layout.fillWidth: true
+                                text: modelData.name
+                                Accessible.name: "Open " + modelData.name
+                                onClicked: root.openFile(modelData.url)
+                                ToolTip.visible: hovered; ToolTip.delay: 600; ToolTip.text: modelData.url
+                            }
+                        }
+                        EditorButton { text: "Recover unsaved work…"; visible: !pdfDocument.loading && pdfDocument.recoveryDocuments.length > 0; onClicked: recoveryDialog.open() }
+                        EditorButton { objectName: "welcomeHelpButton"; text: "How to edit a PDF"; visible: !pdfDocument.loading; onClicked: helpDialog.open() }
+                    }
+                }
             }
         }
     }

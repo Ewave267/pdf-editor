@@ -880,3 +880,33 @@ so the next native CI run rebuilds the dependency once per target.
 Docs: DOCUMENT-WORKFLOW, DESKTOP-EXPERIENCE, ROADMAP, RELEASE, NATIVE-RELEASES,
 FORMS, SAVING, SAFETY, MVP, README and ADR 0007 were updated to distinguish
 implemented functionality from the remaining production acceptance.
+
+## 2026-10-10 — Familiar document-editor interface
+
+- Replaced the catch-all Document menu with File/Edit/View/Insert/Form/Help menus.
+  Kept Open, Undo/Redo, Find and a prominent Save a copy action in the top bar.
+  Standard Save/Save As shortcuts now work on each platform.
+- Reduced toolbar clutter: common insert tools stay visible, while formatting,
+  alignment and deletion appear for selected additions. Added text has direct
+  font/size and bold/italic/underline controls; compact windows keep the full
+  formatting dialog available. Placement tools give click/drag guidance and a
+  visible Cancel action. Sign offers drawing or importing a signature.
+- Added a welcome screen with recent files, drag/drop guidance, recovery when
+  available and brief editing help. Page navigation and zoom share the bottom
+  bar, and thumbnails can be hidden. Form helpers wrap instead of scrolling
+  sideways. Preserved normal window startup with the operating system close button.
+- Unsaved-change prompts now offer Save a copy, Discard and Cancel. Cancelled or
+  failed saves retain the open document and edits; closing/opening continues
+  only after a successful save of all current changes. Modal editing dialogs
+  prevent competing Open/Save/Find/Print shortcuts.
+- Updated README and the desktop, content, forms, saving, viewer, page-workflow
+  and native-release guides to match the controls. No new Qt modules or PDFium
+  rebuild is required. Existing editing/export limits remain unchanged.
+
+Local validation: the complete viewer integration suite passed (40 Qt cases).
+Focused checks also passed after adding modal-shortcut and placement-cancellation
+coverage. Checks exercise mouse/keyboard formatting, selection synchronization,
+recent files, menus, saving before close, cancellation/failure retention and
+controls at 700×480. Reviewed welcome, document, selected-text, compact and dark
+mode screenshots locally. Native Windows/macOS usability still needs desktop
+checks; the previous roadmap batch's native candidate workflow passed.

@@ -1,7 +1,8 @@
-# Step 6 — Save As
+# Step 6 — Save a copy
 
-Use **Save As** or **Ctrl+Shift+S** to choose a new local PDF. The application
-preserves the open document's original content, edited form values and form structures and embeds
+Use **Save a copy** or **Ctrl+S** (also **Ctrl+Shift+S**) to choose a new local
+PDF. Use Command for these shortcuts on macOS. The application preserves the
+open document's original content, edited form values and form structures and embeds
 its text, image, signature, checkmark, drawing, highlight, shape and stamp
 additions in the new PDF. Text uses embedded fonts; paths stay vector graphics,
 and images use lossless encoding. Highlights and signatures retain transparency.
@@ -85,7 +86,7 @@ The save cases extend `viewer-integration` and verify:
   XFA copy; refuse unsafe dynamic XFA additions without losing them.
 - Verify viewer form edits, native keyboard traversal, XFA calculations and
   every control value with PDF.js, including checked/unchecked checkbox states.
-- Exercise the actual QML Save As file dialog and close after a successful save.
+- Exercise the actual QML Save a copy file dialog and close after a successful save.
 
 These checks run with the combined viewer/XFA build. The independent-reader and
 native XFA probe checks require `PDF_EDITOR_BUILD_XFA_PROBE=ON` and the pinned
@@ -95,4 +96,4 @@ not been run in this session.
 Page export and printing are described in [DOCUMENT-WORKFLOW](DOCUMENT-WORKFLOW.md).
 Idle local recovery checkpoints are described in
 [DESKTOP-EXPERIENCE](DESKTOP-EXPERIENCE.md). They do not overwrite the source or
-replace Save As.
+replace Save a copy.

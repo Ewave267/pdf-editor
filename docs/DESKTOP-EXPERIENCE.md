@@ -1,12 +1,36 @@
 # Desktop controls and recovery
 
 The app starts in a normal window with the operating system's close button.
-Use **Document…** for recent files, page export, printing, search, recovery,
-theme selection and optional full screen. **F11** toggles full screen;
-**Ctrl+F** searches; **Ctrl+P** prints. Drop one local PDF into the window to
-open it. Opening, closing and dropping files retain the existing unsaved-change
-confirmation. Fit page and Fit width follow viewport changes. PDF paper remains
-white in dark mode; the theme preference persists locally.
+The layout follows familiar document editors:
+
+- **File** opens PDFs and recent files, saves a copy, exports pages, prints and
+  recovers unsaved work. **Edit** contains clipboard commands and Find.
+- **View** controls page thumbnails, fitting, dark appearance and full screen.
+  **Insert** adds content; **Form** contains field helpers and reset actions.
+- The top bar keeps **Open**, Undo/Redo, **Find** and **Save a copy** available.
+  It shows the current file and whether changes are unsaved.
+- The editing toolbar offers **Select**, **Add text**, **Image**, **Sign** and
+  **Draw**. The row below explains where to click or drag; **Cancel** exits a
+  placement tool. After selecting added content, formatting, alignment and
+  deletion controls appear there. Text has direct bold/italic/underline controls,
+  with font family and size on wider windows. **Edit text** always opens the full
+  text and font dialog. These controls format added text boxes, not original PDF
+  text or native form-field fonts.
+- Page thumbnails sit on the left. **Pages** at the bottom toggles them; page
+  navigation and zoom sit together at the bottom. Compact windows retain the
+  main tools, and form controls wrap onto additional rows instead of requiring
+  sideways scrolling. **Fit width** is also available in View on compact windows.
+- The welcome screen offers **Open a PDF**, recent files, recovery when available
+  and short editing instructions. Drop one local PDF into the window to open it.
+
+**Ctrl+O** opens, **Ctrl+S** or **Ctrl+Shift+S** saves a copy, **Ctrl+F** searches
+and **Ctrl+P** prints (use Command for these standard shortcuts on macOS).
+**F11** toggles optional full screen. Opening, closing and dropping files with
+unsaved edits offer **Save a copy**, **Discard** or **Cancel**. Cancelling or
+failing the save keeps the document open; the requested action continues only
+after a successful save with no remaining unsaved edits. The original source
+cannot be overwritten. Fit page and Fit width follow viewport changes. PDF
+paper remains white in dark mode; the theme preference persists locally.
 
 Recent files retain up to ten successfully opened paths. Search is case
 insensitive and lists matching pages using PDFium text extraction. It searches
@@ -27,10 +51,10 @@ saved. Native form focus is committed when the checkpoint is taken; authored
 form validation/save actions may run, as with a normal form snapshot.
 
 After an interrupted session, close any open document and use
-**Document… → Recover previous session…**. Checkpoints are listed by time.
+**File → Recover unsaved work…**. Checkpoints are listed by time.
 Recover or discard one explicitly. Recovery preserves text styling, geometry,
 images and drawing points, but not undo history or the previous selection.
-The recovered document is dirty and requires Save As. Original source-file
+The recovered document is dirty and requires Save a copy. Original source-file
 protection is retained. Explicit document close/discard and a successful save
 remove the current checkpoint. A renderer failure leaves the last checkpoint
 available; a process crash does not run cleanup.

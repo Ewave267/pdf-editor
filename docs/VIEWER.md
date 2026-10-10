@@ -5,7 +5,7 @@ horizontally, zooms, fits pages to the viewport, and navigates by page number,
 Previous/Next, or thumbnails. The sidebar uses the same renderer as the main
 pages. The default dependency-free foundation build remains available.
 Step 5 adds [text, images and image-based signatures](ADDED-CONTENT.md) in a
-separate overlay; step 6 adds [Save As](SAVING.md) with remaining form/XFA
+separate overlay; step 6 adds [Save a copy](SAVING.md) with remaining form/XFA
 validation gaps.
 
 ## Build and run
@@ -50,7 +50,7 @@ the viewer never runs the renderer unconfined.
 
 ## Controls
 
-- Open PDF or Ctrl+O selects a local document.
+- Open or Ctrl+O selects a local document. The welcome screen also offers recent files.
 - Scroll the main view or drag its scrollbars to browse pages.
 - Plus/minus or Ctrl++/Ctrl+- adjusts zoom; Fit page or Ctrl+0 restores fitting.
 - Type a page number and press Enter, use Previous/Next, or click a thumbnail.
@@ -58,8 +58,9 @@ the viewer never runs the renderer unconfined.
 
 Opening a second document clears the old page model, cached images and pending
 requests before starting a new renderer. Password-protected documents currently
-produce an error; password entry and viewer form editing are later milestones.
-Save As or Ctrl+Shift+S saves a new PDF; see [SAVING](SAVING.md).
+produce an error; password entry is not implemented. Native form editing is
+available; see [FORMS](FORMS.md).
+Save a copy or Ctrl+S (also Ctrl+Shift+S) saves a new PDF; see [SAVING](SAVING.md).
 With additions present, open and close require confirmation before discarding.
 
 ## Architecture and limits
@@ -120,7 +121,7 @@ placement, dragging, resizing, deletion, and discard protection; see
 [ADDED-CONTENT](ADDED-CONTENT.md).
 
 Five additional save cases cover export, reopen, rotated/cropped coordinates,
-save failures, revision tracking, existing forms, and the Save As file dialog.
+save failures, revision tracking, existing forms, and the Save a copy file dialog.
 The combined build invokes PDF.js and the native XFA probe on saved outputs.
 
 Four form data cases validate native control interaction and actual QML keyboard/

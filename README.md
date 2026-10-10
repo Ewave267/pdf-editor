@@ -12,16 +12,20 @@ image-based signatures, checkmarks, freehand strokes, highlights, shapes and
 stamps. Added text supports font family, size, bold, italic and underline.
 Everyday editing includes grouped undo/redo, copy/paste, multi-selection,
 alignment and keyboard controls; see [added-content controls](docs/ADDED-CONTENT.md).
-Save As embeds additions in a new PDF, with atomic writes and source-file
+Save a copy embeds additions in a new PDF, with atomic writes and source-file
 protection. Native text fields, checkboxes, radio buttons, dropdowns, and keyboard
 navigation work for the synthetic AcroForm and dynamic XFA fixtures. The
 [form toolbar](docs/FORMS.md) adds field highlights, required-field feedback,
 cross-page navigation, reset, date/choice helpers and guided visual signatures,
-with explicit XFA helper limits. Save As
+with explicit XFA helper limits. Save a copy
 preserves edited values and XFA calculations. Dynamic XFA copies without additions
 are supported; dynamic XFA additions cannot yet be saved. The Linux safety
 gate now tests malformed documents, restricted JavaScript access, memory limits
 and worker recovery; see [SAFETY](docs/SAFETY.md).
+
+The interface uses familiar File/Edit/View menus, a clear **Save a copy** action,
+contextual text formatting, page thumbnails and a welcome screen with recent
+files. See the [desktop guide](docs/DESKTOP-EXPERIENCE.md) for a quick walkthrough.
 
 The stack is C++20, Qt Quick / QML, PDFium, and CMake. The default build remains
 a dependency-free foundation check. Enable the viewer explicitly with
@@ -95,7 +99,7 @@ See [VIEWER](docs/VIEWER.md) for complete setup, controls, limits and test
 instructions, including this workspace's local Qt SDK configuration. See
 [ADDED-CONTENT](docs/ADDED-CONTENT.md) for the step 5 tools and
 [FORMS](docs/FORMS.md) for form controls and compatibility limits, and
-[SAVING](docs/SAVING.md) for Save As support and remaining validation gaps.
+[SAVING](docs/SAVING.md) for Save a copy support and remaining validation gaps.
 
 ## Development
 

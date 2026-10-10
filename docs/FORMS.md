@@ -6,14 +6,14 @@ select a dropdown value. Tab and Shift+Tab move between native form fields.
 Ctrl+A, Ctrl+C, Ctrl+X and Ctrl+V select, copy, cut and paste field text; Backspace and Delete
 edit it. Zoomed pages map clicks to native page coordinates.
 
-Use **Save As** to create a new PDF containing the current form values. Saving
+Use **Save a copy** to create a new PDF containing the current form values. Saving
 commits the focused field first, so exit events and XFA calculations run before
 serialization. The source PDF remains unchanged. Unsaved changes trigger the
 existing discard protection. Form input is paused while a save is running.
 
 ## Phase 3 — form helpers
 
-The form toolbar appears for documents with native fields. **Show fields**
+The form toolbar appears for documents with native fields. **Highlight fields**
 toggles PDFium's field highlight without changing saved content. AcroForm
 widgets also have outlines: required fields have an asterisk and amber border,
 failed checks use red, and read-only fields are dimmed.
@@ -22,7 +22,7 @@ For supported AcroForms:
 
 - **Fields** lists fields with their page, label, required status and read-only
   status. Select an editable field to scroll it into view and focus it.
-- **Previous field**, **Next field**, Tab and Shift+Tab navigate editable fields
+- **Previous**, **Next**, Tab and Shift+Tab navigate editable fields
   across pages, following page/annotation order and skipping read-only widgets.
   Native focus actions and validation run through PDFium. Focus scrolling also
   moves far-down fields into view and returns keyboard input to that page.
@@ -30,8 +30,8 @@ For supported AcroForms:
   invalid recognized dates. Click an issue to focus its field. Document alerts
   from native validation are shown as plain text. These checks supplement the
   document's scripts; they do not certify a form is ready for submission.
-- **Reset field** restores the selected field's opening value; a radio button
-  restores its group's opening choice. **Reset form** restores editable fields
+- **Form → Reset selected field…** restores the selected field's opening value;
+  a radio button restores its group's opening choice. **Reset form** restores editable fields
   to their opening values. Both ask for confirmation and keep added text,
   drawings, images and signatures. These are the values in the opened PDF,
   rather than necessarily its `/DV` defaults. Resets use native events, so
@@ -85,7 +85,7 @@ state, keyboard traversal, actions and rendering inside the existing Bubblewrap
 worker. QML does not access PDFium. Open pages and their form environments stay
 alive between events; page and thumbnail caches refresh after input.
 
-Save As requests a bounded snapshot of the live native document before the
+Save a copy requests a bounded snapshot of the live native document before the
 separate save worker imports additions. The live renderer never receives those
 addition objects, so repeated saves do not duplicate them. Form and addition
 revisions are tracked separately; a destination write failure retains both.

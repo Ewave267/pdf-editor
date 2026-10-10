@@ -7,12 +7,14 @@ with the [viewer instructions](VIEWER.md); reuse the existing PDFium dependency.
 
 ## Tools
 
-- **Text** opens a plain-text editor with font family, size (6–144 points),
+- **Add text** opens a plain-text editor with font family, size (6–144 points),
   bold, italic and underline. Accept, then click a page to place the box.
   **Edit text** changes the selected text box or stamp. Formatting applies to
-  the whole object; Cancel keeps its previous settings.
-- **Image** and **Signature** import a local image, including transparent PNGs.
-  Accept, then click a page to place it. Signatures are visual additions, not
+  the whole object; Cancel keeps its previous settings. Selected text also has
+  direct bold, italic and underline controls; wider windows show font and size.
+- **Image** imports a local image, including transparent PNGs.
+  **Sign** offers drawing or importing a signature. Accept, then click or draw on
+  the page to place it. Signatures are visual additions, not
   cryptographic signatures. The freehand tool can also draw handwriting.
 - **Draw** offers checkmarks, freehand, highlights, rectangles, ellipses, lines
   and text stamps. Choose a color and line thickness (1–12 points). Click to
@@ -31,7 +33,8 @@ image do not change an imported object.
 
 Click an object to select it. Shift-click adds/removes an object from the
 selection; selections stay on one page. **Select area** lets you drag a rectangle
-around objects; hold Shift to add to the selection. **Select all** selects the
+around objects; hold Shift to add to the selection. **Edit → Select all added
+content on this page** selects the
 current page's additions. Drag a selected object's body to move the entire
 selection. Geometry stays inside its original page.
 
@@ -40,7 +43,8 @@ midpoints. Hold Shift while dragging a corner to preserve its aspect ratio.
 **Align** aligns a group to its left, horizontal center, right, top, vertical
 center or bottom bound. **Delete** removes the selection.
 
-**Copy**, **Cut** and **Paste** preserve addition types, styles and images.
+**Edit → Copy added content**, **Cut added content** and **Paste** preserve
+addition types, styles and images.
 Pasting puts a copy on the current page, offset where space permits. A group
 that cannot fit that page is rejected. Plain text and images copied from other
 applications can also be pasted. Internal clipboard payloads are validated
@@ -72,7 +76,7 @@ after undo clears redo. Closing/replacing the document clears history.
 
 ## Saving and rendering
 
-**Use Save As to persist additions in a new PDF.** Opening another PDF,
+**Use Save a copy to persist additions in a new PDF.** Opening another PDF,
 closing the document, or closing the window asks before discarding unsaved
 changes. The source PDF stays unchanged. Reopened additions are ordinary PDF
 content; the app does not recover their individual editing objects or history.

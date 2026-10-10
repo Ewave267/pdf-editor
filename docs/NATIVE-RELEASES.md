@@ -204,7 +204,7 @@ uses Windows Fonts; the desktop application uses the normal Windows Qt backend.
 Clean-desktop walkthroughs remain pending.
 
 Offscreen checks do not establish usability on a clean desktop. Download the
-matching artifact and test opening your PDFs, editing, Save As and reopening.
+matching artifact and test opening your PDFs, editing, Save a copy and reopening.
 Existing form limits in [FORMS](FORMS.md) and [SAVING](SAVING.md) still apply;
 dynamic XFA documents with added content cannot yet be saved.
 
