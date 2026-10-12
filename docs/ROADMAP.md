@@ -19,6 +19,10 @@ cryptographic signatures from deferred evaluation to planned work.
   field state and all-page render output. See the
   [Canadian corpus](../tests/pdfs/government-canada/README.md). Broader form types
   and edit/save/reopen expectations below remain open.
+- [x] Verify two text-edit/save/reopen generations for each seeded Canadian
+  form with French accented values, all-widget preservation, all-page rendering
+  and independent PDF.js checks that reject deliberately incorrect values.
+  Date/choice/script scenarios and broader fixture types remain open.
 - [ ] Add representative production AcroForms, static/dynamic XFA, scripted
   forms, Unicode/font/layout cases and signed PDFs. Record each fixture's source,
   version, checksum and explicit redistribution license or permission; exclude

@@ -37,9 +37,22 @@ Adjust build and PDFium paths for the local build. Rendering checks verify PNG
 output, not pixel/layout equivalence. Local admission also independently checked
 page/widget counts and recorded initial values using the project's pinned PDF.js
 6.4.299. Its field-object results include non-widget parent records; count only
-page-bearing widgets when comparing with PDFium. That check is not a new CI gate.
-Editing, date-script behavior, calculations, Unicode entry and save/reopen remain
-unverified for these fixtures.
+page-bearing widgets when comparing with PDFium.
+
+`WorkerSafetyTests.test_canadian_government_round_trips` edits the manifest's
+named text field through native form input, commits it and saves two successive
+generations with French accented values. Each generation reopens in a fresh
+isolated worker, checks all widget identities/types/values and page dimensions,
+and renders every page. Pinned PDF.js independently compares every field name,
+widget type/page and value against the original, including both widgets of the
+acknowledgement's repeated name field. Non-widget parent records retain their
+original values. Deliberately incorrect expected values must fail verification.
+Both tests run in the existing worker-safety CI gate; PDF.js and Node.js 24 must
+be installed as documented in the test setup. All edits remain in temporary
+copies and the original fixture bytes must remain unchanged.
+
+This verifies text value persistence and form structure, not visual equivalence,
+date-script behavior, choice editing, calculations or arbitrary Unicode fonts.
 
 ## Remaining admissions
 

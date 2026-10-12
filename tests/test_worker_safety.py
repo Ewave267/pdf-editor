@@ -97,6 +97,58 @@ class WorkerSafetyTests(unittest.TestCase):
                     self.assertTrue(base64.b64decode(response["png"]).startswith(b"\x89PNG\r\n\x1a\n"))
                 self.assertEqual(fixture.read_bytes(), before)
 
+    def test_canadian_government_round_trips(self):
+        directory = ROOT / "tests/pdfs/government-canada"
+        manifest = json.loads((directory / "SOURCE.json").read_text())
+        for name, record in manifest["files"].items():
+            original = directory / name
+            source = original.read_bytes()
+            fixture = original
+            baseline = self.run_worker(original)[0]
+            for generation, value in enumerate(record["expected"]["round_trip"]["values"], 1):
+                with self.subTest(fixture=name, generation=generation):
+                    field_name = record["expected"]["round_trip"]["field"]
+                    field = next(field for field in baseline["fields"] if field["name"] == field_name)
+                    responses = self.run_worker(fixture, [
+                        {"id": 1, "op": "event", "action": "setFieldText",
+                         "page": field["page"], "key": field["id"], "text": value},
+                        {"id": 2, "op": "snapshot"},
+                    ])
+                    self.assertNotIn("error", responses[1])
+                    self.assertTrue(responses[1]["handled"])
+                    self.assertNotIn("error", responses[2])
+                    saved = self.directory / f"{generation}-{name}"
+                    saved.write_bytes(base64.b64decode(responses[2]["pdf"]))
+                    reopened = self.run_worker(saved, [
+                        {"id": page + 1, "page": page, "width": 300}
+                        for page in range(record["expected"]["pages"])
+                    ])
+                    self.assertTrue(reopened[0]["fieldsComplete"])
+                    self.assertEqual(reopened[0]["formType"], 1)
+                    self.assertEqual(reopened[0]["pages"], baseline["pages"])
+                    expected_fields = [dict(item, value=value) if item["name"] == field_name
+                                       else item for item in baseline["fields"]]
+                    keys = ("name", "page", "annot", "type", "value")
+                    self.assertEqual([[item[key] for key in keys] for item in reopened[0]["fields"]],
+                                     [[item[key] for key in keys] for item in expected_fields])
+                    for response in reopened[1:]:
+                        self.assertTrue(base64.b64decode(response["png"]).startswith(b"\x89PNG\r\n\x1a\n"))
+                    reader_command = [
+                        os.environ.get("SAVE_NODE") or "node",
+                        str(ROOT / "tools/check_canadian_forms.mjs"),
+                        os.environ.get("SAVE_PDFJS") or str(ROOT / "tests/reader/node_modules/pdfjs-dist"),
+                        str(original), str(saved), field_name, value,
+                    ]
+                    result = subprocess.run(reader_command, capture_output=True, text=True, timeout=20)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    if generation == 1:
+                        reader_command[-1] = "Deliberately incorrect saved value"
+                        rejected = subprocess.run(reader_command, capture_output=True, text=True, timeout=20)
+                        self.assertNotEqual(rejected.returncode, 0)
+                        self.assertIn("AssertionError", rejected.stderr)
+                    fixture = saved
+            self.assertEqual(original.read_bytes(), source)
+
     def test_deterministic_mutation_corpus(self):
         """Small reproducible malformed-input campaign under the real sandbox."""
         randomizer = random.Random(20261010)

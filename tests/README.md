@@ -15,7 +15,9 @@ compatibility is claimed by the foundation smoke check.
 The [Government of Canada corpus](pdfs/government-canada/README.md) contains four
 unchanged Statistics Canada production AcroForms with separate licence and
 provenance records. `worker-safety` verifies hashes, initial fields and all page
-render outputs; editing and save/reopen coverage remain the next milestone.
+render outputs, plus two text-edit/save/reopen generations with French accented
+values and independent pinned PDF.js verification of field structure and values.
+Date/choice/script scenarios and broader production fixture types remain open.
 
 With the opt-in XFA build, CTest also provides:
 

@@ -2,6 +2,26 @@
 
 Last updated: 2026-10-12
 
+## Production-form text save/reopen regression gate
+
+The four licensed Canadian AcroForms now each exercise two native text edit,
+commit, snapshot-save and fresh isolated reopen generations with French accented
+values. Every widget identity/type/value, page dimensions and all-page render
+output are checked; repeated widgets must share the edited value and untouched
+fields must retain their opening values. Pinned PDF.js independently checks all
+field names, widget types/pages and values against the unchanged original.
+Deliberately incorrect expectations are rejected. Source PDFs remain unchanged;
+only temporary copies contain test input. The manifest records the edited field
+and expected values. Date/choice/script behavior, visual layout equivalence and
+broader production XFA/signature corpus coverage remain open.
+
+Validation: all 16 worker regressions passed, and all six local CTest gates
+passed in 138.6 seconds. The restricted command sandbox initially prevented
+Bubblewrap network-namespace setup; the approved full-suite rerun retained the
+application's worker sandbox and passed. Build and script syntax checks passed.
+No dependency rebuild, native artifact workflow or Windows/macOS run was needed
+for this test-only slice.
+
 ## Government of Canada production-form corpus
 
 Added four unchanged Statistics Canada AcroForms: a three-page project
