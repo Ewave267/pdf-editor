@@ -18,3 +18,14 @@ Thumbs.db
 .env
 .env.*
 /documents/
+
+# Graphify caches and local run state
+/graphify-out/cache/
+/graphify-out/memory/
+/graphify-out/.graphify_*
+!/graphify-out/.graphify_labels.json
+/graphify-out/.vocab.txt
+/graphify-out/corpus.json
+/graphify-out/cost.json
+/graphify-out/extraction.json
+/graphify-out/manifest.json
