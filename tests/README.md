@@ -12,6 +12,11 @@ dynamic XFA, XFA JavaScript, and malformed documents. Original synthetic
 fixtures are described in [the corpus manifest](pdfs/README.md). No PDF
 compatibility is claimed by the foundation smoke check.
 
+The [Government of Canada corpus](pdfs/government-canada/README.md) contains four
+unchanged Statistics Canada production AcroForms with separate licence and
+provenance records. `worker-safety` verifies hashes, initial fields and all page
+render outputs; editing and save/reopen coverage remain the next milestone.
+
 With the opt-in XFA build, CTest also provides:
 
 - `xfa-regressions`: eleven tests covering exact persistence in both XFA

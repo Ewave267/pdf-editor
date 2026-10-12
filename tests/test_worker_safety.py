@@ -71,6 +71,32 @@ class WorkerSafetyTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn(b"password", result.stderr)
 
+    def test_canadian_government_corpus(self):
+        directory = ROOT / "tests/pdfs/government-canada"
+        manifest = json.loads((directory / "SOURCE.json").read_text())
+        for name, record in manifest["files"].items():
+            with self.subTest(fixture=name):
+                fixture = directory / name
+                before = fixture.read_bytes()
+                self.assertEqual(hashlib.sha256(before).hexdigest(), record["sha256"])
+                expected = record["expected"]
+                responses = self.run_worker(fixture, [
+                    {"id": page + 1, "page": page, "width": 300}
+                    for page in range(expected["pages"])
+                ])
+                document = responses[0]
+                self.assertEqual(document["formType"], 1)
+                self.assertEqual(len(document["pages"]), expected["pages"])
+                self.assertTrue(document["fieldsComplete"])
+                self.assertEqual(len(document["fields"]), expected["widgets"])
+                for field_name, value in expected["sample_values"].items():
+                    self.assertEqual({field["value"] for field in document["fields"]
+                                      if field["name"] == field_name}, {value})
+                self.assertEqual(len(responses), expected["pages"] + 1)
+                for response in responses[1:]:
+                    self.assertTrue(base64.b64decode(response["png"]).startswith(b"\x89PNG\r\n\x1a\n"))
+                self.assertEqual(fixture.read_bytes(), before)
+
     def test_deterministic_mutation_corpus(self):
         """Small reproducible malformed-input campaign under the real sandbox."""
         randomizer = random.Random(20261010)

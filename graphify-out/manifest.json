@@ -1,0 +1,818 @@
+{
+  "packaging/native/AppRun": {
+    "mtime": 1791407542.7558565,
+    "seen": 1791839922.4603949,
+    "ast_hash": "2d66b1c64fc078a12af20f238958e243",
+    "semantic_hash": "2d66b1c64fc078a12af20f238958e243"
+  },
+  "packaging/native/appimage-runtime-aarch64.json": {
+    "mtime": 1791466522.0915096,
+    "seen": 1791839922.4603984,
+    "ast_hash": "d2e28be8c4cec07660c9c72ea3ec7e36",
+    "semantic_hash": "d2e28be8c4cec07660c9c72ea3ec7e36"
+  },
+  "packaging/native/appimage-runtime.json": {
+    "mtime": 1791400773.6093745,
+    "seen": 1791839922.4603999,
+    "ast_hash": "a02da0f435adc03b988a8a5fc9107924",
+    "semantic_hash": "a02da0f435adc03b988a8a5fc9107924"
+  },
+  "packaging/native/bubblewrap.json": {
+    "mtime": 1791404092.4008336,
+    "seen": 1791839922.4604006,
+    "ast_hash": "92f6ba12c7ab302286766f56c5d2b09f",
+    "semantic_hash": "92f6ba12c7ab302286766f56c5d2b09f"
+  },
+  "packaging/native/libgcc-runtime-aarch64.json": {
+    "mtime": 1791466522.0916169,
+    "seen": 1791839922.4604013,
+    "ast_hash": "e628e2c8090fc2a639e6c5be60dde064",
+    "semantic_hash": "e628e2c8090fc2a639e6c5be60dde064"
+  },
+  "packaging/native/libgcc-runtime.json": {
+    "mtime": 1791407047.3426876,
+    "seen": 1791839922.4604023,
+    "ast_hash": "0fcc5879f00c9e98e561920becdeff6e",
+    "semantic_hash": "0fcc5879f00c9e98e561920becdeff6e"
+  },
+  "src/app/main.cpp": {
+    "mtime": 1791608349.7294693,
+    "seen": 1791839922.460403,
+    "ast_hash": "5c8d2114665bc94cfe7fd2c072c1c210",
+    "semantic_hash": "5c8d2114665bc94cfe7fd2c072c1c210"
+  },
+  "src/app/viewer_main.cpp": {
+    "mtime": 1791608349.7293882,
+    "seen": 1791839922.4604034,
+    "ast_hash": "1a8092ac67523dad919786daed044c7f",
+    "semantic_hash": "1a8092ac67523dad919786daed044c7f"
+  },
+  "src/app/windows_sandbox_main.cpp": {
+    "mtime": 1791606894.4742324,
+    "seen": 1791839922.460404,
+    "ast_hash": "3950692b7621d84c1d113971fb123da7",
+    "semantic_hash": "3950692b7621d84c1d113971fb123da7"
+  },
+  "src/app/xfa_probe_main.cpp": {
+    "mtime": 1791373822.1787374,
+    "seen": 1791839922.4604046,
+    "ast_hash": "35580f69ea806ff35c4423caf6474c13",
+    "semantic_hash": "35580f69ea806ff35c4423caf6474c13"
+  },
+  "src/content/AddedContent.cpp": {
+    "mtime": 1791608101.5666337,
+    "seen": 1791839922.4604053,
+    "ast_hash": "6c683a64927200bafe02024683512d66",
+    "semantic_hash": "6c683a64927200bafe02024683512d66"
+  },
+  "src/content/AddedContent.h": {
+    "mtime": 1791607974.7601058,
+    "seen": 1791839922.460406,
+    "ast_hash": "b848c6f27959c0456f18bc0fa0dd3537",
+    "semantic_hash": "b848c6f27959c0456f18bc0fa0dd3537"
+  },
+  "src/pdf/NativeFile.h": {
+    "mtime": 1791403611.1746254,
+    "seen": 1791839922.4604065,
+    "ast_hash": "a2212b279e2d59accdeee874509001dd",
+    "semantic_hash": "a2212b279e2d59accdeee874509001dd"
+  },
+  "src/pdf/PdfDocument.cpp": {
+    "mtime": 1791609586.6155646,
+    "seen": 1791839922.4604073,
+    "ast_hash": "d09eae4ab03d1c01909e04a2dd0f01a5",
+    "semantic_hash": "d09eae4ab03d1c01909e04a2dd0f01a5"
+  },
+  "src/pdf/PdfDocument.h": {
+    "mtime": 1791609586.5522838,
+    "seen": 1791839922.460408,
+    "ast_hash": "aaa1e2832145aa45a37a45f4a6266a9e",
+    "semantic_hash": "aaa1e2832145aa45a37a45f4a6266a9e"
+  },
+  "src/pdf/PdfRenderWorker.cpp": {
+    "mtime": 1791609301.8978822,
+    "seen": 1791839922.4604087,
+    "ast_hash": "592a636541dcc68851d65ab5eb5d1667",
+    "semantic_hash": "592a636541dcc68851d65ab5eb5d1667"
+  },
+  "src/pdf/PdfSave.cpp": {
+    "mtime": 1791609133.9981968,
+    "seen": 1791839922.4604094,
+    "ast_hash": "a0aff2949724b132c71ee814bc457dc8",
+    "semantic_hash": "a0aff2949724b132c71ee814bc457dc8"
+  },
+  "src/pdf/PdfiumRuntime.h": {
+    "mtime": 1791485156.4213743,
+    "seen": 1791839922.4604099,
+    "ast_hash": "7258a033abb7d4b8025f2f6e9b0705c2",
+    "semantic_hash": "7258a033abb7d4b8025f2f6e9b0705c2"
+  },
+  "src/pdf/WorkerPolicy.cpp": {
+    "mtime": 1791375268.69417,
+    "seen": 1791839922.4604104,
+    "ast_hash": "51a58323c7302b8d3b6147dc0220cb60",
+    "semantic_hash": "51a58323c7302b8d3b6147dc0220cb60"
+  },
+  "src/pdf/WorkerPolicy.h": {
+    "mtime": 1791464442.718814,
+    "seen": 1791839922.460411,
+    "ast_hash": "13b68ffc86b10fd47a8b941e7d6403bf",
+    "semantic_hash": "13b68ffc86b10fd47a8b941e7d6403bf"
+  },
+  "src/pdf/WorkerPolicyNative.cpp": {
+    "mtime": 1791463428.1051702,
+    "seen": 1791839922.4604115,
+    "ast_hash": "e6da42009d2e37cd6040ae2fb67a1f09",
+    "semantic_hash": "e6da42009d2e37cd6040ae2fb67a1f09"
+  },
+  "src/pdf/XfaProbe.cpp": {
+    "mtime": 1791336914.4251447,
+    "seen": 1791839922.4604125,
+    "ast_hash": "7d629bdf4ebc8da53217394b078f8bd8",
+    "semantic_hash": "7d629bdf4ebc8da53217394b078f8bd8"
+  },
+  "src/pdf/XfaProbe.h": {
+    "mtime": 1791332128.205385,
+    "seen": 1791839922.4604132,
+    "ast_hash": "7ed92911862cfd866e37eeac68510e2e",
+    "semantic_hash": "7ed92911862cfd866e37eeac68510e2e"
+  },
+  "src/ui/AddedOverlay.cpp": {
+    "mtime": 1791481859.9603605,
+    "seen": 1791839922.4604137,
+    "ast_hash": "dbb92b6992d625352e6a382a4b21bd03",
+    "semantic_hash": "dbb92b6992d625352e6a382a4b21bd03"
+  },
+  "src/ui/AddedOverlay.h": {
+    "mtime": 1791338481.8302345,
+    "seen": 1791839922.4604144,
+    "ast_hash": "9cd98e16e1c979c7f6e7590dca65876e",
+    "semantic_hash": "9cd98e16e1c979c7f6e7590dca65876e"
+  },
+  "src/ui/FormInput.cpp": {
+    "mtime": 1791485713.445765,
+    "seen": 1791839922.460415,
+    "ast_hash": "39862d4f02c971270621a3c5a8c6ec46",
+    "semantic_hash": "39862d4f02c971270621a3c5a8c6ec46"
+  },
+  "src/ui/FormInput.h": {
+    "mtime": 1791341073.0144587,
+    "seen": 1791839922.4604156,
+    "ast_hash": "8874a89b6b84258ddf0183d5589f4ed6",
+    "semantic_hash": "8874a89b6b84258ddf0183d5589f4ed6"
+  },
+  "src/ui/PdfPageItem.cpp": {
+    "mtime": 1791512230.8971627,
+    "seen": 1791839922.4604163,
+    "ast_hash": "598005b9b2a97f5bb8eab34d409ed373",
+    "semantic_hash": "598005b9b2a97f5bb8eab34d409ed373"
+  },
+  "src/ui/PdfPageItem.h": {
+    "mtime": 1791512230.8681653,
+    "seen": 1791839922.4604168,
+    "ast_hash": "bad20eb9b4fe8b6316f1145f7053cf8a",
+    "semantic_hash": "bad20eb9b4fe8b6316f1145f7053cf8a"
+  },
+  "tests/check_xfa_roundtrip.py": {
+    "mtime": 1791333822.434727,
+    "seen": 1791839922.4604173,
+    "ast_hash": "da16e29083492c7b016afd4e9e636049",
+    "semantic_hash": "da16e29083492c7b016afd4e9e636049"
+  },
+  "tests/native_smoke.cpp": {
+    "mtime": 1791609216.9113722,
+    "seen": 1791839922.460418,
+    "ast_hash": "d6ce2269cf3b3b7d4322aa3be16f1a8b",
+    "semantic_hash": "d6ce2269cf3b3b7d4322aa3be16f1a8b"
+  },
+  "tests/pdfs/upstream-pdfium/SOURCE.json": {
+    "mtime": 1791608644.2025645,
+    "seen": 1791839922.4604185,
+    "ast_hash": "aa39347685784a914f2c03ca1c81a592",
+    "semantic_hash": "aa39347685784a914f2c03ca1c81a592"
+  },
+  "tests/reader/package.json": {
+    "mtime": 1791333599.7040567,
+    "seen": 1791839922.4604194,
+    "ast_hash": "314d4e33a0844f10af9569954479fc77",
+    "semantic_hash": "314d4e33a0844f10af9569954479fc77"
+  },
+  "tests/sandbox_policy_worker.cpp": {
+    "mtime": 1791374480.2339263,
+    "seen": 1791839922.46042,
+    "ast_hash": "ff5000fb8dc46d4bf8c3fb391ae26019",
+    "semantic_hash": "ff5000fb8dc46d4bf8c3fb391ae26019"
+  },
+  "tests/test_preview_release.py": {
+    "mtime": 1791652347.1498253,
+    "seen": 1791839922.4604204,
+    "ast_hash": "8357bfd5dc9d8e80ae9a1028e98d1439",
+    "semantic_hash": "8357bfd5dc9d8e80ae9a1028e98d1439"
+  },
+  "tests/test_viewer.cpp": {
+    "mtime": 1791649191.3541014,
+    "seen": 1791839922.4604208,
+    "ast_hash": "7f3b4c162cbb76eb986b56d7554effd5",
+    "semantic_hash": "7f3b4c162cbb76eb986b56d7554effd5"
+  },
+  "tests/test_viewer_safety.cpp": {
+    "mtime": 1791374671.5308313,
+    "seen": 1791839922.4604216,
+    "ast_hash": "38674d38c02401e19c3c340dc53cfed4",
+    "semantic_hash": "38674d38c02401e19c3c340dc53cfed4"
+  },
+  "tests/test_windows_runtime.py": {
+    "mtime": 1791510849.992409,
+    "seen": 1791839922.460422,
+    "ast_hash": "3362ca9b4477ab39cebf238c7bfc003c",
+    "semantic_hash": "3362ca9b4477ab39cebf238c7bfc003c"
+  },
+  "tests/test_worker_safety.py": {
+    "mtime": 1791609301.8466518,
+    "seen": 1791839922.4604228,
+    "ast_hash": "cb0f2eddc4429f67b23d4b62f22cad1b",
+    "semantic_hash": "cb0f2eddc4429f67b23d4b62f22cad1b"
+  },
+  "tests/test_xfa_probe.py": {
+    "mtime": 1791372958.5435984,
+    "seen": 1791839922.4604235,
+    "ast_hash": "8e9a246cb138418991bb0bab1a52fcee",
+    "semantic_hash": "8e9a246cb138418991bb0bab1a52fcee"
+  },
+  "tools/build_bubblewrap.py": {
+    "mtime": 1791404092.4678338,
+    "seen": 1791839922.460424,
+    "ast_hash": "d2dfe0d554d7239d44523d7481a3b960",
+    "semantic_hash": "d2dfe0d554d7239d44523d7481a3b960"
+  },
+  "tools/build_native_linux.sh": {
+    "mtime": 1791466655.2544596,
+    "seen": 1791839922.4604244,
+    "ast_hash": "8f62ca6e814439b8f9f355e2481caf2f",
+    "semantic_hash": "8f62ca6e814439b8f9f355e2481caf2f"
+  },
+  "tools/build_pdfium.py": {
+    "mtime": 1791609352.2348633,
+    "seen": 1791839922.460425,
+    "ast_hash": "2440210084c9b72611d7ab8f9389ae28",
+    "semantic_hash": "2440210084c9b72611d7ab8f9389ae28"
+  },
+  "tools/build_pdfium_linux_arm64.sh": {
+    "mtime": 1791473964.027738,
+    "seen": 1791839922.4604273,
+    "ast_hash": "3935e6125c2fb5013efdc46724def478",
+    "semantic_hash": "3935e6125c2fb5013efdc46724def478"
+  },
+  "tools/check_dependency_security.py": {
+    "mtime": 1791609352.235167,
+    "seen": 1791839922.4604278,
+    "ast_hash": "f37693c864a0e0d5a8c5188260bd885f",
+    "semantic_hash": "f37693c864a0e0d5a8c5188260bd885f"
+  },
+  "tools/check_form_controls.mjs": {
+    "mtime": 1791403823.1269586,
+    "seen": 1791839922.4604282,
+    "ast_hash": "575057e501554204c80abd689692cb53",
+    "semantic_hash": "575057e501554204c80abd689692cb53"
+  },
+  "tools/check_native.py": {
+    "mtime": 1791407855.5170283,
+    "seen": 1791839922.460429,
+    "ast_hash": "00631e0df7d29e22d31aa9f77a5756d9",
+    "semantic_hash": "00631e0df7d29e22d31aa9f77a5756d9"
+  },
+  "tools/check_package.py": {
+    "mtime": 1791376033.3212647,
+    "seen": 1791839922.4604297,
+    "ast_hash": "28eb9f1258507902f731386695f90b81",
+    "semantic_hash": "28eb9f1258507902f731386695f90b81"
+  },
+  "tools/check_phase2_content.mjs": {
+    "mtime": 1791482306.5254273,
+    "seen": 1791839922.4604304,
+    "ast_hash": "c8e7d496adcaa64ba9edb25e1fbd6981",
+    "semantic_hash": "c8e7d496adcaa64ba9edb25e1fbd6981"
+  },
+  "tools/check_phase3_forms.mjs": {
+    "mtime": 1791485481.3612237,
+    "seen": 1791839922.4604309,
+    "ast_hash": "eb1f4d9a1d5db092ba9fa9e8fbe17ebb",
+    "semantic_hash": "eb1f4d9a1d5db092ba9fa9e8fbe17ebb"
+  },
+  "tools/check_saved_content.mjs": {
+    "mtime": 1791339740.5896485,
+    "seen": 1791839922.4604313,
+    "ast_hash": "d0ef54941399a06cbea0e340ca8537f3",
+    "semantic_hash": "d0ef54941399a06cbea0e340ca8537f3"
+  },
+  "tools/check_text_style.mjs": {
+    "mtime": 1791477583.6908245,
+    "seen": 1791839922.460432,
+    "ast_hash": "5ac2cbdae40c713db9af99a609841083",
+    "semantic_hash": "5ac2cbdae40c713db9af99a609841083"
+  },
+  "tools/check_xfa_with_pdfjs.mjs": {
+    "mtime": 1791333483.4582863,
+    "seen": 1791839922.4604325,
+    "ast_hash": "93f9e86afb2437e51c19aa8b622b135a",
+    "semantic_hash": "93f9e86afb2437e51c19aa8b622b135a"
+  },
+  "tools/fetch_native_inputs.py": {
+    "mtime": 1791466522.091713,
+    "seen": 1791839922.4604332,
+    "ast_hash": "ea491a776258b177b71b3aea41c0b04f",
+    "semantic_hash": "ea491a776258b177b71b3aea41c0b04f"
+  },
+  "tools/generate_phase3_fixture.py": {
+    "mtime": 1791486470.6674767,
+    "seen": 1791839922.4604337,
+    "ast_hash": "31cb5a871b20e84c314c15a6418c47c5",
+    "semantic_hash": "31cb5a871b20e84c314c15a6418c47c5"
+  },
+  "tools/generate_probe_fixtures.py": {
+    "mtime": 1791377506.6951013,
+    "seen": 1791839922.4604344,
+    "ast_hash": "5845483bddef161ed514909318c6dc6e",
+    "semantic_hash": "5845483bddef161ed514909318c6dc6e"
+  },
+  "tools/package_desktop.py": {
+    "mtime": 1791608349.7297158,
+    "seen": 1791839922.460435,
+    "ast_hash": "d81038b13a7046ee28a2e95a96ecc53e",
+    "semantic_hash": "d81038b13a7046ee28a2e95a96ecc53e"
+  },
+  "tools/package_native.py": {
+    "mtime": 1791608349.7295494,
+    "seen": 1791839922.4604354,
+    "ast_hash": "fc1077213dc43dda8c38374faa1aaa8b",
+    "semantic_hash": "fc1077213dc43dda8c38374faa1aaa8b"
+  },
+  "tools/publish_preview.py": {
+    "mtime": 1791652347.0908258,
+    "seen": 1791839922.460436,
+    "ast_hash": "fe63a48c33fa9c9f6929ae5d6d3a3cf7",
+    "semantic_hash": "fe63a48c33fa9c9f6929ae5d6d3a3cf7"
+  },
+  "tools/run_xfa_probe.py": {
+    "mtime": 1791385806.9276228,
+    "seen": 1791839922.4604368,
+    "ast_hash": "1e541448ee9f6828a255905f3a6ef2de",
+    "semantic_hash": "1e541448ee9f6828a255905f3a6ef2de"
+  },
+  "tools/setup_msvc.ps1": {
+    "mtime": 1791410237.7821083,
+    "seen": 1791839922.4604373,
+    "ast_hash": "84b73ae9cd34ea0b955fc55381cf7f8b",
+    "semantic_hash": "84b73ae9cd34ea0b955fc55381cf7f8b"
+  },
+  "tools/setup_native_linux.sh": {
+    "mtime": 1791408895.8829405,
+    "seen": 1791839922.460438,
+    "ast_hash": "291991c7afb8d4fdf421f26d4d7cb69f",
+    "semantic_hash": "291991c7afb8d4fdf421f26d4d7cb69f"
+  },
+  "tools/windows_runtime.py": {
+    "mtime": 1791510756.6006718,
+    "seen": 1791839922.4604385,
+    "ast_hash": "4036e08f7a7266a254eac89440618d07",
+    "semantic_hash": "4036e08f7a7266a254eac89440618d07"
+  },
+  ".github/dependabot.yml": {
+    "mtime": 1791608382.2974176,
+    "seen": 1791839922.460439,
+    "ast_hash": "0d3894443492ecd5d2cd2f7dc3ab340d",
+    "semantic_hash": "0d3894443492ecd5d2cd2f7dc3ab340d"
+  },
+  ".github/workflows/build.yml": {
+    "mtime": 1791410237.7782638,
+    "seen": 1791839922.4604394,
+    "ast_hash": "0b6adda1af243a8ac22db952dc1ab7df",
+    "semantic_hash": "0b6adda1af243a8ac22db952dc1ab7df"
+  },
+  ".github/workflows/dependency-security.yml": {
+    "mtime": 1791609352.235211,
+    "seen": 1791839922.4604404,
+    "ast_hash": "246a1ab3b9556181a7679d75daa3d32a",
+    "semantic_hash": "246a1ab3b9556181a7679d75daa3d32a"
+  },
+  ".github/workflows/native.yml": {
+    "mtime": 1791608349.7359653,
+    "seen": 1791839922.4604409,
+    "ast_hash": "30c7eedbc2db6baa2212e1902e1e7457",
+    "semantic_hash": "30c7eedbc2db6baa2212e1902e1e7457"
+  },
+  ".github/workflows/preview-release.yml": {
+    "mtime": 1791652347.0598261,
+    "seen": 1791839922.4604416,
+    "ast_hash": "f6e7c7ec51341ac2e0b65f8a59c3c3bc",
+    "semantic_hash": "f6e7c7ec51341ac2e0b65f8a59c3c3bc"
+  },
+  ".github/workflows/xfa.yml": {
+    "mtime": 1791648971.4052296,
+    "seen": 1791839922.460442,
+    "ast_hash": "dfcfe21eea71f970908c120dfefbce30",
+    "semantic_hash": "dfcfe21eea71f970908c120dfefbce30"
+  },
+  "CMakeLists.txt": {
+    "mtime": 1791608349.729146,
+    "seen": 1791839922.4604425,
+    "ast_hash": "383f94a7d9ed3cedffc9847fe1acad4e",
+    "semantic_hash": "383f94a7d9ed3cedffc9847fe1acad4e"
+  },
+  "PROGRESS.md": {
+    "mtime": 1791651657.5757976,
+    "seen": 1791839922.460443,
+    "ast_hash": "2c2649b06e06932d7a17cced26089e81",
+    "semantic_hash": "2c2649b06e06932d7a17cced26089e81"
+  },
+  "README.md": {
+    "mtime": 1791652461.6287494,
+    "seen": 1791839922.460444,
+    "ast_hash": "94a37e4ee5d6fa188bb1563744628257",
+    "semantic_hash": "94a37e4ee5d6fa188bb1563744628257"
+  },
+  "docs/ADDED-CONTENT.md": {
+    "mtime": 1791644760.9824123,
+    "seen": 1791839922.4604445,
+    "ast_hash": "2ea8b0e5ff47360fabea9cffabdcdacc",
+    "semantic_hash": "2ea8b0e5ff47360fabea9cffabdcdacc"
+  },
+  "docs/DESKTOP-EXPERIENCE.md": {
+    "mtime": 1791644760.9806027,
+    "seen": 1791839922.460445,
+    "ast_hash": "2b586eff192a325e2370e9660f52029d",
+    "semantic_hash": "2b586eff192a325e2370e9660f52029d"
+  },
+  "docs/DOCUMENT-WORKFLOW.md": {
+    "mtime": 1791644760.98127,
+    "seen": 1791839922.4604456,
+    "ast_hash": "094fb454e64b996dc701910368f40083",
+    "semantic_hash": "094fb454e64b996dc701910368f40083"
+  },
+  "docs/FORMS.md": {
+    "mtime": 1791644879.2697234,
+    "seen": 1791839922.460448,
+    "ast_hash": "7448b5d9856d1c48f2a22bd2a2e24ca5",
+    "semantic_hash": "7448b5d9856d1c48f2a22bd2a2e24ca5"
+  },
+  "docs/GOAL.md": {
+    "mtime": 1791331542.452634,
+    "seen": 1791839922.4604487,
+    "ast_hash": "c1c657161c2bf5b61b2bf2667bd27a1a",
+    "semantic_hash": "c1c657161c2bf5b61b2bf2667bd27a1a"
+  },
+  "docs/MVP.md": {
+    "mtime": 1791609216.8812065,
+    "seen": 1791839922.4604495,
+    "ast_hash": "809b7980c8646f4cc53d4f971dd749ad",
+    "semantic_hash": "809b7980c8646f4cc53d4f971dd749ad"
+  },
+  "docs/NATIVE-RELEASES.md": {
+    "mtime": 1791652347.1188257,
+    "seen": 1791839922.46045,
+    "ast_hash": "0999eb22e3fbfad280e64a073e33ef4a",
+    "semantic_hash": "0999eb22e3fbfad280e64a073e33ef4a"
+  },
+  "docs/RELEASE.md": {
+    "mtime": 1791651499.0454059,
+    "seen": 1791839922.460451,
+    "ast_hash": "4086f64cc12e415a9f3b235982639624",
+    "semantic_hash": "4086f64cc12e415a9f3b235982639624"
+  },
+  "docs/ROADMAP.md": {
+    "mtime": 1791839566.4937246,
+    "seen": 1791839922.4604514,
+    "ast_hash": "c61ce04fef60a3a6ede3c04a113aad5a",
+    "semantic_hash": "c61ce04fef60a3a6ede3c04a113aad5a"
+  },
+  "docs/SAFETY.md": {
+    "mtime": 1791609216.880779,
+    "seen": 1791839922.4604518,
+    "ast_hash": "d581e0d8f04436eb330ac48c0c3bafa4",
+    "semantic_hash": "d581e0d8f04436eb330ac48c0c3bafa4"
+  },
+  "docs/SAVING.md": {
+    "mtime": 1791644879.2695742,
+    "seen": 1791839922.4604526,
+    "ast_hash": "fd079da02346077b5c8fdbeb0febe448",
+    "semantic_hash": "fd079da02346077b5c8fdbeb0febe448"
+  },
+  "docs/VIEWER.md": {
+    "mtime": 1791644760.981987,
+    "seen": 1791839922.460453,
+    "ast_hash": "c53904ef323855b7b5b3f6628f028e1d",
+    "semantic_hash": "c53904ef323855b7b5b3f6628f028e1d"
+  },
+  "docs/XFA-PROBE.md": {
+    "mtime": 1791377708.8211584,
+    "seen": 1791839922.4604537,
+    "ast_hash": "403202821f23b7a47f84888d635bff73",
+    "semantic_hash": "403202821f23b7a47f84888d635bff73"
+  },
+  "docs/adr/0001-isolated-xfa-probe.md": {
+    "mtime": 1791336528.550764,
+    "seen": 1791839922.4604542,
+    "ast_hash": "9583e5dd73ab0e9e12d630f145ac4aa1",
+    "semantic_hash": "9583e5dd73ab0e9e12d630f145ac4aa1"
+  },
+  "docs/adr/0002-viewer-render-worker.md": {
+    "mtime": 1791337706.2805743,
+    "seen": 1791839922.4604554,
+    "ast_hash": "25bb90aed1e2595ed252e20d77c8d57b",
+    "semantic_hash": "25bb90aed1e2595ed252e20d77c8d57b"
+  },
+  "docs/adr/0003-application-owned-additions.md": {
+    "mtime": 1791338687.7068367,
+    "seen": 1791839922.460456,
+    "ast_hash": "07628c3ca06f2e9f05d0b778c40343ec",
+    "semantic_hash": "07628c3ca06f2e9f05d0b778c40343ec"
+  },
+  "docs/adr/0004-isolated-save-as.md": {
+    "mtime": 1791609216.8813677,
+    "seen": 1791839922.4604566,
+    "ast_hash": "da32b63871abf8588901c2d62fc605dd",
+    "semantic_hash": "da32b63871abf8588901c2d62fc605dd"
+  },
+  "docs/adr/0005-native-form-events.md": {
+    "mtime": 1791373225.7874,
+    "seen": 1791839922.4604573,
+    "ast_hash": "f33e8a7374da263292118e95b72f2f59",
+    "semantic_hash": "f33e8a7374da263292118e95b72f2f59"
+  },
+  "docs/adr/0006-worker-safety-limits.md": {
+    "mtime": 1791375163.1882389,
+    "seen": 1791839922.4604578,
+    "ast_hash": "b81834b8da281029bacfcb54e63e61cd",
+    "semantic_hash": "b81834b8da281029bacfcb54e63e61cd"
+  },
+  "docs/adr/0007-advanced-feature-evaluation.md": {
+    "mtime": 1791608932.800932,
+    "seen": 1791839922.4604583,
+    "ast_hash": "e81c25b366ab67d992ed5a294033e055",
+    "semantic_hash": "e81c25b366ab67d992ed5a294033e055"
+  },
+  "docs/adr/0007-linux-preview-packaging.md": {
+    "mtime": 1791376018.4078655,
+    "seen": 1791839922.460459,
+    "ast_hash": "a912c4a79ce527e55bbeda883d8322ef",
+    "semantic_hash": "a912c4a79ce527e55bbeda883d8322ef"
+  },
+  "docs/adr/0008-form-and-signature-reliability.md": {
+    "mtime": 1791839566.5247242,
+    "seen": 1791839922.4604597,
+    "ast_hash": "951a14d7ca587560dcae96364912f0ef",
+    "semantic_hash": "951a14d7ca587560dcae96364912f0ef"
+  },
+  "docs/adr/README.md": {
+    "mtime": 1791331776.2632163,
+    "seen": 1791839922.4604602,
+    "ast_hash": "4aa8d43568eabcaca1d2b9c167407a5e",
+    "semantic_hash": "4aa8d43568eabcaca1d2b9c167407a5e"
+  },
+  "tests/README.md": {
+    "mtime": 1791337706.295052,
+    "seen": 1791839922.4604611,
+    "ast_hash": "48f461fa56bc26432762fec70b7f8271",
+    "semantic_hash": "48f461fa56bc26432762fec70b7f8271"
+  },
+  "tests/pdfs/README.md": {
+    "mtime": 1791608644.2028828,
+    "seen": 1791839922.4604616,
+    "ast_hash": "27d2b4620f21893f5645f4676dbde088",
+    "semantic_hash": "27d2b4620f21893f5645f4676dbde088"
+  },
+  "third_party/pdfium/README.md": {
+    "mtime": 1791377708.821319,
+    "seen": 1791839922.460462,
+    "ast_hash": "f099ce4e1b9c0e60e3e2a44c42de9ebf",
+    "semantic_hash": "f099ce4e1b9c0e60e3e2a44c42de9ebf"
+  },
+  "tests/pdfs/acroform/controls.pdf": {
+    "mtime": 1791377506.721611,
+    "seen": 1791839922.4604628,
+    "ast_hash": "8e243e4f883f49e38fc0ce8474af9ec5",
+    "semantic_hash": "8e243e4f883f49e38fc0ce8474af9ec5"
+  },
+  "tests/pdfs/acroform/phase3-lock-on-focus.pdf": {
+    "mtime": 1791486470.687298,
+    "seen": 1791839922.4604633,
+    "ast_hash": "d885efe22c0f70a8014328f24b0dcccd",
+    "semantic_hash": "d885efe22c0f70a8014328f24b0dcccd"
+  },
+  "tests/pdfs/acroform/phase3.pdf": {
+    "mtime": 1791486470.6871572,
+    "seen": 1791839922.4604642,
+    "ast_hash": "7289f6cb56b1238b093dac4cad2ac9de",
+    "semantic_hash": "7289f6cb56b1238b093dac4cad2ac9de"
+  },
+  "tests/pdfs/acroform/text.pdf": {
+    "mtime": 1791377506.721836,
+    "seen": 1791839922.4604647,
+    "ast_hash": "3a4e3f6fd5b34fc77768731658f80376",
+    "semantic_hash": "3a4e3f6fd5b34fc77768731658f80376"
+  },
+  "tests/pdfs/malformed/not-a-pdf.pdf": {
+    "mtime": 1791377506.722031,
+    "seen": 1791839922.4604652,
+    "ast_hash": "68112d8bca6bfcb3ef7f0e4d266119d0",
+    "semantic_hash": "68112d8bca6bfcb3ef7f0e4d266119d0"
+  },
+  "tests/pdfs/normal/blank.pdf": {
+    "mtime": 1791377506.7215471,
+    "seen": 1791839922.4604657,
+    "ast_hash": "0da173cef2aba8252cf5c3eeef720c5e",
+    "semantic_hash": "0da173cef2aba8252cf5c3eeef720c5e"
+  },
+  "tests/pdfs/normal/multi-page.pdf": {
+    "mtime": 1791377506.7219837,
+    "seen": 1791839922.4604664,
+    "ast_hash": "1c124c7a8105bbd121b33b17f94388f2",
+    "semantic_hash": "1c124c7a8105bbd121b33b17f94388f2"
+  },
+  "tests/pdfs/normal/rotated-cropped.pdf": {
+    "mtime": 1791377506.7218719,
+    "seen": 1791839922.4604669,
+    "ast_hash": "4f48a8ecd624ab53e3a9676b5eedd1a0",
+    "semantic_hash": "4f48a8ecd624ab53e3a9676b5eedd1a0"
+  },
+  "tests/pdfs/normal/single-page.pdf": {
+    "mtime": 1791377506.7219272,
+    "seen": 1791839922.4604673,
+    "ast_hash": "0b770d1dc0293030950ba717420f71c1",
+    "semantic_hash": "0b770d1dc0293030950ba717420f71c1"
+  },
+  "tests/pdfs/safety/broken-xfa.pdf": {
+    "mtime": 1791377506.7201352,
+    "seen": 1791839922.460468,
+    "ast_hash": "ab2c11e1652f1d7112b32759c0c6c2db",
+    "semantic_hash": "ab2c11e1652f1d7112b32759c0c6c2db"
+  },
+  "tests/pdfs/safety/corrupted.pdf": {
+    "mtime": 1791377506.7200947,
+    "seen": 1791839922.4604688,
+    "ast_hash": "2dddd444b49df2689359a3663b53154a",
+    "semantic_hash": "2dddd444b49df2689359a3663b53154a"
+  },
+  "tests/pdfs/safety/cyclic-acroform.pdf": {
+    "mtime": 1791377506.7199516,
+    "seen": 1791839922.4604692,
+    "ast_hash": "91d79cbe007daefed2d60ecc64941ad0",
+    "semantic_hash": "91d79cbe007daefed2d60ecc64941ad0"
+  },
+  "tests/pdfs/safety/exit-loop-xfa.pdf": {
+    "mtime": 1791377506.7207737,
+    "seen": 1791839922.4604697,
+    "ast_hash": "e976827d574fb506ae230483ebc3d210",
+    "semantic_hash": "e976827d574fb506ae230483ebc3d210"
+  },
+  "tests/pdfs/safety/extreme-page.pdf": {
+    "mtime": 1791377506.7200084,
+    "seen": 1791839922.4604704,
+    "ast_hash": "fbc2b1d27945ff3ebb1e6b954f558a7e",
+    "semantic_hash": "fbc2b1d27945ff3ebb1e6b954f558a7e"
+  },
+  "tests/pdfs/safety/host-access-acroform.pdf": {
+    "mtime": 1791377506.7201715,
+    "seen": 1791839922.4604712,
+    "ast_hash": "3ecbbf17d3c162a45f7d7916a819ded2",
+    "semantic_hash": "3ecbbf17d3c162a45f7d7916a819ded2"
+  },
+  "tests/pdfs/safety/host-access-xfa.pdf": {
+    "mtime": 1791377506.720211,
+    "seen": 1791839922.4604719,
+    "ast_hash": "4020cd3eea5ecb6d20b1c3fe0fb44960",
+    "semantic_hash": "4020cd3eea5ecb6d20b1c3fe0fb44960"
+  },
+  "tests/pdfs/safety/loop-acroform.pdf": {
+    "mtime": 1791377506.7203646,
+    "seen": 1791839922.4604723,
+    "ast_hash": "f06d2b9391c1970227aee3a57c427803",
+    "semantic_hash": "f06d2b9391c1970227aee3a57c427803"
+  },
+  "tests/pdfs/safety/loop-xfa.pdf": {
+    "mtime": 1791377506.7204049,
+    "seen": 1791839922.4604728,
+    "ast_hash": "aa7f5f450b20ca6e5ed10606c1acc71a",
+    "semantic_hash": "aa7f5f450b20ca6e5ed10606c1acc71a"
+  },
+  "tests/pdfs/safety/many-pages.pdf": {
+    "mtime": 1791377506.7204607,
+    "seen": 1791839922.4604735,
+    "ast_hash": "57a86ab271211bdd5ae7c4e57130e094",
+    "semantic_hash": "57a86ab271211bdd5ae7c4e57130e094"
+  },
+  "tests/pdfs/safety/memory-acroform.pdf": {
+    "mtime": 1791377506.7208478,
+    "seen": 1791839922.460474,
+    "ast_hash": "e80e0aaf6edcd5caf5ea677e6d615b9a",
+    "semantic_hash": "e80e0aaf6edcd5caf5ea677e6d615b9a"
+  },
+  "tests/pdfs/safety/memory-xfa.pdf": {
+    "mtime": 1791377506.720874,
+    "seen": 1791839922.460475,
+    "ast_hash": "4fdc2fdc66aeb77632c4da515d7aa5f8",
+    "semantic_hash": "4fdc2fdc66aeb77632c4da515d7aa5f8"
+  },
+  "tests/pdfs/safety/save-loop-acroform.pdf": {
+    "mtime": 1791377506.7207341,
+    "seen": 1791839922.4604754,
+    "ast_hash": "5cf3b54cc5102eeff5f83617a7b92bef",
+    "semantic_hash": "5cf3b54cc5102eeff5f83617a7b92bef"
+  },
+  "tests/pdfs/safety/stress-acroform.pdf": {
+    "mtime": 1791377506.7208104,
+    "seen": 1791839922.4604762,
+    "ast_hash": "fa06bac60785f059dfc00dff05ad9d09",
+    "semantic_hash": "fa06bac60785f059dfc00dff05ad9d09"
+  },
+  "tests/pdfs/safety/stress-xfa.pdf": {
+    "mtime": 1791377506.7209454,
+    "seen": 1791839922.4604766,
+    "ast_hash": "9b17f2d08ac6f58c76568c48a9b3d8d7",
+    "semantic_hash": "9b17f2d08ac6f58c76568c48a9b3d8d7"
+  },
+  "tests/pdfs/safety/throw-acroform.pdf": {
+    "mtime": 1791377506.7202928,
+    "seen": 1791839922.460477,
+    "ast_hash": "c8daeb1eb925b1cdceccda757e065f0b",
+    "semantic_hash": "c8daeb1eb925b1cdceccda757e065f0b"
+  },
+  "tests/pdfs/safety/throw-xfa.pdf": {
+    "mtime": 1791377506.72033,
+    "seen": 1791839922.4604776,
+    "ast_hash": "7f0cc80bc03219270563761d2ffa0946",
+    "semantic_hash": "7f0cc80bc03219270563761d2ffa0946"
+  },
+  "tests/pdfs/safety/tiny-page.pdf": {
+    "mtime": 1791377506.7200487,
+    "seen": 1791839922.4604785,
+    "ast_hash": "c2de67aaee35b3c531aa64c56a39d04b",
+    "semantic_hash": "c2de67aaee35b3c531aa64c56a39d04b"
+  },
+  "tests/pdfs/upstream-pdfium/arabic.pdf": {
+    "mtime": 1791608644.2013748,
+    "seen": 1791839922.460479,
+    "ast_hash": "7bfaad57b31c29b55051da9e0fe2a6d7",
+    "semantic_hash": "7bfaad57b31c29b55051da9e0fe2a6d7"
+  },
+  "tests/pdfs/upstream-pdfium/encrypted_hello_world_r6.pdf": {
+    "mtime": 1791608644.2018495,
+    "seen": 1791839922.4604795,
+    "ast_hash": "9538ce19c73a717df20edb2e03a58f91",
+    "semantic_hash": "9538ce19c73a717df20edb2e03a58f91"
+  },
+  "tests/pdfs/upstream-pdfium/simple_xfa.pdf": {
+    "mtime": 1791608644.20171,
+    "seen": 1791839922.4604802,
+    "ast_hash": "62489bd3f95487675d78b4a444194221",
+    "semantic_hash": "62489bd3f95487675d78b4a444194221"
+  },
+  "tests/pdfs/upstream-pdfium/static_password_field_rotate.pdf": {
+    "mtime": 1791608644.2021928,
+    "seen": 1791839922.4604807,
+    "ast_hash": "ce9135daf596ddabee9db8dc0ffd35d9",
+    "semantic_hash": "ce9135daf596ddabee9db8dc0ffd35d9"
+  },
+  "tests/pdfs/xfa-dynamic/arial-caption.pdf": {
+    "mtime": 1791377506.7217462,
+    "seen": 1791839922.4604812,
+    "ast_hash": "410f88db700f0e869655803d8a6396b5",
+    "semantic_hash": "410f88db700f0e869655803d8a6396b5"
+  },
+  "tests/pdfs/xfa-dynamic/controls.pdf": {
+    "mtime": 1791377506.7217908,
+    "seen": 1791839922.4604821,
+    "ast_hash": "2652156973a6f93e0dbd9a8d0653d503",
+    "semantic_hash": "2652156973a6f93e0dbd9a8d0653d503"
+  },
+  "tests/pdfs/xfa-dynamic/empty-calculation.pdf": {
+    "mtime": 1791377506.7216911,
+    "seen": 1791839922.4604826,
+    "ast_hash": "79f6e02feeb86d3cdebcf74973437e96",
+    "semantic_hash": "79f6e02feeb86d3cdebcf74973437e96"
+  },
+  "tests/pdfs/xfa-dynamic/phase3-navigation.pdf": {
+    "mtime": 1791486470.6873844,
+    "seen": 1791839922.460483,
+    "ast_hash": "e067c71ce37d6d1f8afb3c4ccc41fa20",
+    "semantic_hash": "e067c71ce37d6d1f8afb3c4ccc41fa20"
+  },
+  "tests/pdfs/xfa-javascript/calculation.pdf": {
+    "mtime": 1791377506.7215002,
+    "seen": 1791839922.4604838,
+    "ast_hash": "296b27987395893a03b0bc954805222e",
+    "semantic_hash": "296b27987395893a03b0bc954805222e"
+  },
+  "tests/pdfs/xfa-javascript/single-stream.pdf": {
+    "mtime": 1791377506.7210333,
+    "seen": 1791839922.4604843,
+    "ast_hash": "14d4c6cb6a77b9d16f1063644c55823f",
+    "semantic_hash": "14d4c6cb6a77b9d16f1063644c55823f"
+  },
+  "packaging/pdf-form-editor.svg": {
+    "mtime": 1791375881.3921695,
+    "seen": 1791839922.4604852,
+    "ast_hash": "0eceb4b53bc86009cf72c3fe6cd28427",
+    "semantic_hash": "0eceb4b53bc86009cf72c3fe6cd28427"
+  }
+}

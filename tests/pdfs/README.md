@@ -1,6 +1,7 @@
 # Probe fixture corpus
 
-Except for the separately licensed `upstream-pdfium` corpus, fixtures are original synthetic test documents created for this
+Except for the separately licensed `upstream-pdfium` and
+[`government-canada`](government-canada/README.md) corpora, fixtures are original synthetic test documents created for this
 project, contain no personal data or external copyrighted content, and use
 the repository's GPL-3.0-only license. The scripted URL uses the reserved
 `example.invalid` domain and is denied by the embedder callback.
@@ -75,3 +76,11 @@ exercise Arabic text, dynamic XFA, foreground/static XFA and controlled rejectio
 of an encrypted PDF needing a password. They complement our generated fixtures;
 they do not establish compatibility with arbitrary production forms. Password
 entry is not yet supported. No user documents are redistributed.
+
+## Government of Canada production forms
+
+[`government-canada/`](government-canada/README.md) adds four unsubmitted
+Statistics Canada AcroForms under its Open Licence. Original bytes, source URLs,
+hashes, attribution and privacy review are recorded separately. The existing
+worker regression gate verifies opening, initial field state and every page's
+render output. Production XFA, editing and save/reopen coverage remain open.

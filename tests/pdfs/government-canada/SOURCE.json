@@ -1,0 +1,98 @@
+{
+  "publisher": "Statistics Canada, Government of Canada",
+  "landing_page": "https://www.statcan.gc.ca/en/microdata/data-centres/forms",
+  "retrieved_on": "2026-10-12",
+  "licence": "Statistics Canada Open Licence",
+  "licence_url": "https://www.statcan.gc.ca/en/terms-conditions/open-licence",
+  "licence_page_modified": "2025-07-10",
+  "licence_faq_url": "https://www.statcan.gc.ca/en/terms-conditions/open-licence-faq",
+  "privacy_review": "Official unsubmitted public templates; authored generic placeholders retained. No applicant responses added. Public staff authorship metadata retained to preserve original bytes.",
+  "symbols_review": "All 18 rendered pages inspected; no official wordmarks, crests, flags or third-party logos observed. No image objects in the PDFs.",
+  "files": {
+    "statcan-applications.pdf": {
+      "title": "Research Data Centre – Project Application",
+      "source_url": "https://www.statcan.gc.ca/sites/default/files/documents/2026-06/data-centres-access-applications.pdf",
+      "version": "Official 2026-06 URL; exact downloaded bytes pinned below",
+      "sha256": "e4120a77c36cfdc00adcfb420d61eaa12d7efa4b32a4a4d6f0f9ff3460753638",
+      "bytes": 104041,
+      "expected": {
+        "pages": 3,
+        "widgets": 29,
+        "sample_values": {
+          "Title of the project": "",
+          "Dropdown1": "Choose application type",
+          "Dropdown6": "Choose role"
+        }
+      },
+      "coverage": [
+        "AcroForm",
+        "text fields",
+        "choice fields",
+        "multiple pages"
+      ]
+    },
+    "statcan-proposal.pdf": {
+      "title": "Data Proposal Requirements / Research Proposal for Data Access",
+      "source_url": "https://www.statcan.gc.ca/sites/default/files/documents/2026-06/data-centres-forms-proposal.pdf",
+      "version": "Official 2026-06 URL; exact downloaded bytes pinned below",
+      "sha256": "1af8425509a0e7cb37593ac4e2acaaafc76ed71cc814f00c0c22417694aee4d7",
+      "bytes": 138538,
+      "expected": {
+        "pages": 13,
+        "widgets": 28,
+        "sample_values": {
+          "pi": "Principal Investigator",
+          "piAffl": "Affiliation"
+        }
+      },
+      "coverage": [
+        "AcroForm",
+        "text fields",
+        "multiline fields",
+        "multiple pages"
+      ]
+    },
+    "statcan-reference.pdf": {
+      "title": "Letter of reference template",
+      "source_url": "https://www.statcan.gc.ca/sites/default/files/documents/2026-06/data-centres-forms-reference.pdf",
+      "version": "Official 2026-06 URL; exact downloaded bytes pinned below",
+      "sha256": "cab93f76ec8625b2675d0ec9da35f122f99ccf6db750d0c95a1d290acbdc53eb",
+      "bytes": 1035783,
+      "expected": {
+        "pages": 1,
+        "widgets": 6,
+        "sample_values": {
+          "name_institution": "Researcher Full Name at Affiliated Institution",
+          "years": ""
+        }
+      },
+      "coverage": [
+        "AcroForm",
+        "text fields",
+        "inline fields",
+        "authored placeholder values"
+      ]
+    },
+    "statcan-acknowledgement.pdf": {
+      "title": "Letter of acknowledgement template",
+      "source_url": "https://www.statcan.gc.ca/sites/default/files/documents/2026-06/data-centres-forms-acknowledgement.pdf",
+      "version": "Official 2026-06 URL; exact downloaded bytes pinned below",
+      "sha256": "a182707a5cc8165e7071a2a435f31efa19bf32944298523a59fd7125865a24bb",
+      "bytes": 903267,
+      "expected": {
+        "pages": 1,
+        "widgets": 6,
+        "sample_values": {
+          "name": "Researcher Full Name",
+          "university": "the University Name."
+        }
+      },
+      "coverage": [
+        "AcroForm",
+        "text fields",
+        "inline fields",
+        "authored placeholder values"
+      ]
+    }
+  }
+}

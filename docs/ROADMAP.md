@@ -4,6 +4,111 @@ This roadmap describes the direction after the MVP proves the core architecture.
 
 It is intentionally ordered by dependency rather than release date.
 
+## Next steps — Form and signature reliability (2026-10-12)
+
+These are planned, unchecked milestones. Extend the existing PDFium renderer,
+isolated workers and save/reopen tests; retain PDF as the file format. No new
+rendering engine or file format is planned. Existing production release gates
+remain open. [ADR 0008](adr/0008-form-and-signature-reliability.md) promotes
+cryptographic signatures from deferred evaluation to planned work.
+
+### 1. Build a redistributable real-world compatibility corpus
+
+- [x] Seed the corpus with four unchanged Statistics Canada production AcroForms
+  under its Open Licence; pin provenance/hashes and gate native opening, initial
+  field state and all-page render output. See the
+  [Canadian corpus](../tests/pdfs/government-canada/README.md). Broader form types
+  and edit/save/reopen expectations below remain open.
+- [ ] Add representative production AcroForms, static/dynamic XFA, scripted
+  forms, Unicode/font/layout cases and signed PDFs. Record each fixture's source,
+  version, checksum and explicit redistribution license or permission; exclude
+  personal data and documents without established redistribution rights.
+- [ ] Define expected open/render/input/save/reopen results per fixture, including
+  unsupported behavior and known reader differences. Keep existing synthetic and
+  upstream regression samples alongside the real-world corpus.
+- [ ] Run the corpus through existing native integration/probe and independent
+  reader checks in CI; report failures by fixture and operation. Regressions in
+  supported behavior block release.
+
+Acceptance: each admitted fixture has provenance and expected results, and the
+suite detects deliberately changed saved values or lost form structures.
+
+### 2. Make dynamic XFA filling and saving reliable
+
+Depends on step 1's licensed dynamic XFA fixtures.
+
+- [ ] Exercise field exit/commit, calculations, validation, repeated subforms,
+  pagination/layout changes and representative Unicode values across repeated
+  edit/save/reopen cycles; fix shared input/save paths when regressions appear.
+- [ ] Verify values, form structure and expected layout after each cycle using
+  native probes and independent readers where supported. Track unsupported
+  scripts/layout behavior explicitly rather than treating it as a passing check.
+- [ ] Preserve the source and unsaved edits on save failure; keep unsafe XFA
+  addition export and flattening blocked until preservation is demonstrated.
+
+Acceptance: declared supported fixture scenarios survive repeated round trips;
+timeouts, worker failures and unsupported operations produce controlled errors
+without overwriting the source or silently discarding edits.
+
+### 3. Add a user-facing save compatibility check
+
+Build on steps 1–2 and the existing isolated save/reopen infrastructure.
+
+- [ ] Capture expected committed form state for the saved revision, reopen the
+  staged saved PDF in a fresh isolated worker and compare field identities,
+  types and values, including checkbox/radio/choice state and XFA data where
+  available. Verify that supported form structures survived before committing
+  the destination atomically.
+- [ ] Show which checks passed, failed or could not be performed. Use wording
+  such as “Form fields and values verified after saving”; unavailable field
+  inspection must remain an explicit unchecked result, never a pass.
+- [ ] On mismatch, reopen failure or verification timeout, retain edits and the
+  previous destination, explain the failure and allow retry. Test successful
+  checks, missing/changed fields, Unicode values and worker failures.
+
+Acceptance: a deliberate saved-value mismatch prevents a verified-success result
+and destination replacement. The report identifies its scope: reopening does
+not guarantee every script, layout rule or external reader will behave correctly
+and is not a universal compatibility certificate.
+
+### 4. Warn before operations that could invalidate forms or signatures
+
+Deliver form warnings alongside steps 2–3; extend signature warnings with step 5.
+
+- [ ] Detect affected forms and signature presence before saving, adding content,
+  changing pages or flattening. Explain the specific potential loss of form
+  behavior, signature validity or certification permissions before proceeding;
+  uncertain impact must be stated clearly.
+- [ ] Allow cancellation without changing the document. Keep unsafe operations
+  blocked where preservation cannot be supported; acknowledgement alone must
+  not bypass those restrictions. Distinguish drawn/imported signature images
+  from cryptographic signatures in the interface.
+- [ ] Cover signed, unsigned, certified, XFA and AcroForm documents in tests,
+  including cancellation and unsupported-operation paths.
+
+Acceptance: every supported risky operation has a relevant pre-operation warning
+and a tested cancellation path; unsupported destructive operations remain blocked.
+
+### 5. Add cryptographic PDF signing and validation
+
+Depends on corpus coverage, verified saving and signature-aware operation checks.
+
+- [ ] Record a signing design covering library/license choice, certificate and
+  private-key handling, incremental updates, certification permissions, trust
+  anchors, timestamps and revocation policy before selecting dependencies.
+- [ ] Implement real PDF signatures using protected key access and incremental
+  saves that preserve prior signed revisions. Validate existing/new signatures,
+  signed byte ranges, later modifications, certificate chains and applicable
+  document permissions; explain cryptographic validity separately from trust.
+- [ ] Report expired, untrusted, revoked and indeterminate/offline status without
+  claiming trust when verification is unavailable. Verify outputs with an
+  independent signature validator and test tampering, multiple signatures,
+  invalid chains and signing failures without source or key disclosure.
+
+Acceptance: independently validated signed outputs, explicit trust/status
+reporting and failure-safe saving. Visual signature placement remains available
+as a separate feature and is never described as cryptographic signing.
+
 ## Phase 1 — Reliable Core
 
 Make the MVP production-quality.
@@ -188,8 +293,10 @@ Automate:
 ## Phase 8 — Advanced Capabilities
 
 Evaluation complete for the requested scope. Decisions and prerequisites are
-recorded in [ADR 0007](adr/0007-advanced-feature-evaluation.md); these optional
-features are deferred pending concrete user needs and individual designs.
+recorded in [ADR 0007](adr/0007-advanced-feature-evaluation.md). Cryptographic
+signatures are now planned in the next steps above and
+[ADR 0008](adr/0008-form-and-signature-reliability.md); the other optional
+features remain subject to the earlier decisions and individual designs.
 
 Evaluate separately rather than automatically adding them to the core product:
 

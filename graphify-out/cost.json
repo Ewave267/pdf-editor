@@ -1,0 +1,16 @@
+{
+  "runs": [
+    {
+      "date": "2026-10-12T21:18:42.463690+00:00",
+      "files": 136,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "monetary_cost": null,
+      "token_usage_available": false
+    }
+  ],
+  "total_input_tokens": 0,
+  "total_output_tokens": 0,
+  "token_usage_available": false,
+  "counter_note": "Zero counters are placeholders. Actual session token usage is unavailable."
+}

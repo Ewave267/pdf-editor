@@ -1,6 +1,24 @@
 # MVP Progress
 
-Last updated: 2026-10-10
+Last updated: 2026-10-12
+
+## Government of Canada production-form corpus
+
+Added four unchanged Statistics Canada AcroForms: a three-page project
+application, a 13-page research proposal and two one-page letter templates.
+Their Open Licence, official source URLs, hashes, source versions and privacy/
+official-symbol review are recorded in `tests/pdfs/government-canada/`. Generic
+authored placeholders and public staff metadata remain unchanged; no applicant
+responses were added. No restricted IRCC forms are bundled.
+
+The existing worker CI gate now checks hashes, page/widget counts, initial values
+for selected fields, every page's render output and source-byte preservation.
+Local admission passed in the isolated PDFium worker; all 15 worker regressions
+passed in 6.8 seconds. Pinned PDF.js independently confirmed the four documents'
+page/widget counts and recorded initial values. Parent field records must be
+excluded when counting PDF.js widgets. These checks do not establish editing,
+date-script behavior or save/reopen compatibility. Production XFA, French/Unicode
+and signature fixtures remain open.
 
 ## Windows renderer warm-up on application launch
 
