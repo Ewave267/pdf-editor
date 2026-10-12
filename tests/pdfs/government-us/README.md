@@ -43,7 +43,20 @@ as the only expected differences. The manifest pins these differences explicitly
 a deliberately incorrect saved value must fail. All edits use temporary copies
 and source bytes remain unchanged.
 
-These checks do not establish pixel/layout equivalence, font fidelity, general
+`WorkerSafetyTests.test_irs_production_xfa_calculation_round_trips` fills all
+three tax/interest rows, verifies alphabetic input is rejected without changing
+the numeric values, and checks the first year field's four-character limit.
+Two successive save/reopen generations replace earlier values, including zero
+and fractional amounts. Fresh native workers read back every edited input and
+render every page; PDF.js verifies all 56 controls, including the three row
+totals, two column totals and grand total. Deliberately incorrect input and
+calculated-total expectations must fail. Native input retains trailing zeros
+(such as `2.50`), while PDF.js exposes `2.5`; the manifest pins both expectations.
+The unchanged template has no custom validation scripts. Numeric rejection and
+length limits produce no validation message; these are input constraints, not
+evidence of custom script-validation coverage.
+
+These checks do not establish pixel/layout equivalence, font fidelity, other
 calculations/validation, pagination after edits or other input/save scenarios.
 Signature-labelled controls do not establish cryptographic signing support.
 Production static XFA and signed fixtures remain outstanding.

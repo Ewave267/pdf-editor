@@ -2,6 +2,27 @@
 
 Last updated: 2026-10-12
 
+## Production dynamic XFA calculation and input-constraint regression gate
+
+IRS Form 14653 now exercises two successive edit/blur/save/reopen generations
+across all three tax/interest rows, including zero and fractional values. Fresh
+native workers verify every edited input and render all three pages. Pinned
+PDF.js compares all 56 controls and the six calculated row/column/grand totals;
+deliberately incorrect input and total expectations are rejected. The fixture
+manifest records native trailing-zero preservation and PDF.js numeric display
+normalization separately. Alphabetic numeric input leaves committed values
+unchanged, and the first year control enforces its four-character limit without
+a validation message. The template has no custom validation scripts, so these
+checks establish input constraints rather than custom script-validation support.
+Only temporary copies contain test input; the production fixture stays unchanged.
+No application or dependency changes were needed. Pagination/layout changes and
+other calculation/validation scenarios remain open.
+
+Validation: all three focused IRS checks and all six local CTest gates passed,
+including deliberate input/total mismatch rejection. Python/JavaScript syntax
+and diff whitespace checks passed. Approved runs retained the native worker's
+Bubblewrap isolation. No dependency rebuild or Windows/macOS desktop run.
+
 ## Production dynamic XFA text save/reopen regression gate
 
 IRS Form 14653 now exercises two native taxpayer-name edits with accented test

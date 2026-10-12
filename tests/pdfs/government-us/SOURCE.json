@@ -99,11 +99,117 @@
           "value": "0"
         }
       ]
+    },
+    "calculation_round_trip": {
+      "page": 0,
+      "inputs": [
+        {
+          "control": 9,
+          "name": "year",
+          "x": 100,
+          "y": 340
+        },
+        {
+          "control": 10,
+          "name": "amount_owe",
+          "x": 230,
+          "y": 340
+        },
+        {
+          "control": 11,
+          "name": "interest",
+          "x": 370,
+          "y": 340
+        },
+        {
+          "control": 14,
+          "name": "amount_owe",
+          "x": 230,
+          "y": 358
+        },
+        {
+          "control": 15,
+          "name": "interest",
+          "x": 370,
+          "y": 358
+        },
+        {
+          "control": 18,
+          "name": "amount_owe",
+          "x": 230,
+          "y": 376
+        },
+        {
+          "control": 19,
+          "name": "interest",
+          "x": 370,
+          "y": 376
+        }
+      ],
+      "generations": [
+        {
+          "text": [
+            "2025123",
+            "100.25",
+            "2.50",
+            "200.5",
+            "3.25",
+            "0",
+            "0.75"
+          ],
+          "values": [
+            "2025",
+            "100.25",
+            "2.5",
+            "200.5",
+            "3.25",
+            "0",
+            "0.75"
+          ],
+          "totals": [
+            "102.75",
+            "203.75",
+            "0.75",
+            "300.75",
+            "6.5",
+            "307.25"
+          ]
+        },
+        {
+          "text": [
+            "2024999",
+            "10.5",
+            "0",
+            "0",
+            "1.25",
+            "300.75",
+            "2.50"
+          ],
+          "values": [
+            "2024",
+            "10.5",
+            "0",
+            "0",
+            "1.25",
+            "300.75",
+            "2.5"
+          ],
+          "totals": [
+            "10.5",
+            "1.25",
+            "303.25",
+            "311.25",
+            "3.75",
+            "315"
+          ]
+        }
+      ],
+      "validation": "Numeric edits reject alphabetic characters; the first year control truncates input to four characters. The template has no custom validation scripts."
     }
   },
   "unchecked_operations": [
-    "input and save/reopen beyond the declared taxpayer-name scenario",
-    "calculations and validation",
+    "input and save/reopen beyond the declared taxpayer-name and tax/interest scenarios",
+    "other calculations and custom script validation (this template has no custom validation scripts)",
     "pagination after edits",
     "Unicode/font fidelity",
     "cryptographic signature behavior",

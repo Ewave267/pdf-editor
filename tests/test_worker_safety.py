@@ -234,6 +234,86 @@ class WorkerSafetyTests(unittest.TestCase):
                 fixture = saved
         self.assertEqual(original.read_bytes(), before)
 
+    def test_irs_production_xfa_calculation_round_trips(self):
+        directory = ROOT / "tests/pdfs/government-us"
+        record = json.loads((directory / "SOURCE.json").read_text())
+        original = directory / record["file"]
+        before = original.read_bytes()
+        scenario = record["expected"]["calculation_round_trip"]
+        fixture = original
+        for generation, expected in enumerate(scenario["generations"], 1):
+            with self.subTest(generation=generation):
+                commands = []
+                for field, text in zip(scenario["inputs"], expected["text"], strict=True):
+                    click = dict(action="click", x=field["x"], y=field["y"])
+                    actions = [click, dict(action="selectAll"), dict(action="text", text=text),
+                               dict(action="blur"), click]
+                    if field["name"] != "year":
+                        actions += [dict(action="text", text="abc"), dict(action="blur"), click]
+                    for action in actions:
+                        commands.append(dict(id=len(commands) + 1, op="event",
+                                             page=scenario["page"], **action))
+                commands += [dict(id=len(commands) + 1, op="event", page=0, action="blur"),
+                             dict(id=len(commands) + 2, op="snapshot")]
+                responses = self.run_worker(fixture, commands)
+                offset = 1
+                for field, text in zip(scenario["inputs"], expected["text"], strict=True):
+                    count = 5 if field["name"] == "year" else 8
+                    events = responses[offset:offset + count]
+                    for response in events:
+                        self.assertNotIn("error", response)
+                        self.assertEqual(response["validationMessage"], "")
+                    self.assertTrue(events[0]["handled"])
+                    self.assertTrue(events[2]["handled"])
+                    self.assertTrue(events[3]["handled"])
+                    committed = text[:4] if field["name"] == "year" else text
+                    self.assertEqual(events[2]["text"], committed)
+                    self.assertEqual(events[4]["text"], committed)
+                    if count == 8:
+                        self.assertEqual(events[5]["text"], committed, "alphabetic input must be rejected")
+                        self.assertTrue(events[6]["handled"])
+                        self.assertEqual(events[7]["text"], committed)
+                    offset += count
+                self.assertTrue(responses[-2]["handled"])
+                self.assertNotIn("error", responses[-1])
+                saved = self.directory / f"calculation-{generation}-{record['file']}"
+                saved.write_bytes(base64.b64decode(responses[-1]["pdf"]))
+                clicks = [dict(id=index + 1, op="event", page=0, action="click",
+                               x=field["x"], y=field["y"])
+                          for index, field in enumerate(scenario["inputs"])]
+                reopened = self.run_worker(saved, clicks + [
+                    dict(id=len(clicks) + page + 1, page=page, width=300)
+                    for page in range(len(record["expected"]["pages"]))
+                ])
+                self.assertEqual(reopened[0]["formType"], record["expected"]["formType"])
+                self.assertEqual(reopened[0]["pages"], record["expected"]["pages"])
+                for response, field, text in zip(reopened[1:len(clicks) + 1], scenario["inputs"],
+                                                 expected["text"], strict=True):
+                    self.assertTrue(response["handled"])
+                    self.assertEqual(response["text"], text[:4] if field["name"] == "year" else text)
+                for response in reopened[len(clicks) + 1:]:
+                    self.assertNotIn("error", response)
+                    self.assertTrue(base64.b64decode(response["png"]).startswith(b"\x89PNG\r\n\x1a\n"))
+                command = [os.environ.get("SAVE_NODE") or "node",
+                           str(ROOT / "tools/check_production_xfa.mjs"),
+                           os.environ.get("SAVE_PDFJS") or str(ROOT / "tests/reader/node_modules/pdfjs-dist"),
+                           str(directory / "SOURCE.json"), str(saved), str(generation), "calculation_round_trip"]
+                result = subprocess.run(command, capture_output=True, text=True, timeout=20)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                if generation == 1:
+                    for key in ("values", "totals"):
+                        incorrect = json.loads(json.dumps(record))
+                        incorrect["file"] = str(original)
+                        incorrect["expected"]["calculation_round_trip"]["generations"][0][key][0] = "999"
+                        manifest = self.directory / f"incorrect-{key}.json"
+                        manifest.write_text(json.dumps(incorrect))
+                        rejected = subprocess.run(command[:3] + [str(manifest)] + command[4:],
+                                                  capture_output=True, text=True, timeout=20)
+                        self.assertNotEqual(rejected.returncode, 0)
+                        self.assertIn("AssertionError", rejected.stderr)
+                fixture = saved
+        self.assertEqual(original.read_bytes(), before)
+
     def test_deterministic_mutation_corpus(self):
         """Small reproducible malformed-input campaign under the real sandbox."""
         randomizer = random.Random(20261010)

@@ -31,6 +31,12 @@ cryptographic signatures from deferred evaluation to planned work.
   independent comparison of all 56 controls. Pin the six script-committed zero
   totals as expected reader differences and reject incorrect saved values.
   Other input, calculation/validation and pagination scenarios remain open.
+- [x] Verify two IRS Form 14653 numeric edit/blur/save/reopen generations across
+  all three tax/interest rows, six calculated totals, rejected alphabetic numeric
+  input and the first year control's four-character limit. Fresh native readback,
+  all-page rendering and independent PDF.js checks preserve all 56 controls;
+  incorrect input/total expectations fail. This template has no custom validation
+  scripts; other validation and pagination scenarios remain open.
 - [ ] Add representative production AcroForms, static/dynamic XFA, scripted
   forms, Unicode/font/layout cases and signed PDFs. Record each fixture's source,
   version, checksum and explicit redistribution license or permission; exclude

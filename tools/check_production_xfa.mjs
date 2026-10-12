@@ -5,8 +5,9 @@ import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const [pdfjsDirectory, manifestPath, savedPdf, savedValue] = process.argv.slice(2);
+const [pdfjsDirectory, manifestPath, savedPdf, savedValue, scenarioName] = process.argv.slice(2);
 assert.equal(savedPdf === undefined, savedValue === undefined, "saved PDF and expected value must be supplied together");
+assert.ok(scenarioName === undefined || (savedPdf && scenarioName === "calculation_round_trip"));
 const record = JSON.parse(await readFile(manifestPath, "utf8"));
 const { getDocument, version } = await import(pathToFileURL(resolve(pdfjsDirectory, "legacy/build/pdf.mjs")));
 assert.equal(version, "6.4.299");
@@ -53,11 +54,26 @@ for (const file of [resolve(dirname(manifestPath), record.file), ...(savedPdf ? 
     }
     if (saved) {
       const scenario = expected.round_trip;
-      assert.equal(baseline.filter(control => control.page === scenario.page && control.name === scenario.field).length, 1);
-      const expectedState = baseline.map(control => control.page === scenario.page && control.name === scenario.field
-        ? { ...control, value: savedValue } : { ...control });
-      // Native form scripts commit these exact zero totals; PDF.js does not run them.
-      for (const change of scenario.committed_controls) {
+      const expectedState = baseline.map(control => ({ ...control }));
+      let changes = scenario.committed_controls;
+      if (scenarioName) {
+        const calculation = expected[scenarioName];
+        const index = Number(savedValue) - 1;
+        assert.ok(Number.isInteger(index) && index >= 0 && index < calculation.generations.length);
+        const generation = calculation.generations[index];
+        assert.equal(generation.values.length, calculation.inputs.length);
+        assert.equal(generation.totals.length, changes.length);
+        changes = [
+          ...calculation.inputs.map((field, index) => ({ ...field, page: calculation.page, value: generation.values[index] })),
+          ...changes.map((field, index) => ({ ...field, value: generation.totals[index] })),
+        ];
+      } else {
+        const edited = expectedState.filter(control => control.page === scenario.page && control.name === scenario.field);
+        assert.equal(edited.length, 1);
+        edited[0].value = savedValue;
+      }
+      // PDF.js does not execute the native calculations; pin their committed outputs.
+      for (const change of changes) {
         const control = expectedState.filter(item => item.page === change.page)[change.control];
         assert.equal(control.name, change.name);
         control.value = change.value;
