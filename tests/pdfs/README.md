@@ -29,9 +29,10 @@ uncompressed PDFs with byte-accurate cross-reference tables. Phase 3 fixtures us
 | `malformed/not-a-pdf.pdf` | Invalid PDF bytes | Probe rejects it with a PDFium open error |
 
 See [FORMS](../../docs/FORMS.md) for the pinned AcroForm script limitation.
-No real-world static or dynamic XFA documents have been added yet. The empty
-category directories reserve space for future licensed/privacy-reviewed
-regression documents.
+The [United States corpus](government-us/README.md) includes unchanged production
+IRS dynamic XFA Form 14653 with native opening/rendering and independent PDF.js
+layout admission checks. Input/save/reopen and production static XFA coverage
+remain open. Empty category directories reserve space for future reviewed forms.
 
 ## Safety corpus
 

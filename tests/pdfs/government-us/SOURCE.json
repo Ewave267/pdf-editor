@@ -1,0 +1,65 @@
+{
+  "publisher": "Internal Revenue Service, United States Department of the Treasury",
+  "file": "irs-f14653.pdf",
+  "title": "Form 14653: Certification by U.S. Person Residing Outside of the United States for Streamlined Foreign Offshore Procedures",
+  "version": "Rev. March 2025; PDF metadata dated 2025-03-10",
+  "source_url": "https://www.irs.gov/pub/irs-pdf/f14653.pdf",
+  "retrieved_on": "2026-10-12",
+  "sha256": "b9b63eb71dcb45fb3689ff24a9c2dd1b650eaf4196de68cee4a278a08bf0b7db",
+  "bytes": 1938999,
+  "rights": "Federal-employee IRS content is not subject to copyright and may be freely copied; IRS credit requested. No endorsement is implied.",
+  "rights_url": "https://www.irs.gov/about-irs/use-of-content-from-irsgov",
+  "privacy_review": "Unsubmitted official template; no taxpayer responses added. Independent layout inspection checks all 56 controls have empty text or unchecked values.",
+  "symbols_review": "Official form retained unchanged for compatibility testing, separately attributed; no government endorsement is claimed.",
+  "expected": {
+    "formType": 2,
+    "pure_xfa": true,
+    "pages": [
+      {
+        "width": 612,
+        "height": 792
+      },
+      {
+        "width": 612,
+        "height": 792
+      },
+      {
+        "width": 612,
+        "height": 792
+      }
+    ],
+    "controls_per_page": [
+      24,
+      10,
+      22
+    ],
+    "unchecked_per_page": [
+      0,
+      6,
+      3
+    ],
+    "sample_fields_per_page": [
+      [
+        "name_of_taxpayer",
+        "TIN__of_taxpayer"
+      ],
+      [
+        "failure_to_report"
+      ],
+      [
+        "PTIN",
+        "self_employed"
+      ]
+    ],
+    "native_field_inspection": "Unavailable for full XFA; empty native field metadata is not evidence of an empty form."
+  },
+  "unchecked_operations": [
+    "native input and exit/commit",
+    "calculations and validation",
+    "pagination after edits",
+    "Unicode/font fidelity",
+    "save/reopen preservation",
+    "cryptographic signature behavior",
+    "pixel/layout equivalence"
+  ]
+}

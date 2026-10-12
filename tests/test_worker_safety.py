@@ -149,6 +149,40 @@ class WorkerSafetyTests(unittest.TestCase):
                     fixture = saved
             self.assertEqual(original.read_bytes(), source)
 
+    def test_irs_production_xfa_corpus(self):
+        directory = ROOT / "tests/pdfs/government-us"
+        record = json.loads((directory / "SOURCE.json").read_text())
+        fixture = directory / record["file"]
+        before = fixture.read_bytes()
+        self.assertEqual(len(before), record["bytes"])
+        self.assertEqual(hashlib.sha256(before).hexdigest(), record["sha256"])
+        expected = record["expected"]
+        responses = self.run_worker(fixture, [
+            {"id": page + 1, "page": page, "width": 300}
+            for page in range(len(expected["pages"]))
+        ])
+        self.assertEqual(responses[0]["formType"], expected["formType"])
+        self.assertEqual(responses[0]["pages"], expected["pages"])
+        self.assertEqual(len(responses), len(expected["pages"]) + 1)
+        for page, response in enumerate(responses[1:]):
+            self.assertNotIn("error", response, f"{fixture.name}: render page {page + 1}")
+            self.assertTrue(base64.b64decode(response["png"]).startswith(b"\x89PNG\r\n\x1a\n"))
+        command = [os.environ.get("SAVE_NODE") or "node",
+                   str(ROOT / "tools/check_production_xfa.mjs"),
+                   os.environ.get("SAVE_PDFJS") or str(ROOT / "tests/reader/node_modules/pdfjs-dist"),
+                   str(directory / "SOURCE.json")]
+        result = subprocess.run(command, capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        record["file"] = str(fixture)
+        record["expected"]["controls_per_page"][0] += 1
+        incorrect = self.directory / "incorrect-xfa-expectation.json"
+        incorrect.write_text(json.dumps(record))
+        command[-1] = str(incorrect)
+        rejected = subprocess.run(command, capture_output=True, text=True, timeout=20)
+        self.assertNotEqual(rejected.returncode, 0)
+        self.assertIn("AssertionError", rejected.stderr)
+        self.assertEqual(fixture.read_bytes(), before)
+
     def test_deterministic_mutation_corpus(self):
         """Small reproducible malformed-input campaign under the real sandbox."""
         randomizer = random.Random(20261010)

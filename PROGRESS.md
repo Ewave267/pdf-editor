@@ -2,6 +2,28 @@
 
 Last updated: 2026-10-12
 
+## First production dynamic XFA admission
+
+Added unchanged IRS Form 14653 (revision March 2025) with official provenance,
+exact size/hash, IRS public-domain content policy, attribution and an explicit
+non-endorsement statement. No taxpayer responses were added. The existing
+worker-safety CI gate checks native dynamic XFA type, three letter-size pages,
+all-page PNG output and source preservation. Pinned PDF.js independently checks
+three-page XFA layout, 56 empty/unchecked controls and selected field names.
+The PDF fallback has only one page; it is not the XFA layout expectation.
+
+Admission passed in the isolated worker and independent reader. A deliberately
+incorrect control-count expectation was rejected. Full XFA native field metadata
+is unavailable; input, calculations, validation, Unicode/font fidelity, layout
+after edits and save/reopen remain explicitly unchecked. This slice adds no app
+behavior or dependency changes.
+
+Validation: all six local CTest gates passed in 128.3 seconds, including all 17
+worker regressions. The updated focused admission/mismatch gate also passed.
+Python/JavaScript syntax and diff whitespace checks passed. The approved test run
+retained the application's Bubblewrap isolation. Windows/macOS and native artifact
+workflows were not run; the existing patched PDFium build was reused.
+
 ## Production-form text save/reopen regression gate
 
 The four licensed Canadian AcroForms now each exercise two native text edit,

@@ -23,6 +23,10 @@ cryptographic signatures from deferred evaluation to planned work.
   form with French accented values, all-widget preservation, all-page rendering
   and independent PDF.js checks that reject deliberately incorrect values.
   Date/choice/script scenarios and broader fixture types remain open.
+- [x] Admit unchanged production IRS dynamic XFA Form 14653 with public-domain
+  provenance, native three-page opening/rendering and independent PDF.js blank
+  control/layout checks in CI. See the [US corpus](../tests/pdfs/government-us/README.md).
+  Input, scripts, layout after edits and save/reopen expectations remain unchecked.
 - [ ] Add representative production AcroForms, static/dynamic XFA, scripted
   forms, Unicode/font/layout cases and signed PDFs. Record each fixture's source,
   version, checksum and explicit redistribution license or permission; exclude
