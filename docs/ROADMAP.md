@@ -26,7 +26,11 @@ cryptographic signatures from deferred evaluation to planned work.
 - [x] Admit unchanged production IRS dynamic XFA Form 14653 with public-domain
   provenance, native three-page opening/rendering and independent PDF.js blank
   control/layout checks in CI. See the [US corpus](../tests/pdfs/government-us/README.md).
-  Input, scripts, layout after edits and save/reopen expectations remain unchecked.
+- [x] Verify two accented taxpayer-name edit/blur/save/reopen generations for
+  IRS Form 14653 with fresh native text readback, all-page rendering and
+  independent comparison of all 56 controls. Pin the six script-committed zero
+  totals as expected reader differences and reject incorrect saved values.
+  Other input, calculation/validation and pagination scenarios remain open.
 - [ ] Add representative production AcroForms, static/dynamic XFA, scripted
   forms, Unicode/font/layout cases and signed PDFs. Record each fixture's source,
   version, checksum and explicit redistribution license or permission; exclude

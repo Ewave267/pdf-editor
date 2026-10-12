@@ -33,7 +33,17 @@ python3 tests/test_worker_safety.py build-viewer/pdf-render-worker \
 The fallback PDF reports one page; the actual XFA layout has three. Native full
 XFA field enumeration is unavailable even when the worker reports
 `fieldsComplete`; an empty metadata list does not establish an empty form.
-These checks establish opening and rendering output, not pixel/layout equivalence,
-input, calculations, validation, Unicode/font fidelity or save/reopen preservation.
+`WorkerSafetyTests.test_irs_production_xfa_round_trips` additionally edits the
+page-one taxpayer-name control with two accented placeholder values, explicitly
+blurs/commits and saves each generation, then reopens in a fresh isolated worker.
+Native readback checks exact text, form type, page dimensions and every page's
+PNG output. PDF.js compares all 56 control names/types/values and checkbox state
+against the original, with the edited name and six script-committed zero totals
+as the only expected differences. The manifest pins these differences explicitly;
+a deliberately incorrect saved value must fail. All edits use temporary copies
+and source bytes remain unchanged.
+
+These checks do not establish pixel/layout equivalence, font fidelity, general
+calculations/validation, pagination after edits or other input/save scenarios.
 Signature-labelled controls do not establish cryptographic signing support.
 Production static XFA and signed fixtures remain outstanding.

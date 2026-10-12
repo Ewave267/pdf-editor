@@ -51,14 +51,61 @@
         "self_employed"
       ]
     ],
-    "native_field_inspection": "Unavailable for full XFA; empty native field metadata is not evidence of an empty form."
+    "native_field_inspection": "Unavailable for full XFA; empty native field metadata is not evidence of an empty form.",
+    "round_trip": {
+      "field": "name_of_taxpayer",
+      "page": 0,
+      "x": 100,
+      "y": 110,
+      "values": [
+        "Test Élodie François",
+        "Test André Noël"
+      ],
+      "committed_controls": [
+        {
+          "page": 0,
+          "control": 12,
+          "name": "total",
+          "value": "0"
+        },
+        {
+          "page": 0,
+          "control": 16,
+          "name": "total",
+          "value": "0"
+        },
+        {
+          "page": 0,
+          "control": 20,
+          "name": "total",
+          "value": "0"
+        },
+        {
+          "page": 0,
+          "control": 21,
+          "name": "amount_owe",
+          "value": "0"
+        },
+        {
+          "page": 0,
+          "control": 22,
+          "name": "interest",
+          "value": "0"
+        },
+        {
+          "page": 0,
+          "control": 23,
+          "name": "total2",
+          "value": "0"
+        }
+      ]
+    }
   },
   "unchecked_operations": [
-    "native input and exit/commit",
+    "input and save/reopen beyond the declared taxpayer-name scenario",
     "calculations and validation",
     "pagination after edits",
     "Unicode/font fidelity",
-    "save/reopen preservation",
     "cryptographic signature behavior",
     "pixel/layout equivalence"
   ]

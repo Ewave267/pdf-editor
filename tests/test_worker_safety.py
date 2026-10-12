@@ -183,6 +183,57 @@ class WorkerSafetyTests(unittest.TestCase):
         self.assertIn("AssertionError", rejected.stderr)
         self.assertEqual(fixture.read_bytes(), before)
 
+    def test_irs_production_xfa_round_trips(self):
+        directory = ROOT / "tests/pdfs/government-us"
+        record = json.loads((directory / "SOURCE.json").read_text())
+        original = directory / record["file"]
+        before = original.read_bytes()
+        scenario = record["expected"]["round_trip"]
+        fixture = original
+        for generation, value in enumerate(scenario["values"], 1):
+            with self.subTest(generation=generation):
+                click = {"op": "event", "page": scenario["page"], "action": "click",
+                         "x": scenario["x"], "y": scenario["y"]}
+                responses = self.run_worker(fixture, [
+                    dict(click, id=1),
+                    {"id": 2, "op": "event", "page": scenario["page"], "action": "selectAll"},
+                    {"id": 3, "op": "event", "page": scenario["page"],
+                     "action": "text", "text": value},
+                    {"id": 4, "op": "event", "page": scenario["page"], "action": "blur"},
+                    {"id": 5, "op": "snapshot"},
+                ])
+                for response in responses[1:]:
+                    self.assertNotIn("error", response)
+                self.assertTrue(responses[1]["handled"])
+                self.assertTrue(responses[3]["handled"])
+                self.assertTrue(responses[4]["handled"])
+                self.assertEqual(responses[3]["text"], value)
+                saved = self.directory / f"{generation}-{record['file']}"
+                saved.write_bytes(base64.b64decode(responses[5]["pdf"]))
+                reopened = self.run_worker(saved, [dict(click, id=1)] + [
+                    {"id": page + 2, "page": page, "width": 300}
+                    for page in range(len(record["expected"]["pages"]))
+                ])
+                self.assertEqual(reopened[0]["formType"], record["expected"]["formType"])
+                self.assertEqual(reopened[0]["pages"], record["expected"]["pages"])
+                self.assertEqual(reopened[1]["text"], value)
+                for response in reopened[2:]:
+                    self.assertNotIn("error", response)
+                    self.assertTrue(base64.b64decode(response["png"]).startswith(b"\x89PNG\r\n\x1a\n"))
+                command = [os.environ.get("SAVE_NODE") or "node",
+                           str(ROOT / "tools/check_production_xfa.mjs"),
+                           os.environ.get("SAVE_PDFJS") or str(ROOT / "tests/reader/node_modules/pdfjs-dist"),
+                           str(directory / "SOURCE.json"), str(saved), value]
+                result = subprocess.run(command, capture_output=True, text=True, timeout=20)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                if generation == 1:
+                    command[-1] = "Deliberately incorrect saved value"
+                    rejected = subprocess.run(command, capture_output=True, text=True, timeout=20)
+                    self.assertNotEqual(rejected.returncode, 0)
+                    self.assertIn("AssertionError", rejected.stderr)
+                fixture = saved
+        self.assertEqual(original.read_bytes(), before)
+
     def test_deterministic_mutation_corpus(self):
         """Small reproducible malformed-input campaign under the real sandbox."""
         randomizer = random.Random(20261010)

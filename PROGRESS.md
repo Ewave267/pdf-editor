@@ -2,6 +2,27 @@
 
 Last updated: 2026-10-12
 
+## Production dynamic XFA text save/reopen regression gate
+
+IRS Form 14653 now exercises two native taxpayer-name edits with accented test
+placeholders, explicit blur/commit, snapshot-save and fresh isolated reopen.
+Native exact text readback, dynamic form type, three-page dimensions and all-page
+PNG output are checked. Pinned PDF.js compares all 56 controls' names/types,
+values and checkbox state, allowing only the declared edited name and six exact
+zero totals committed by native form scripts. PDF.js textarea content uses
+`textContent`; the checker includes it rather than mistaking filled text for blank.
+Deliberately incorrect saved-value expectations are rejected. The source remains
+unchanged and only temporary copies contain test input. No app or dependency
+changes were needed. Other fields, calculations/validation, repeated subforms,
+pagination after edits, font fidelity and signature behavior remain unchecked.
+
+Validation: focused admission/round-trip checks and all 18 worker regressions
+passed, including deliberate mismatch rejection. The full CTest run passed the
+other five gates; its worker gate caught an overly strict empty-field select-all
+assertion, which was removed and rechecked. Python/JavaScript syntax and diff
+whitespace checks passed. The command sandbox blocked Bubblewrap setup; approved
+runs retained application isolation. No dependency rebuild or Windows/macOS run.
+
 ## First production dynamic XFA admission
 
 Added unchanged IRS Form 14653 (revision March 2025) with official provenance,
