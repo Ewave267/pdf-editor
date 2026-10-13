@@ -37,6 +37,12 @@ cryptographic signatures from deferred evaluation to planned work.
   all-page rendering and independent PDF.js checks preserve all 56 controls;
   incorrect input/total expectations fail. This template has no custom validation
   scripts; other validation and pagination scenarios remain open.
+- [x] Verify long-to-short multiline explanation save/reopen generations for
+  IRS Form 14653, with accented/XML-sensitive text, all-page native rendering
+  and independent preservation of all 56 controls. Pin the opening-layout
+  difference (five native pages versus four PDF.js pages) and the return to three
+  pages after replacement. Native split-field focus and cached-page limitations
+  remain open; this is not acceptance of reliable interactive pagination.
 - [ ] Add representative production AcroForms, static/dynamic XFA, scripted
   forms, Unicode/font/layout cases and signed PDFs. Record each fixture's source,
   version, checksum and explicit redistribution license or permission; exclude

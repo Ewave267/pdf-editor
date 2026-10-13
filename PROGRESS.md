@@ -1064,3 +1064,26 @@ Publication validation: workflow 38069902937 passed in 41 seconds and published
 [Development preview — build 25](https://github.com/Ewave267/pdf-editor/releases/tag/preview-38062531097).
 Verified the release is public, marked prerelease, includes all 15 expected
 assets and points at the exact tested application commit `d748565`.
+
+
+## 2026-10-12 — Production XFA multiline persistence and layout evidence
+
+- Added two IRS Form 14653 explanation edit/blur/save/reopen generations:
+  80 accented lines with XML-sensitive characters, followed by a two-line
+  replacement. Fresh native text readback and all-page rendering pass; PDF.js
+  preserves all 56 controls, their values and expected page placement. A
+  deliberately incorrect saved-text expectation fails. Source bytes are unchanged.
+- Pinned reader differences: the long saved form opens with five PDFium pages
+  versus four PDF.js pages; the short replacement opens with three in both.
+- Recorded native limitations rather than declaring interactive pagination
+  reliable: initial split-field focus can return empty text, focusing another
+  text field first changes pagination, and cached page handles after that change
+  can return empty text. Rendering and text readback use separate fresh workers.
+  Shared live-layout/cache handling remains the next repair, with a UI regression
+  needed before claiming this workflow fully supported.
+
+Validation: the focused native/PDF.js multiline regression and all six combined
+viewer/XFA CTest gates passed (130 seconds), including the incorrect-value
+rejection. Python compilation, JavaScript syntax and whitespace checks passed.
+No application or PDFium dependency code changed. Remote/native-platform CI was
+not run.

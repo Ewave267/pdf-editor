@@ -56,7 +56,21 @@ The unchanged template has no custom validation scripts. Numeric rejection and
 length limits produce no validation message; these are input constraints, not
 evidence of custom script-validation coverage.
 
+`WorkerSafetyTests.test_irs_production_xfa_multiline_round_trips` saves an
+80-line accented explanation containing ampersands and XML-sensitive characters,
+then replaces it with two lines and saves again. Fresh native workers verify
+exact text and render every opening page; PDF.js compares all 56 controls,
+including moved fields, preserved line breaks and the six committed zero totals.
+An incorrect saved-text expectation must fail. The source stays unchanged.
+
+The long explanation opens as five pages in PDFium and four in PDF.js; the short
+replacement opens as three in both. Native split-field readback needs another
+text field focused first. That transition changes native pagination to four pages,
+and previously rendered page handles can return empty focused text. Rendering
+and readback therefore use separate fresh workers. These are known limitations,
+not proof of reliable interactive pagination or cached-page preservation.
+
 These checks do not establish pixel/layout equivalence, font fidelity, other
-calculations/validation, pagination after edits or other input/save scenarios.
+calculations/validation, reliable interactive pagination or other input/save scenarios.
 Signature-labelled controls do not establish cryptographic signing support.
 Production static XFA and signed fixtures remain outstanding.

@@ -31,7 +31,9 @@ uncompressed PDFs with byte-accurate cross-reference tables. Phase 3 fixtures us
 See [FORMS](../../docs/FORMS.md) for the pinned AcroForm script limitation.
 The [United States corpus](government-us/README.md) includes unchanged production
 IRS dynamic XFA Form 14653 with native opening/rendering and independent PDF.js
-layout admission checks plus two accented text edit/save/reopen generations.
+layout admission checks plus repeated accented text, numeric calculation and
+long-to-short multiline explanation saves. The explanation checks record native
+split-field focus/cache limitations and reader pagination differences.
 Broader input/save scenarios and production static XFA coverage remain open. Empty category directories reserve space for future reviewed forms.
 
 ## Safety corpus

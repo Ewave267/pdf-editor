@@ -314,6 +314,71 @@ class WorkerSafetyTests(unittest.TestCase):
                 fixture = saved
         self.assertEqual(original.read_bytes(), before)
 
+    def test_irs_production_xfa_multiline_round_trips(self):
+        directory = ROOT / "tests/pdfs/government-us"
+        record = json.loads((directory / "SOURCE.json").read_text())
+        original = directory / record["file"]
+        before = original.read_bytes()
+        scenario = record["expected"]["multiline_round_trip"]
+        fixture = original
+        # shortcut: split-field readback needs prior focus, remove after live XFA pagination is repaired.
+        name_focus = dict(id=99, op="event", page=0, action="click", x=100, y=110)
+        for generation, expected in enumerate(scenario["generations"], 1):
+            with self.subTest(generation=generation):
+                page, value = expected["edit_page"], expected["value"]
+                responses = self.run_worker(fixture, [name_focus,
+                    dict(id=1, op="event", page=page, action="click", x=scenario["x"], y=expected["edit_y"]),
+                    dict(id=2, op="event", page=page, action="selectAll"),
+                    # Native Return is CR; focused text and saved XML normalize it to LF.
+                    dict(id=3, op="event", page=page, action="text", text=value.replace("\n", "\r")),
+                    dict(id=4, op="event", page=page, action="blur"),
+                    dict(id=5, op="snapshot"),
+                ])
+                self.assertTrue(responses.pop(1)["handled"])
+                for response in responses[1:]:
+                    self.assertNotIn("error", response)
+                self.assertTrue(responses[1]["handled"])
+                self.assertTrue(responses[3]["handled"])
+                self.assertEqual(responses[3]["text"], value)
+                self.assertTrue(responses[4]["handled"])
+                saved = self.directory / f"multiline-{generation}-{record['file']}"
+                saved.write_bytes(base64.b64decode(responses[5]["pdf"]))
+                renders = [dict(id=page + 1, page=page, width=300)
+                           for page in range(expected["native_page_count"])]
+                reopened = self.run_worker(saved, renders)
+                self.assertEqual(reopened[0]["formType"], record["expected"]["formType"])
+                self.assertEqual(reopened[0]["pages"],
+                                 [record["expected"]["pages"][0]] * expected["native_page_count"])
+                for response in reopened[1:len(renders) + 1]:
+                    self.assertNotIn("error", response)
+                    self.assertTrue(base64.b64decode(response["png"]).startswith(b"\x89PNG\r\n\x1a\n"))
+                # Keep cached render handles out of the known native layout-change limitation.
+                readback = self.run_worker(saved, [name_focus,
+                    dict(id=98, op="event", page=expected["read_page"], action="click",
+                         x=scenario["x"], y=expected["read_y"]),
+                ])
+                self.assertTrue(readback[-2]["handled"])
+                self.assertTrue(readback[-1]["handled"])
+                self.assertEqual(readback[-1]["text"], value)
+                command = [os.environ.get("SAVE_NODE") or "node",
+                           str(ROOT / "tools/check_production_xfa.mjs"),
+                           os.environ.get("SAVE_PDFJS") or str(ROOT / "tests/reader/node_modules/pdfjs-dist"),
+                           str(directory / "SOURCE.json"), str(saved), str(generation), "multiline_round_trip"]
+                result = subprocess.run(command, capture_output=True, text=True, timeout=20)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                if generation == 1:
+                    incorrect = json.loads(json.dumps(record))
+                    incorrect["file"] = str(original)
+                    incorrect["expected"]["multiline_round_trip"]["generations"][0]["value"] = "Incorrect saved text"
+                    manifest = self.directory / "incorrect-multiline.json"
+                    manifest.write_text(json.dumps(incorrect))
+                    rejected = subprocess.run(command[:3] + [str(manifest)] + command[4:],
+                                              capture_output=True, text=True, timeout=20)
+                    self.assertNotEqual(rejected.returncode, 0)
+                    self.assertIn("AssertionError", rejected.stderr)
+                fixture = saved
+        self.assertEqual(original.read_bytes(), before)
+
     def test_deterministic_mutation_corpus(self):
         """Small reproducible malformed-input campaign under the real sandbox."""
         randomizer = random.Random(20261010)

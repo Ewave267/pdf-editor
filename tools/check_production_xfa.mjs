@@ -7,14 +7,23 @@ import { pathToFileURL } from "node:url";
 
 const [pdfjsDirectory, manifestPath, savedPdf, savedValue, scenarioName] = process.argv.slice(2);
 assert.equal(savedPdf === undefined, savedValue === undefined, "saved PDF and expected value must be supplied together");
-assert.ok(scenarioName === undefined || (savedPdf && scenarioName === "calculation_round_trip"));
+assert.ok(scenarioName === undefined || (savedPdf && ["calculation_round_trip", "multiline_round_trip"].includes(scenarioName)));
 const record = JSON.parse(await readFile(manifestPath, "utf8"));
 const { getDocument, version } = await import(pathToFileURL(resolve(pdfjsDirectory, "legacy/build/pdf.mjs")));
 assert.equal(version, "6.4.299");
 const expected = record.expected;
+let generation;
+if (scenarioName) {
+  const index = Number(savedValue) - 1;
+  const generations = expected[scenarioName].generations;
+  assert.ok(Number.isInteger(index) && index >= 0 && index < generations.length);
+  generation = generations[index];
+}
 let baseline;
 for (const file of [resolve(dirname(manifestPath), record.file), ...(savedPdf ? [savedPdf] : [])]) {
   const saved = file === savedPdf;
+  const multiline = saved && scenarioName === "multiline_round_trip";
+  const counts = multiline ? generation.reader_controls_per_page : expected.controls_per_page;
   const task = getDocument({
     data: new Uint8Array(await readFile(file)),
     enableXfa: true, isEvalSupported: false, disableFontFace: true, useSystemFonts: true,
@@ -22,13 +31,14 @@ for (const file of [resolve(dirname(manifestPath), record.file), ...(savedPdf ? 
   try {
     const document = await task.promise;
     assert.equal(document.isPureXfa, expected.pure_xfa);
-    assert.equal(document.numPages, expected.pages.length);
+    assert.equal(document.numPages, counts.length);
     const state = [];
     for (let index = 0; index < document.numPages; index++) {
       const page = await document.getPage(index + 1);
       const viewport = page.getViewport({ scale: 1 });
-      assert.equal(viewport.width, expected.pages[index].width);
-      assert.equal(viewport.height, expected.pages[index].height);
+      const dimensions = multiline ? expected.pages[0] : expected.pages[index];
+      assert.equal(viewport.width, dimensions.width);
+      assert.equal(viewport.height, dimensions.height);
       const controls = [], names = [];
       function visit(node, name = "") {
         name = node.attributes?.xfaName ?? name;
@@ -44,29 +54,34 @@ for (const file of [resolve(dirname(manifestPath), record.file), ...(savedPdf ? 
       const tree = await page.getXfa();
       assert.ok(tree, `page ${index + 1} must have XFA layout`);
       visit(tree);
-      assert.equal(controls.length, expected.controls_per_page[index]);
+      assert.equal(controls.length, counts[index]);
       const values = controls.map(node => node.attributes?.value ?? node.attributes?.textContent ?? node.value ?? "");
       if (!saved) {
         assert.ok(values.every(value => value === "" || value === "0"), "template must have no filled responses");
         assert.equal(values.filter(value => value === "0").length, expected.unchecked_per_page[index]);
       }
-      for (const name of expected.sample_fields_per_page[index]) assert.ok(names.includes(name), `missing ${name}`);
+      if (!multiline) {
+        for (const name of expected.sample_fields_per_page[index]) assert.ok(names.includes(name), `missing ${name}`);
+      }
     }
     if (saved) {
       const scenario = expected.round_trip;
       const expectedState = baseline.map(control => ({ ...control }));
       let changes = scenario.committed_controls;
-      if (scenarioName) {
+      if (scenarioName === "calculation_round_trip") {
         const calculation = expected[scenarioName];
-        const index = Number(savedValue) - 1;
-        assert.ok(Number.isInteger(index) && index >= 0 && index < calculation.generations.length);
-        const generation = calculation.generations[index];
         assert.equal(generation.values.length, calculation.inputs.length);
         assert.equal(generation.totals.length, changes.length);
         changes = [
           ...calculation.inputs.map((field, index) => ({ ...field, page: calculation.page, value: generation.values[index] })),
           ...changes.map((field, index) => ({ ...field, value: generation.totals[index] })),
         ];
+      } else if (multiline) {
+        const edited = expectedState.filter(control => control.name === expected.multiline_round_trip.field);
+        assert.equal(edited.length, 1);
+        for (const control of expectedState) control.page = generation.reader_page_mapping[control.page];
+        edited[0].page = generation.reader_field_page;
+        edited[0].value = generation.value;
       } else {
         const edited = expectedState.filter(control => control.page === scenario.page && control.name === scenario.field);
         assert.equal(edited.length, 1);

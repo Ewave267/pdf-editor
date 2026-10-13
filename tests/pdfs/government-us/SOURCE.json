@@ -205,12 +205,59 @@
         }
       ],
       "validation": "Numeric edits reject alphabetic characters; the first year control truncates input to four characters. The template has no custom validation scripts."
+    },
+    "multiline_round_trip": {
+      "field": "failure_to_report",
+      "x": 100,
+      "generations": [
+        {
+          "edit_page": 1,
+          "edit_y": 500,
+          "read_page": 2,
+          "read_y": 60,
+          "value": "Test line 01: Élodie & André <placeholder>.\nTest line 02: Élodie & André <placeholder>.\nTest line 03: Élodie & André <placeholder>.\nTest line 04: Élodie & André <placeholder>.\nTest line 05: Élodie & André <placeholder>.\nTest line 06: Élodie & André <placeholder>.\nTest line 07: Élodie & André <placeholder>.\nTest line 08: Élodie & André <placeholder>.\nTest line 09: Élodie & André <placeholder>.\nTest line 10: Élodie & André <placeholder>.\nTest line 11: Élodie & André <placeholder>.\nTest line 12: Élodie & André <placeholder>.\nTest line 13: Élodie & André <placeholder>.\nTest line 14: Élodie & André <placeholder>.\nTest line 15: Élodie & André <placeholder>.\nTest line 16: Élodie & André <placeholder>.\nTest line 17: Élodie & André <placeholder>.\nTest line 18: Élodie & André <placeholder>.\nTest line 19: Élodie & André <placeholder>.\nTest line 20: Élodie & André <placeholder>.\nTest line 21: Élodie & André <placeholder>.\nTest line 22: Élodie & André <placeholder>.\nTest line 23: Élodie & André <placeholder>.\nTest line 24: Élodie & André <placeholder>.\nTest line 25: Élodie & André <placeholder>.\nTest line 26: Élodie & André <placeholder>.\nTest line 27: Élodie & André <placeholder>.\nTest line 28: Élodie & André <placeholder>.\nTest line 29: Élodie & André <placeholder>.\nTest line 30: Élodie & André <placeholder>.\nTest line 31: Élodie & André <placeholder>.\nTest line 32: Élodie & André <placeholder>.\nTest line 33: Élodie & André <placeholder>.\nTest line 34: Élodie & André <placeholder>.\nTest line 35: Élodie & André <placeholder>.\nTest line 36: Élodie & André <placeholder>.\nTest line 37: Élodie & André <placeholder>.\nTest line 38: Élodie & André <placeholder>.\nTest line 39: Élodie & André <placeholder>.\nTest line 40: Élodie & André <placeholder>.\nTest line 41: Élodie & André <placeholder>.\nTest line 42: Élodie & André <placeholder>.\nTest line 43: Élodie & André <placeholder>.\nTest line 44: Élodie & André <placeholder>.\nTest line 45: Élodie & André <placeholder>.\nTest line 46: Élodie & André <placeholder>.\nTest line 47: Élodie & André <placeholder>.\nTest line 48: Élodie & André <placeholder>.\nTest line 49: Élodie & André <placeholder>.\nTest line 50: Élodie & André <placeholder>.\nTest line 51: Élodie & André <placeholder>.\nTest line 52: Élodie & André <placeholder>.\nTest line 53: Élodie & André <placeholder>.\nTest line 54: Élodie & André <placeholder>.\nTest line 55: Élodie & André <placeholder>.\nTest line 56: Élodie & André <placeholder>.\nTest line 57: Élodie & André <placeholder>.\nTest line 58: Élodie & André <placeholder>.\nTest line 59: Élodie & André <placeholder>.\nTest line 60: Élodie & André <placeholder>.\nTest line 61: Élodie & André <placeholder>.\nTest line 62: Élodie & André <placeholder>.\nTest line 63: Élodie & André <placeholder>.\nTest line 64: Élodie & André <placeholder>.\nTest line 65: Élodie & André <placeholder>.\nTest line 66: Élodie & André <placeholder>.\nTest line 67: Élodie & André <placeholder>.\nTest line 68: Élodie & André <placeholder>.\nTest line 69: Élodie & André <placeholder>.\nTest line 70: Élodie & André <placeholder>.\nTest line 71: Élodie & André <placeholder>.\nTest line 72: Élodie & André <placeholder>.\nTest line 73: Élodie & André <placeholder>.\nTest line 74: Élodie & André <placeholder>.\nTest line 75: Élodie & André <placeholder>.\nTest line 76: Élodie & André <placeholder>.\nTest line 77: Élodie & André <placeholder>.\nTest line 78: Élodie & André <placeholder>.\nTest line 79: Élodie & André <placeholder>.\nTest line 80: Élodie & André <placeholder>.",
+          "native_page_count": 5,
+          "reader_controls_per_page": [
+            24,
+            9,
+            1,
+            22
+          ],
+          "reader_page_mapping": [
+            0,
+            1,
+            3
+          ],
+          "reader_field_page": 2
+        },
+        {
+          "edit_page": 2,
+          "edit_y": 60,
+          "read_page": 1,
+          "read_y": 500,
+          "value": "Test Élodie & André <replacement>.\nSecond placeholder line.",
+          "native_page_count": 3,
+          "reader_controls_per_page": [
+            24,
+            10,
+            22
+          ],
+          "reader_page_mapping": [
+            0,
+            1,
+            2
+          ],
+          "reader_field_page": 1
+        }
+      ],
+      "reader_difference": "The 80-line explanation opens as five PDFium pages and four PDF.js pages. Short replacement opens as three in both. PDF.js verifies all controls; native readback verifies exact explanation text. Layout equivalence is not established.",
+      "native_limitations": "Fresh split-field focus returns empty text unless another text field is focused first. That focus transition changes the native page count from five to four; previously rendered page handles may then return empty text. Rendering and text readback use separate fresh workers. Live pagination/cache preservation is not supported by this scenario."
     }
   },
   "unchecked_operations": [
-    "input and save/reopen beyond the declared taxpayer-name and tax/interest scenarios",
+    "input and save/reopen beyond the declared taxpayer-name, tax/interest and multiline explanation scenarios",
     "other calculations and custom script validation (this template has no custom validation scripts)",
-    "pagination after edits",
+    "interactive pagination and cached-page/field preservation after layout changes",
     "Unicode/font fidelity",
     "cryptographic signature behavior",
     "pixel/layout equivalence"
