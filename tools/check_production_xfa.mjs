@@ -7,7 +7,7 @@ import { pathToFileURL } from "node:url";
 
 const [pdfjsDirectory, manifestPath, savedPdf, savedValue, scenarioName] = process.argv.slice(2);
 assert.equal(savedPdf === undefined, savedValue === undefined, "saved PDF and expected value must be supplied together");
-assert.ok(scenarioName === undefined || (savedPdf && ["calculation_round_trip", "multiline_round_trip"].includes(scenarioName)));
+assert.ok(scenarioName === undefined || (savedPdf && ["calculation_round_trip", "multiline_round_trip", "repeated_rows_round_trip"].includes(scenarioName)));
 const record = JSON.parse(await readFile(manifestPath, "utf8"));
 const { getDocument, version } = await import(pathToFileURL(resolve(pdfjsDirectory, "legacy/build/pdf.mjs")));
 assert.equal(version, "6.4.299");
@@ -23,7 +23,8 @@ let baseline;
 for (const file of [resolve(dirname(manifestPath), record.file), ...(savedPdf ? [savedPdf] : [])]) {
   const saved = file === savedPdf;
   const multiline = saved && scenarioName === "multiline_round_trip";
-  const counts = multiline ? generation.reader_controls_per_page : expected.controls_per_page;
+  const repeated = saved && scenarioName === "repeated_rows_round_trip";
+  const counts = multiline || repeated ? generation.reader_controls_per_page : expected.controls_per_page;
   const task = getDocument({
     data: new Uint8Array(await readFile(file)),
     enableXfa: true, isEvalSupported: false, disableFontFace: true, useSystemFonts: true,
@@ -36,7 +37,7 @@ for (const file of [resolve(dirname(manifestPath), record.file), ...(savedPdf ? 
     for (let index = 0; index < document.numPages; index++) {
       const page = await document.getPage(index + 1);
       const viewport = page.getViewport({ scale: 1 });
-      const dimensions = multiline ? expected.pages[0] : expected.pages[index];
+      const dimensions = multiline || repeated ? expected.pages[0] : expected.pages[index];
       assert.equal(viewport.width, dimensions.width);
       assert.equal(viewport.height, dimensions.height);
       const controls = [], names = [];
@@ -60,11 +61,28 @@ for (const file of [resolve(dirname(manifestPath), record.file), ...(savedPdf ? 
         assert.ok(values.every(value => value === "" || value === "0"), "template must have no filled responses");
         assert.equal(values.filter(value => value === "0").length, expected.unchecked_per_page[index]);
       }
-      if (!multiline) {
+      if (!multiline && !repeated) {
         for (const name of expected.sample_fields_per_page[index]) assert.ok(names.includes(name), `missing ${name}`);
       }
     }
     if (saved) {
+      // shortcut: row data only; add heading/layout checks when native header duplication is fixed.
+      if (repeated) {
+        const scenario = expected.repeated_rows_round_trip;
+        const headers = baseline.slice(0, scenario.header_controls).map(control => ({ ...control }));
+        const row = baseline.slice(scenario.header_controls);
+        assert.deepEqual(row.map(control => control.name), scenario.row_fields);
+        assert.equal(headers.at(-1).name, "number_of_issues");
+        headers.at(-1).value = generation.count;
+        assert.equal(generation.values.length, Number(generation.count));
+        const rows = generation.values.flatMap(value => row.map(control => ({ ...control,
+          page: generation.reader_row_page,
+          value: control.name === "identified_issue" ? value : control.value,
+        })));
+        assert.deepEqual(state, [...headers, ...rows], "saved repeated rows must preserve every control and value");
+        console.log(`PASS: PDF.js verified ${file} repeated rows and values`);
+        continue;
+      }
       const scenario = expected.round_trip;
       const expectedState = baseline.map(control => ({ ...control }));
       let changes = scenario.committed_controls;

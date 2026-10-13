@@ -44,6 +44,16 @@ cryptographic signatures from deferred evaluation to planned work.
   pages after replacement. Repair direct split-field focus and cached-page
   handling after relayout; verify live page-list changes, cancelled removed-page
   renders and continued QML keyboard input. Other layout scenarios remain open.
+- [x] Admit unchanged IRS Form 14234-C with pinned public-domain provenance.
+  Verify one-to-three-to-two repeated issue rows over two edit/save/reopen
+  generations, accented/XML-sensitive values, preservation of neighboring rows
+  and removal of a populated last row. Fresh native readback/all-page rendering
+  and PDF.js compare every control; wrong values and missing-row expectations
+  fail. Native saved datasets accumulate table headings and the second generation
+  opens as two pages in both readers; layout preservation remains unsupported.
+- [ ] Fix accumulating `HeaderRow` groups/table headings in Form 14234-C native
+  save/reopen; verify live row-count changes and longer pagination cycles before
+  declaring this fixture's layout reliable.
 - [ ] Add representative production AcroForms, static/dynamic XFA, scripted
   forms, Unicode/font/layout cases and signed PDFs. Record each fixture's source,
   version, checksum and explicit redistribution license or permission; exclude

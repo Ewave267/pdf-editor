@@ -183,6 +183,87 @@ class WorkerSafetyTests(unittest.TestCase):
         self.assertIn("AssertionError", rejected.stderr)
         self.assertEqual(fixture.read_bytes(), before)
 
+    def test_irs_production_xfa_repeated_rows(self):
+        directory = ROOT / "tests/pdfs/government-us"
+        manifest = directory / "f14234c-SOURCE.json"
+        record = json.loads(manifest.read_text())
+        original = directory / record["file"]
+        source = original.read_bytes()
+        self.assertEqual(len(source), record["bytes"])
+        self.assertEqual(hashlib.sha256(source).hexdigest(), record["sha256"])
+        expected = record["expected"]
+        opening = self.run_worker(original, [{"id": 1, "page": 0, "width": 300}])
+        self.assertEqual(opening[0]["formType"], expected["formType"])
+        self.assertEqual(opening[0]["pages"], expected["pages"])
+        self.assertTrue(base64.b64decode(opening[1]["png"]).startswith(b"\x89PNG\r\n\x1a\n"))
+        reader = [os.environ.get("SAVE_NODE") or "node",
+                  str(ROOT / "tools/check_production_xfa.mjs"),
+                  os.environ.get("SAVE_PDFJS") or str(ROOT / "tests/reader/node_modules/pdfjs-dist"),
+                  str(manifest)]
+        result = subprocess.run(reader, capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        fixture = original
+        scenario = expected["repeated_rows_round_trip"]
+        for generation, state in enumerate(scenario["generations"], 1):
+            with self.subTest(generation=generation):
+                commands = []
+                for edit in state["edits"]:
+                    commands.extend([
+                        {"op": "event", "page": edit["page"], "action": "click",
+                         "x": edit["x"], "y": edit["y"]},
+                        {"op": "event", "page": edit["page"], "action": "selectAll"},
+                        {"op": "event", "page": edit["page"], "action": "text", "text": edit["value"]},
+                        {"op": "event", "page": edit["page"], "action": "blur"},
+                    ])
+                commands.append({"op": "snapshot"})
+                responses = self.run_worker(fixture, [dict(command, id=index)
+                                                     for index, command in enumerate(commands, 1)])
+                for response in responses[1:]:
+                    self.assertNotIn("error", response)
+                for index, edit in enumerate(state["edits"]):
+                    self.assertTrue(responses[index * 4 + 1]["handled"], edit["field"])
+                    self.assertTrue(responses[index * 4 + 3]["handled"], edit["field"])
+                    self.assertEqual(responses[index * 4 + 3]["text"], edit["value"])
+                    self.assertTrue(responses[index * 4 + 4]["handled"])
+                saved = self.directory / f"{generation}-{record['file']}"
+                saved.write_bytes(base64.b64decode(responses[-1]["pdf"]))
+                read_commands = [{"page": page, "width": 300}
+                                 for page in range(state["native_page_count"])]
+                read_commands.extend({"op": "event", "page": state["read_page"],
+                                      "action": "click", "x": 120, "y": y} for y in state["read_y"])
+                reopened = self.run_worker(saved, [dict(command, id=index)
+                                                  for index, command in enumerate(read_commands, 1)])
+                self.assertEqual(reopened[0]["formType"], expected["formType"])
+                self.assertEqual(reopened[0]["pages"], expected["pages"] * state["native_page_count"])
+                for response in reopened[1:state["native_page_count"] + 1]:
+                    self.assertNotIn("error", response)
+                    self.assertTrue(base64.b64decode(response["png"]).startswith(b"\x89PNG\r\n\x1a\n"))
+                self.assertEqual(len(reopened), len(read_commands) + 1)
+                for response, value in zip(reopened[state["native_page_count"] + 1:], state["values"]):
+                    self.assertTrue(response["handled"])
+                    self.assertEqual(response["text"], value)
+                command = reader + [str(saved), str(generation), "repeated_rows_round_trip"]
+                result = subprocess.run(command, capture_output=True, text=True, timeout=20)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                incorrect = json.loads(manifest.read_text())
+                incorrect["file"] = str(original)
+                for mismatch in ("value", "lost-row"):
+                    bad_state = json.loads(json.dumps(incorrect))
+                    bad_generation = bad_state["expected"]["repeated_rows_round_trip"]["generations"][generation - 1]
+                    if mismatch == "value":
+                        bad_generation["values"][0] = "Deliberately incorrect saved value"
+                    else:
+                        bad_generation["values"].pop()
+                        bad_generation["count"] = str(len(bad_generation["values"]))
+                    bad_manifest = self.directory / f"incorrect-{mismatch}.json"
+                    bad_manifest.write_text(json.dumps(bad_state))
+                    rejected = subprocess.run(reader[:-1] + [str(bad_manifest)] + command[-3:],
+                                              capture_output=True, text=True, timeout=20)
+                    self.assertNotEqual(rejected.returncode, 0)
+                    self.assertIn("AssertionError", rejected.stderr)
+                fixture = saved
+        self.assertEqual(original.read_bytes(), source)
+
     def test_irs_production_xfa_round_trips(self):
         directory = ROOT / "tests/pdfs/government-us"
         record = json.loads((directory / "SOURCE.json").read_text())

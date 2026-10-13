@@ -1,0 +1,143 @@
+{
+  "publisher": "Internal Revenue Service, United States Department of the Treasury",
+  "file": "irs-f14234c.pdf",
+  "title": "Form 14234-C: Taxpayer Initial Issues List",
+  "version": "Rev. May 2025",
+  "source_url": "https://www.irs.gov/pub/irs-pdf/f14234c.pdf",
+  "retrieved_on": "2026-10-12",
+  "sha256": "b01de38c777e62f3559252279b328a77d31a9d4e2b0f7058b219664d9487934c",
+  "bytes": 34955,
+  "rights": "Federal-employee IRS content is not subject to copyright and may be freely copied; IRS credit requested. No endorsement is implied.",
+  "rights_url": "https://www.irs.gov/about-irs/use-of-content-from-irsgov",
+  "privacy_review": "Unsubmitted blank template; all 12 opening controls independently checked empty. No taxpayer data added.",
+  "symbols_review": "Official form retained unchanged for compatibility testing, separately attributed; no government endorsement is claimed.",
+  "expected": {
+    "formType": 2,
+    "pure_xfa": true,
+    "pages": [
+      {
+        "width": 792,
+        "height": 612
+      }
+    ],
+    "controls_per_page": [
+      12
+    ],
+    "unchecked_per_page": [
+      0
+    ],
+    "sample_fields_per_page": [
+      [
+        "number_of_issues",
+        "identified_issue"
+      ]
+    ],
+    "native_field_inspection": "Full XFA field enumeration unavailable; use direct focused text readback.",
+    "repeated_rows_round_trip": {
+      "header_controls": 5,
+      "row_fields": [
+        "issue_number",
+        "identified_issue",
+        "new_recurring_issue",
+        "permanent_temporary_both",
+        "short_long_term",
+        "estimated_amount",
+        "description"
+      ],
+      "generations": [
+        {
+          "edits": [
+            {
+              "field": "number_of_issues",
+              "page": 0,
+              "x": 680,
+              "y": 185,
+              "value": "3"
+            },
+            {
+              "field": "identified_issue",
+              "page": 0,
+              "x": 120,
+              "y": 243,
+              "value": "Test Élodie <first>"
+            }
+          ],
+          "count": "3",
+          "values": [
+            "Test Élodie <first>",
+            "",
+            ""
+          ],
+          "read_page": 0,
+          "read_y": [
+            360,
+            379,
+            398
+          ],
+          "native_page_count": 1,
+          "reader_controls_per_page": [
+            26
+          ],
+          "reader_row_page": 0
+        },
+        {
+          "edits": [
+            {
+              "field": "identified_issue",
+              "page": 0,
+              "x": 120,
+              "y": 360,
+              "value": "Test André <replace>"
+            },
+            {
+              "field": "identified_issue",
+              "page": 0,
+              "x": 120,
+              "y": 379,
+              "value": "Test Noël & second"
+            },
+            {
+              "field": "identified_issue",
+              "page": 0,
+              "x": 120,
+              "y": 398,
+              "value": "Test discarded third"
+            },
+            {
+              "field": "number_of_issues",
+              "page": 0,
+              "x": 680,
+              "y": 185,
+              "value": "2"
+            }
+          ],
+          "count": "2",
+          "values": [
+            "Test André <replace>",
+            "Test Noël & second"
+          ],
+          "read_page": 1,
+          "read_y": [
+            163,
+            181
+          ],
+          "native_page_count": 2,
+          "reader_controls_per_page": [
+            5,
+            14
+          ],
+          "reader_row_page": 1
+        }
+      ],
+      "layout_limitation": "Native save/reopen creates extra HeaderRow data groups and repeated table headings; second saved generation opens as two pages in both readers. Row values and removal are checked, but layout preservation is unsupported."
+    }
+  },
+  "unchecked_operations": [
+    "custom script validation (this template has no validation scripts)",
+    "layout preservation: repeated table headings accumulate in native saved datasets",
+    "live row positioning and pagination after count changes",
+    "more than two edit/save/reopen cycles",
+    "Unicode/font fidelity",
+    "cryptographic signatures"
+  ]
+}

@@ -2,6 +2,28 @@
 
 Last updated: 2026-10-12
 
+## Production dynamic XFA repeated-row regression gate
+
+Added unchanged IRS Form 14234-C (May 2025) with official public-domain provenance,
+exact bytes/hash and empty-response admission. Two edit/blur/save/reopen cycles
+exercise its scripted row count: one row grows to three, then shrinks to two
+after all three identified-issue fields have been populated. Accented/XML-sensitive
+values survive, neighboring rows remain distinct and the populated last row is
+removed. Fresh native workers read back every surviving row and render all pages;
+pinned PDF.js checks every control. Deliberately wrong values and missing-row
+expectations fail. Original fixture bytes stay unchanged.
+
+Discovered a layout defect: native saves add HeaderRow groups/repeated headings;
+the second generation opens as two pages in both readers. The manifest and
+roadmap explicitly leave layout preservation and live row positioning unresolved.
+This test-only slice does not claim arbitrary repeated-subform compatibility.
+No application or dependency changes were made.
+
+Validation: the focused regression and all six local CTest gates passed (136.8
+seconds), including deliberate wrong-value and missing-row rejection. Python/
+JavaScript syntax and diff whitespace checks passed. Approved runs retained
+Bubblewrap isolation. No dependency rebuild or Windows/macOS desktop checks.
+
 ## Production dynamic XFA calculation and input-constraint regression gate
 
 IRS Form 14653 now exercises two successive edit/blur/save/reopen generations
