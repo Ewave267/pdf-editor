@@ -64,13 +64,18 @@ including moved fields, preserved line breaks and the six committed zero totals.
 An incorrect saved-text expectation must fail. The source stays unchanged.
 
 The long explanation opens as five pages in PDFium and four in PDF.js; the short
-replacement opens as three in both. Native split-field readback needs another
-text field focused first. That transition changes native pagination to four pages,
-and previously rendered page handles can return empty focused text. Rendering
-and readback therefore use separate fresh workers. These are known limitations,
-not proof of reliable interactive pagination or cached-page preservation.
+replacement opens as three in both. Focusing the expanded field triggers a
+four-page native live layout. The worker revalidates cached page views after
+relayout and completes text-field focus when the first click rebuilds its view.
+Native rendering and direct text readback now use the same worker, without
+focusing another field first.
+
+`ViewerTests.xfaProductionRelayout` verifies the app's live page list, removal
+of queued renders for deleted pages, continued native editing after cached
+renders, shorter replacement and saving/reopening. It also clicks the expanded
+field in QML and types after relayout to verify restored keyboard focus.
 
 These checks do not establish pixel/layout equivalence, font fidelity, other
-calculations/validation, reliable interactive pagination or other input/save scenarios.
+calculations/validation, layout rules beyond this scenario or other input/save scenarios.
 Signature-labelled controls do not establish cryptographic signing support.
 Production static XFA and signed fixtures remain outstanding.

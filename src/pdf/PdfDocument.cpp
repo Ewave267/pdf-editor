@@ -632,6 +632,15 @@ void PdfDocument::receive()
                 updateFit();
                 emit stateChanged();
             }
+            if (response.contains("layoutPages"))
+            {
+                pages_ = response["layoutPages"].toArray().toVariantList();
+                queue_.removeIf([this](const auto& request)
+                                { return request.command.isEmpty() && request.page >= pageCount(); });
+                setCurrentPage(std::clamp(currentPage_, 1, pageCount()));
+                updateFit();
+                emit stateChanged();
+            }
             const int previousFocus = focusedField_;
             focusedField_ = response["focusedField"].toInt(-1);
             formPage_ = response["focusPage"].toInt(formPage_);
@@ -644,11 +653,15 @@ void PdfDocument::receive()
                 setCurrentPage(formPage_ + 1);
                 emit formFocusRequested(formPage_, focusedField());
             }
-            if (xfaFull_ && response["caretUpdated"].toBool() && command["action"] == "key" &&
-                command["key"].toInt() == 9)
+            if (xfaFull_ && ((response["caretUpdated"].toBool() && command["action"] == "key" &&
+                              command["key"].toInt() == 9) ||
+                             (response.contains("layoutPages") && formFieldType_ >= 0)))
             {
                 setCurrentPage(formPage_ + 1);
-                emit formFocusRequested(formPage_, response["focusRect"].toObject().toVariantMap());
+                auto rect = response["focusRect"].toObject().toVariantMap();
+                if (rect.isEmpty() && command["action"] == "click")
+                    rect = {{"x", command["x"].toDouble()}, {"y", command["y"].toDouble()}};
+                emit formFocusRequested(formPage_, rect);
             }
             formError_ = response["validationMessage"].toString();
             if (response["changed"].toBool())

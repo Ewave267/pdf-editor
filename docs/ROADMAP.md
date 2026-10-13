@@ -41,8 +41,9 @@ cryptographic signatures from deferred evaluation to planned work.
   IRS Form 14653, with accented/XML-sensitive text, all-page native rendering
   and independent preservation of all 56 controls. Pin the opening-layout
   difference (five native pages versus four PDF.js pages) and the return to three
-  pages after replacement. Native split-field focus and cached-page limitations
-  remain open; this is not acceptance of reliable interactive pagination.
+  pages after replacement. Repair direct split-field focus and cached-page
+  handling after relayout; verify live page-list changes, cancelled removed-page
+  renders and continued QML keyboard input. Other layout scenarios remain open.
 - [ ] Add representative production AcroForms, static/dynamic XFA, scripted
   forms, Unicode/font/layout cases and signed PDFs. Record each fixture's source,
   version, checksum and explicit redistribution license or permission; exclude

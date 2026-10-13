@@ -251,13 +251,13 @@
         }
       ],
       "reader_difference": "The 80-line explanation opens as five PDFium pages and four PDF.js pages. Short replacement opens as three in both. PDF.js verifies all controls; native readback verifies exact explanation text. Layout equivalence is not established.",
-      "native_limitations": "Fresh split-field focus returns empty text unless another text field is focused first. That focus transition changes the native page count from five to four; previously rendered page handles may then return empty text. Rendering and text readback use separate fresh workers. Live pagination/cache preservation is not supported by this scenario."
+      "native_interaction": "Direct split-field focus after rendering all five opening pages triggers four-page live layout and retains the full edit buffer. Cached page views are revalidated; native page changes update the app model and restore keyboard focus. Replacing the explanation and leaving the field contracts the live layout to three pages. Rendering and readback use the same worker."
     }
   },
   "unchecked_operations": [
     "input and save/reopen beyond the declared taxpayer-name, tax/interest and multiline explanation scenarios",
     "other calculations and custom script validation (this template has no custom validation scripts)",
-    "interactive pagination and cached-page/field preservation after layout changes",
+    "interactive pagination and layout rules beyond the declared multiline explanation scenario",
     "Unicode/font fidelity",
     "cryptographic signature behavior",
     "pixel/layout equivalence"

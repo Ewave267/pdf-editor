@@ -281,12 +281,11 @@ class PdfDocument
             page = FPDF_LoadPage(document_, index);
             require(page, "Cannot load the form page.");
             openPages_.insert(index, page);
-            host_.page = page;
-            host_.pageIndex = index;
-            FORM_OnAfterLoadPage(page, form_);
         }
         host_.page = page;
         host_.pageIndex = index;
+        // XFA relayout replaces native page views even when the page handle is cached.
+        FORM_OnAfterLoadPage(page, form_);
         return page;
     }
     template <typename Read> QString fieldString(Read read)
@@ -566,6 +565,7 @@ class PdfDocument
         bool handled = false;
         QString copiedText;
         host_.changed = false;
+        host_.layoutChanged = false;
         caretUpdated_ = false;
         host_.validationMessage.clear();
         if (action == "highlight")
@@ -679,6 +679,15 @@ class PdfDocument
             FORM_OnMouseMove(form_, page, flags, x, y);
             handled = FORM_OnLButtonDown(form_, page, flags, x, y);
             handled = FORM_OnLButtonUp(form_, page, flags, x, y) || handled;
+            if (focusedType_ == FPDF_FORMFIELD_XFA_TEXTFIELD && host_.layoutChanged &&
+                index < FPDF_GetPageCount(document_))
+            {
+                // Relayout can remove the page view while its first click sets focus.
+                page = loadPage(index);
+                FORM_OnMouseMove(form_, page, flags, x, y);
+                handled = FORM_OnLButtonDown(form_, page, flags, x, y) || handled;
+                handled = FORM_OnLButtonUp(form_, page, flags, x, y) || handled;
+            }
         }
         else if (action == "text")
         {
@@ -796,7 +805,10 @@ class PdfDocument
             }
         }
         if (type_ == FORMTYPE_XFA_FULL && currentFormPage_ >= 0)
+        {
+            currentFormPage_ = std::min(currentFormPage_, FPDF_GetPageCount(document_) - 1);
             page = loadPage(currentFormPage_);
+        }
         refreshFields();
         // The annotation value is committed on blur. Publish the active edit
         // buffer for text fields so helper feedback follows ongoing typing.
@@ -815,20 +827,39 @@ class PdfDocument
                (request.value("key").toInt() == 8 || request.value("key").toInt() == 46)) ||
               (action == "click" && (focusedType_ == 2 || focusedType_ == 3 || focusedType_ == 4 ||
                                      focusedType_ == 9 || focusedType_ == 10))));
-        return {{"handled", handled},
-                {"changed", mutation},
-                {"fields", fields_},
-                {"fieldsComplete", fieldsComplete_},
-                {"focusedField", focusedId_},
-                {"focusPage", currentFormPage_},
-                {"focusRect", focusRect_},
-                {"caretUpdated", caretUpdated_},
-                {"validationMessage", QString::fromUtf16(host_.validationMessage.data(),
+        QJsonObject result{{"handled", handled},
+                           {"changed", mutation},
+                           {"fields", fields_},
+                           {"fieldsComplete", fieldsComplete_},
+                           {"focusedField", focusedId_},
+                           {"focusPage", currentFormPage_},
+                           {"focusRect", focusRect_},
+                           {"caretUpdated", caretUpdated_},
+                           {"validationMessage", QString::fromUtf16(host_.validationMessage.data(),
                                                          host_.validationMessage.size())},
-                {"fieldType", focusedType_},
-                {"text", focusedText(page)},
-                {"deniedHostRequests", host_.deniedRequests},
-                {"selectedText", copiedText}};
+                           {"fieldType", focusedType_},
+                           {"text", focusedText(page)},
+                           {"deniedHostRequests", host_.deniedRequests},
+                           {"selectedText", copiedText}};
+        if (host_.layoutChanged)
+        {
+            const int count = FPDF_GetPageCount(document_);
+            require(count > 0 && count <= 2000, "The viewer supports documents with 1 to 2000 pages.");
+            QJsonArray pages;
+            for (int i = 0; i < count; ++i)
+            {
+                auto updated = FPDF_LoadPage(document_, i);
+                require(updated, "Cannot load a document page.");
+                const double width = FPDF_GetPageWidth(updated), height = FPDF_GetPageHeight(updated);
+                FPDF_ClosePage(updated);
+                require(std::isfinite(width) && std::isfinite(height) && width >= 1 && height >= 1 &&
+                            width <= 14400 && height <= 14400,
+                        "The document contains an unsupported page size.");
+                pages.append(QJsonObject{{"width", width}, {"height", height}});
+            }
+            result.insert("layoutPages", pages);
+        }
+        return result;
     }
 
     QJsonObject snapshot()

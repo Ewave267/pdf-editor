@@ -29,7 +29,7 @@ struct Host : FPDF_FORMFILLINFO
     FPDF_PAGE page = nullptr;
     int deniedRequests = 0;
     int pageIndex = 0;
-    bool changed = false, topLeftCoordinates = false;
+    bool changed = false, topLeftCoordinates = false, layoutChanged = false;
     std::u16string validationMessage;
     std::function<FPDF_PAGE(int)> lookupPage;
     std::function<void(FPDF_PAGE, double, double, double, double)> caret;
@@ -120,7 +120,8 @@ struct Host : FPDF_FORMFILLINFO
             *right = FPDF_GetPageWidth(page);
             *bottom = host(info).topLeftCoordinates ? FPDF_GetPageHeight(page) : 0;
         };
-        FFI_PageEvent = [](FPDF_FORMFILLINFO*, int, FPDF_DWORD) {};
+        FFI_PageEvent = [](FPDF_FORMFILLINFO* info, int, FPDF_DWORD)
+        { host(info).layoutChanged = true; };
         FFI_PopupMenu = [](FPDF_FORMFILLINFO*, FPDF_PAGE, FPDF_WIDGET, int, float, float)
         { return 0; };
         FFI_OpenFile = [](FPDF_FORMFILLINFO* info, int, FPDF_WIDESTRING,

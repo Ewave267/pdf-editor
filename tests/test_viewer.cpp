@@ -247,6 +247,99 @@ class ViewerTests : public QObject
         QVERIFY(!qvariant_cast<QImage>(rendered.first()[1]).isNull());
     }
 
+    void xfaProductionRelayout()
+    {
+        QFile manifest(QString(TEST_ROOT) + "/tests/pdfs/government-us/SOURCE.json");
+        QVERIFY(manifest.open(QIODevice::ReadOnly));
+        const auto generations = QJsonDocument::fromJson(manifest.readAll()).object()["expected"]
+                                     .toObject()["multiline_round_trip"].toObject()["generations"].toArray();
+        const auto longText = generations[0].toObject()["value"].toString();
+        const auto shortText = generations[1].toObject()["value"].toString();
+        QTemporaryDir directory;
+        PdfDocument document;
+        document.open(fixture("government-us/irs-f14653.pdf"));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        auto event = [&](int page, const QString& action, double y = 0, QString text = {})
+        {
+            QSignalSpy done(&document, &PdfDocument::formEventFinished);
+            document.formEvent(page, action, 100, y, 0, text.replace('\n', '\r'));
+            return done.wait(10000) && done.first()[1].toBool();
+        };
+        QVERIFY(event(1, "click", 500));
+        QVERIFY(event(1, "text", 0, longText));
+        QVERIFY(event(1, "blur"));
+        const auto expanded = directory.filePath("expanded.pdf");
+        document.saveAs(QUrl::fromLocalFile(expanded));
+        QTRY_VERIFY_WITH_TIMEOUT(!document.saving(), 30000);
+        QVERIFY2(document.saveError().isEmpty(), qPrintable(document.saveError()));
+        document.close();
+        document.open(QUrl::fromLocalFile(expanded));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        QCOMPARE(document.pageCount(), 5);
+        for (int page = 0; page < document.pageCount(); ++page)
+        {
+            QSignalSpy images(&document, &PdfDocument::rendered);
+            document.requestRender(page, 300);
+            QVERIFY(images.wait(10000));
+            QVERIFY(!qvariant_cast<QImage>(images.first()[1]).isNull());
+        }
+        document.setCurrentPage(5);
+        QVERIFY(event(2, "click", 60));
+        QCOMPARE(document.formText(), longText);
+        QCOMPARE(document.pageCount(), 4);
+        QCOMPARE(document.currentPage(), 3);
+        document.setCurrentPage(4);
+        QVERIFY(event(2, "selectAll"));
+        QVERIFY(event(2, "text", 0, shortText));
+        QVERIFY(event(2, "blur"));
+        // Input runs before queued thumbnails; a removed page must not reach the worker.
+        document.formEvent(0, "click", 100, 110);
+        document.requestRender(3, 301);
+        QTRY_VERIFY_WITH_TIMEOUT(!document.formBusy(), 10000);
+        QCOMPARE(document.pageCount(), 3);
+        QCOMPARE(document.currentPage(), 1);
+        QVERIFY(event(1, "click", 500));
+        QCOMPARE(document.formText(), shortText);
+        const auto contracted = directory.filePath("contracted.pdf");
+        document.saveAs(QUrl::fromLocalFile(contracted));
+        QTRY_VERIFY_WITH_TIMEOUT(!document.saving(), 30000);
+        QVERIFY2(document.saveError().isEmpty(), qPrintable(document.saveError()));
+        document.close();
+        document.open(QUrl::fromLocalFile(contracted));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        QCOMPARE(document.pageCount(), 3);
+        QVERIFY(event(1, "click", 500));
+        QCOMPARE(document.formText(), shortText);
+        QVERIFY(document.error().isEmpty());
+        QVERIFY(document.formError().isEmpty());
+        document.close();
+        document.open(QUrl::fromLocalFile(expanded));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        QQmlApplicationEngine engine;
+        engine.rootContext()->setContextProperty("pdfDocument", &document);
+        engine.load(QUrl("qrc:/qml/Main.qml"));
+        auto* window = qobject_cast<QQuickWindow*>(engine.rootObjects().first());
+        QVERIFY(QTest::qWaitForWindowExposed(window));
+        QVERIFY(waitForFrame(window));
+        QVERIFY(QMetaObject::invokeMethod(window, "revealFormField", Q_ARG(QVariant, 2),
+                                         Q_ARG(QVariant, QVariantMap{})));
+        QTRY_VERIFY(window->activeFocusItem() &&
+                    window->activeFocusItem()->objectName() == "formInput2");
+        auto* surface = item(window->contentItem(), "formInput2");
+        QVERIFY(surface);
+        QVERIFY(waitForFrame(window));
+        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier,
+                          surface->mapToScene(QPointF(100 * document.zoom(),
+                                                     60 * document.zoom())).toPoint());
+        QTRY_COMPARE(document.formText(), longText);
+        QCOMPARE(document.pageCount(), 4);
+        QTRY_VERIFY(window->activeFocusItem() &&
+                    window->activeFocusItem()->objectName() == "formInput2");
+        QTest::keyClick(window, Qt::Key_A, Qt::ControlModifier);
+        QTest::keyClick(window, Qt::Key_X);
+        QTRY_COMPARE(document.formText(), QString("x"));
+    }
+
     void xfaCrossPageNavigation()
     {
         PdfDocument document;

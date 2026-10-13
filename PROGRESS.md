@@ -1087,3 +1087,28 @@ viewer/XFA CTest gates passed (130 seconds), including the incorrect-value
 rejection. Python compilation, JavaScript syntax and whitespace checks passed.
 No application or PDFium dependency code changed. Remote/native-platform CI was
 not run.
+
+
+## 2026-10-12 — Repair live production XFA focus and pagination
+
+- PDFium replaces page views during XFA relayout. Cached page handles now call
+  the native after-load hook so those replacement views become valid. A text
+  click interrupted by relayout completes focus once against the refreshed view;
+  checkbox/radio clicks are not replayed.
+- Page-change callbacks now return validated dimensions to the app. The app
+  updates its page list, drops queued renders for removed pages and restores the
+  focused native field in QML after delegates are rebuilt.
+- Removed the production multiline test's prior-focus/separate-worker workaround.
+  One worker renders every opening page and then reads the expanded field
+  directly. A new app/QML regression covers five-to-four-to-three page changes,
+  retained values, shortened edits, saved copies and typing after relayout.
+- The five-page native opening versus four-page PDF.js layout difference remains
+  explicit. This repair does not establish equivalent rendering across readers
+  or support for arbitrary XFA layout rules. No PDFium rebuild is needed.
+
+Validation: focused native/PDF.js and app/QML regressions passed. All six
+viewer/XFA CTest gates passed (140 seconds); the full viewer integration suite
+also passed with the existing Clang ASan/UBSan build (32 seconds). The GCC
+sanitizer build could not link because the host lacks its ASan runtime; Clang's
+bundled runtime provided the sanitizer check. Python compilation and whitespace
+checks passed. Windows/macOS and remote CI have not been run for this repair.
