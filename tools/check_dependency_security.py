@@ -9,6 +9,8 @@ from pathlib import Path
 import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
+# Reviewed 2026-10-19: upstream PDFium still uses this V8; re-review on pin changes.
+REVIEWED_V8_FRESHNESS_PIN = "0d546234ecf0af2032e958300ef8aeb14bc716c9"
 
 
 def query(payload):
@@ -58,8 +60,17 @@ def main():
     count = 0
     for name, payload in inputs.items():
         findings = query(payload)
-        count += len(findings)
+        warnings = []
+        for finding in findings:
+            if (name == "V8" and payload.get("commit") == REVIEWED_V8_FRESHNESS_PIN
+                    and finding.get("id") == "V8-FRESHNESS"):
+                warnings.append(finding["id"])
+                print("::warning::V8-FRESHNESS: reviewed upstream V8 pin; "
+                      "update-policy notice remains a production release gate (docs/RELEASE.md)")
+            else:
+                count += 1
         report["inputs"][name] = {"query": payload, "findings": findings}
+        report["inputs"][name]["nonblocking_policy_notices"] = warnings
         print(f"{name}: {len(findings)} advisory findings")
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2) + "\n")

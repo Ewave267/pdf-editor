@@ -7,6 +7,7 @@ on:
     paths:
       - 'tools/build_pdfium.py'
       - 'tools/check_dependency_security.py'
+      - 'tests/test_dependency_security.py'
       - 'tests/reader/package*.json'
       - '.github/workflows/dependency-security.yml'
 permissions:
@@ -20,6 +21,8 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.14'
+      - name: Test advisory failure and warning handling
+        run: python -m unittest discover -s tests -p test_dependency_security.py
       - name: Check tracked dependencies without rebuilding
         run: python tools/check_dependency_security.py
       - uses: actions/upload-artifact@v6

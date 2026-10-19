@@ -30,11 +30,21 @@ Dependabot tracks Actions and the independent npm reader. The scheduled
 Dependency security workflow queries OSV for PDFium, desktop Qt and the reader;
 it also queries the explicitly tracked V8 revision. Builds verify that the
 actual V8 checkout matches this pin. Network failures
-and advisory findings fail the check. OSV coverage is incomplete: review Qt and Linux distribution
+and advisory findings fail the check, except for the reviewed policy notice below.
+OSV coverage is incomplete: review Qt and Linux distribution
 security notices and bundled runtime dependencies separately.
 
 The local advisory check found `V8-FRESHNESS`, an upstream update-policy finding
 for the pinned V8 revision. This requires review/update before a production
-release; it is not a confirmed application exploit. Candidate artifacts remain
+release; it is not a confirmed application exploit. On 2026-10-19, both upstream
+PDFium main and the latest published `chromium/8111` branch still selected V8
+`0d546234ecf0af2032e958300ef8aeb14bc716c9`. For this exact pin only,
+the dependency CI check reports `V8-FRESHNESS` as a visible warning, retains the
+complete finding in its report, and marks it under `nonblocking_policy_notices`.
+All other findings and scan failures still fail CI. Any V8 pin change requires
+reviewing this exception again. This CI exception does not clear the production
+release gate.
+
+Candidate artifacts remain
 unsigned and must not be labelled production-ready while this gate, signing/
 notarization or clean-desktop validation is outstanding.
