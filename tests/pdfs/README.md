@@ -35,9 +35,9 @@ layout admission checks plus repeated accented text, numeric calculation and
 long-to-short multiline explanation saves. The explanation checks record native
 split-field focus/cache limitations and reader pagination differences.
 IRS Form 14234-C additionally checks one-to-three-to-two scripted repeated rows,
-neighboring Unicode values and populated last-row removal over two saved
-generations. Accumulating native saved table headings remain an explicit layout
-defect. Broader input/save scenarios and production static XFA coverage remain open. Empty category directories reserve space for future reviewed forms.
+neighboring Unicode values, live row positions and populated last-row removal
+over five saved generations. Both readers retain one heading and one page;
+longer multi-page repeated-row pagination remains unchecked. Broader input/save scenarios and production static XFA coverage remain open. Empty category directories reserve space for future reviewed forms.
 
 ## Safety corpus
 

@@ -70,9 +70,9 @@
           ],
           "read_page": 0,
           "read_y": [
-            360,
-            379,
-            398
+            243,
+            262,
+            281
           ],
           "native_page_count": 1,
           "reader_controls_per_page": [
@@ -86,21 +86,21 @@
               "field": "identified_issue",
               "page": 0,
               "x": 120,
-              "y": 360,
+              "y": 243,
               "value": "Test André <replace>"
             },
             {
               "field": "identified_issue",
               "page": 0,
               "x": 120,
-              "y": 379,
+              "y": 262,
               "value": "Test Noël & second"
             },
             {
               "field": "identified_issue",
               "page": 0,
               "x": 120,
-              "y": 398,
+              "y": 281,
               "value": "Test discarded third"
             },
             {
@@ -116,28 +116,79 @@
             "Test André <replace>",
             "Test Noël & second"
           ],
-          "read_page": 1,
+          "read_page": 0,
           "read_y": [
-            163,
-            181
+            243,
+            262
           ],
-          "native_page_count": 2,
+          "native_page_count": 1,
           "reader_controls_per_page": [
-            5,
-            14
+            19
           ],
-          "reader_row_page": 1
+          "reader_row_page": 0
+        },
+        {
+          "edits": [],
+          "count": "2",
+          "values": [
+            "Test André <replace>",
+            "Test Noël & second"
+          ],
+          "read_page": 0,
+          "read_y": [
+            243,
+            262
+          ],
+          "native_page_count": 1,
+          "reader_controls_per_page": [
+            19
+          ],
+          "reader_row_page": 0
+        },
+        {
+          "edits": [],
+          "count": "2",
+          "values": [
+            "Test André <replace>",
+            "Test Noël & second"
+          ],
+          "read_page": 0,
+          "read_y": [
+            243,
+            262
+          ],
+          "native_page_count": 1,
+          "reader_controls_per_page": [
+            19
+          ],
+          "reader_row_page": 0
+        },
+        {
+          "edits": [],
+          "count": "2",
+          "values": [
+            "Test André <replace>",
+            "Test Noël & second"
+          ],
+          "read_page": 0,
+          "read_y": [
+            243,
+            262
+          ],
+          "native_page_count": 1,
+          "reader_controls_per_page": [
+            19
+          ],
+          "reader_row_page": 0
         }
       ],
-      "layout_limitation": "Native save/reopen creates extra HeaderRow data groups and repeated table headings; second saved generation opens as two pages in both readers. Row values and removal are checked, but layout preservation is unsupported."
+      "layout_limitation": "One heading and one page preserved for the covered one-to-three-to-two row scenario and five save/reopen generations; longer multi-page row counts remain unchecked."
     }
   },
   "unchecked_operations": [
     "custom script validation (this template has no validation scripts)",
-    "layout preservation: repeated table headings accumulate in native saved datasets",
-    "live row positioning and pagination after count changes",
-    "more than two edit/save/reopen cycles",
     "Unicode/font fidelity",
-    "cryptographic signatures"
+    "cryptographic signatures",
+    "longer multi-page repeated-row pagination cycles"
   ]
 }

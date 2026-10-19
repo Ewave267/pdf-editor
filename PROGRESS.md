@@ -1,6 +1,31 @@
 # MVP Progress
 
-Last updated: 2026-10-12
+Last updated: 2026-10-19
+
+## 2026-10-19 — Stop production XFA table headings accumulating
+
+Reproduced IRS Form 14234-C heading growth from one to four to nine across two
+saved generations. PDFium's discarded overflow leader/trailer cleanup skipped
+its root and left unbound dataset nodes behind. Patch 0005 includes the root
+and removes a data node only after its final form binding is removed, matching
+existing instance-removal ownership rules. The build applies and hashes the
+patch; existing CI cache keys include every patch and will rebuild per platform.
+
+The production regression now checks live row positions and values before saving,
+then fresh native readback/rendering and independent PDF.js heading/control/value
+preservation across five saved generations. One-to-three-to-two row changes keep
+one heading and one page; removal of a populated last row and unchanged source
+bytes remain checked. The final checker rejects a saved PDF from before the fix
+with four headings. Longer multi-page row scenarios remain open on the roadmap.
+
+Validation: all six local CTest gates passed (182.75 seconds).
+Incremental pinned PDFium rebuild and all 69 XML tests passed;
+five-generation native/PDF.js checks and focused Clang ASan/UBSan live-relayout
+checks passed. Python/JavaScript syntax and diff whitespace checks passed.
+The initial command sandbox blocked the sanitizer worker and LeakSanitizer;
+the approved rerun retained application isolation and passed. Windows/macOS/ARM
+native CI and clean desktops have not been run for this dependency patch.
+
 
 ## Production dynamic XFA repeated-row regression gate
 

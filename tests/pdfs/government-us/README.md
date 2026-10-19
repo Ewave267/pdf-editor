@@ -103,13 +103,12 @@ third row is removed. All pages render; PDF.js compares every control's name,
 type, page, value and checkbox state. Deliberately wrong values and missing-row
 expectations fail. Source bytes remain unchanged.
 
-**Known layout defect:** native save/reopen adds `HeaderRow` data groups and
-repeated table headings. The first saved generation remains one page; the
-second opens as two pages in both readers. Live row positions after changing
-the count are not covered. These checks establish repeated-row data preservation,
-not layout preservation or production readiness. Fixing the accumulating headings
-and checking longer/live pagination cycles remain open; custom validation is
-not present in this template.
+The overflow-binding cleanup patch prevents discarded layout headings from
+leaving data groups behind. Live native row positions and values are checked
+before saving; five save/reopen generations retain one heading and one page in
+both readers. Longer multi-page row-count scenarios remain unchecked; this does
+not establish arbitrary XFA layout compatibility or production readiness.
+Custom validation is not present in this template.
 
 ```sh
 python3 tests/test_worker_safety.py build-viewer/pdf-render-worker \

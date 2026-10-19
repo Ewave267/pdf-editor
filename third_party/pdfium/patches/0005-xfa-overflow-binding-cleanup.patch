@@ -1,0 +1,18 @@
+diff --git a/xfa/fxfa/layout/cxfa_contentlayoutprocessor.cpp b/xfa/fxfa/layout/cxfa_contentlayoutprocessor.cpp
+index dde8848..3267549 100644
+--- a/xfa/fxfa/layout/cxfa_contentlayoutprocessor.cpp
++++ b/xfa/fxfa/layout/cxfa_contentlayoutprocessor.cpp
+@@ -1581,3 +1581,3 @@ void CXFA_ContentLayoutProcessor::ProcessUnUseBinds(CXFA_Node* pFormNode) {
+   CXFA_NodeIterator sIterator(pFormNode);
+-  for (CXFA_Node* pNode = sIterator.MoveToNext(); pNode;
++  for (CXFA_Node* pNode = sIterator.GetCurrent(); pNode;
+        pNode = sIterator.MoveToNext()) {
+@@ -1586,3 +1586,7 @@ void CXFA_ContentLayoutProcessor::ProcessUnUseBinds(CXFA_Node* pFormNode) {
+       if (pBindNode) {
+-        pBindNode->RemoveBindItem(pNode);
++        if (!pBindNode->RemoveBindItem(pNode)) {
++          if (CXFA_Node* pDataParent = pBindNode->GetParent()) {
++            pDataParent->RemoveChildAndNotify(pBindNode, true);
++          }
++        }
+         pNode->SetBindingNode(nullptr);

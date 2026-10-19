@@ -215,6 +215,9 @@ class WorkerSafetyTests(unittest.TestCase):
                         {"op": "event", "page": edit["page"], "action": "text", "text": edit["value"]},
                         {"op": "event", "page": edit["page"], "action": "blur"},
                     ])
+                live_start = len(commands) + 1
+                commands.extend({"op": "event", "page": state["read_page"],
+                                 "action": "click", "x": 120, "y": y} for y in state["read_y"])
                 commands.append({"op": "snapshot"})
                 responses = self.run_worker(fixture, [dict(command, id=index)
                                                      for index, command in enumerate(commands, 1)])
@@ -225,6 +228,9 @@ class WorkerSafetyTests(unittest.TestCase):
                     self.assertTrue(responses[index * 4 + 3]["handled"], edit["field"])
                     self.assertEqual(responses[index * 4 + 3]["text"], edit["value"])
                     self.assertTrue(responses[index * 4 + 4]["handled"])
+                for response, value in zip(responses[live_start:-1], state["values"]):
+                    self.assertTrue(response["handled"])
+                    self.assertEqual(response["text"], value)
                 saved = self.directory / f"{generation}-{record['file']}"
                 saved.write_bytes(base64.b64decode(responses[-1]["pdf"]))
                 read_commands = [{"page": page, "width": 300}

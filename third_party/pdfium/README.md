@@ -32,3 +32,10 @@ prefers Liberation Sans when substituting unavailable Arial on Linux. Patchset 2
 includes all three patches; install Liberation Sans in the runtime environment.
 Synthetic regression fixtures cover radio/checkbox edits and repeated saves with
 empty calculations, plus exact rendering of a fixed-height rich-text caption.
+
+`patches/0005-xfa-overflow-binding-cleanup.patch` includes the discarded overflow
+leader/trailer root in binding cleanup and removes its data node only when no
+form bindings remain, matching instance-removal ownership rules. This prevents
+orphaned headings from multiplying on reopen. Production IRS Form 14234-C checks
+live repeated-row positions, five saved generations and independent PDF.js heading,
+control and value preservation. All platform dependency caches must rebuild.

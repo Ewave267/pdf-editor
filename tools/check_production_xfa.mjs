@@ -20,6 +20,7 @@ if (scenarioName) {
   generation = generations[index];
 }
 let baseline;
+let baselineHeadings;
 for (const file of [resolve(dirname(manifestPath), record.file), ...(savedPdf ? [savedPdf] : [])]) {
   const saved = file === savedPdf;
   const multiline = saved && scenarioName === "multiline_round_trip";
@@ -34,6 +35,7 @@ for (const file of [resolve(dirname(manifestPath), record.file), ...(savedPdf ? 
     assert.equal(document.isPureXfa, expected.pure_xfa);
     assert.equal(document.numPages, counts.length);
     const state = [];
+    let headings = 0;
     for (let index = 0; index < document.numPages; index++) {
       const page = await document.getPage(index + 1);
       const viewport = page.getViewport({ scale: 1 });
@@ -44,6 +46,7 @@ for (const file of [resolve(dirname(manifestPath), record.file), ...(savedPdf ? 
       function visit(node, name = "") {
         name = node.attributes?.xfaName ?? name;
         if (node.attributes?.xfaName) names.push(node.attributes.xfaName);
+        if (node.attributes?.xfaName === "HeaderRow") headings++;
         if (["input", "textarea", "select"].includes(node.name)) {
           controls.push(node);
           state.push({ page: index, name, type: node.name,
@@ -65,9 +68,11 @@ for (const file of [resolve(dirname(manifestPath), record.file), ...(savedPdf ? 
         for (const name of expected.sample_fields_per_page[index]) assert.ok(names.includes(name), `missing ${name}`);
       }
     }
+    if (!saved) baselineHeadings = headings;
     if (saved) {
-      // shortcut: row data only; add heading/layout checks when native header duplication is fixed.
       if (repeated) {
+        assert.ok(baselineHeadings > 0, "baseline must include a table heading");
+        assert.equal(headings, baselineHeadings, "save/reopen must not accumulate table headings");
         const scenario = expected.repeated_rows_round_trip;
         const headers = baseline.slice(0, scenario.header_controls).map(control => ({ ...control }));
         const row = baseline.slice(scenario.header_controls);

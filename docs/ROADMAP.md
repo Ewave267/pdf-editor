@@ -49,11 +49,12 @@ cryptographic signatures from deferred evaluation to planned work.
   generations, accented/XML-sensitive values, preservation of neighboring rows
   and removal of a populated last row. Fresh native readback/all-page rendering
   and PDF.js compare every control; wrong values and missing-row expectations
-  fail. Native saved datasets accumulate table headings and the second generation
-  opens as two pages in both readers; layout preservation remains unsupported.
-- [ ] Fix accumulating `HeaderRow` groups/table headings in Form 14234-C native
-  save/reopen; verify live row-count changes and longer pagination cycles before
-  declaring this fixture's layout reliable.
+  fail. The initial regression exposed accumulating table headings, repaired below.
+- [x] Fix accumulating `HeaderRow` groups/table headings in Form 14234-C native
+  save/reopen. Overflow binding cleanup now preserves one heading and one page,
+  live row positions and neighboring values across five saved generations.
+- [ ] Verify longer multi-page repeated-row pagination cycles before declaring
+  this fixture's layout reliable beyond the covered one-to-three-to-two rows.
 - [ ] Add representative production AcroForms, static/dynamic XFA, scripted
   forms, Unicode/font/layout cases and signed PDFs. Record each fixture's source,
   version, checksum and explicit redistribution license or permission; exclude
