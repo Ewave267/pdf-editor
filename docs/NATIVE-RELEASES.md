@@ -104,7 +104,7 @@ Local Fedora preview archives require glibc 2.39 and are explicitly named
 
 ## Windows and macOS
 
-Windows x64 builds use MSVC, Qt 6.8.3 and the Windows SDK required by pinned
+Windows x64 builds use MSVC, Qt 6.11.2 and the Windows SDK required by pinned
 PDFium. The workflow initializes the installed Microsoft developer shell.
 Qt installation uses Python 3.14; the pinned PDFium tools and packaging use
 Python 3.12. `windeployqt` collects Qt/QML/plugins; the redistributable MSVC CRT DLLs

@@ -250,7 +250,7 @@ jobs:
           'PDF_EDITOR_BASH=C:/Program Files/Git/bin/bash.exe' | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - uses: jurplel/install-qt-action@v4
         with:
-          version: '6.8.3'
+          version: '6.11.2'
           setup-python: false
           arch: ${{ matrix.qt-arch }}
           cache: true
@@ -281,7 +281,7 @@ jobs:
             -DPDF_EDITOR_BUILD_NATIVE_SMOKE=ON -DPDFium_DIR="$PWD/.deps/pdfium-patched"
           cmake --build build-native --parallel ${{ matrix.build-jobs }}
       - name: Fetch matching Qt source and license inputs
-        run: python tools/fetch_native_inputs.py --qt-version 6.8.3
+        run: python tools/fetch_native_inputs.py --qt-version 6.11.2
       - name: Deploy and test packaged application
         run: |
           python tests/test_windows_runtime.py

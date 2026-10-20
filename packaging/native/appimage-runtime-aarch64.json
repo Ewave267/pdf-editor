@@ -1,10 +1,12 @@
 {
   "architecture": "aarch64",
   "url": "https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-aarch64",
-  "sha256": "b4ff0030242d0c3bb12ce40541828303cf167493f4793456f0436edd6255c39d",
+  "sha256": "9a72a744d221576c9347ec074243acc5c3c7568896b12714e0e82e9f0bf47900",
   "source": "https://github.com/AppImage/type2-runtime",
-  "source_revision": "8f39b89e2ac31e1640b3d3f7e9a5108e6ce805fa",
-  "license_url": "https://raw.githubusercontent.com/AppImage/type2-runtime/8f39b89e2ac31e1640b3d3f7e9a5108e6ce805fa/LICENSE",
+  "source_revision": "fedfad51acc2860b2916a1eef32ba4a500ff31ef",
+  "license_url": "https://raw.githubusercontent.com/AppImage/type2-runtime/fedfad51acc2860b2916a1eef32ba4a500ff31ef/LICENSE",
   "license_sha256": "aa154fc9070614bbe7921f89db11efd1dba7a1f3a41685958110e2230f9c0ca1",
-  "note": "Continuous assets can change. A hash mismatch must fail; explicitly review and update the pin when needed."
+  "note": "Continuous assets can change. A hash mismatch must fail; explicitly review and update the pin when needed.",
+  "build_run": "https://github.com/AppImage/type2-runtime/actions/runs/39320578745",
+  "review": "2026-10-20: one upstream change maps temporary build paths for reproducibility; successful build head matches source revision; release asset digest matches pin. ARM binary execution remains pending."
 }

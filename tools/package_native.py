@@ -80,7 +80,14 @@ def stage(args, directory):
     for name in ("plugins", "qml"):
         if not (qt / name).is_dir():
             raise RuntimeError(f"Qt runtime folder missing: {qt / name}")
-        shutil.copytree(qt / name, directory / name, symlinks=False)
+    shutil.copytree(qt / "qml", directory / "qml", symlinks=False)
+    # Optional SQL/network drivers require vendor runtimes the editor never uses.
+    for category in ("platforms", "imageformats", "iconengines", "styles", "printsupport",
+                     "platformthemes", "platforminputcontexts", "xcbglintegrations",
+                     "wayland-graphics-integration-client", "wayland-shell-integration"):
+        source = qt / "plugins" / category
+        if source.is_dir():
+            shutil.copytree(source, directory / "plugins" / category, symlinks=False)
     bwrap = shutil.which("bwrap")
     if not bwrap:
         raise RuntimeError("Bubblewrap is required on the packaging host")
@@ -90,6 +97,9 @@ def stage(args, directory):
         raise RuntimeError("Bubblewrap needs bounded tmpfs support; run tools/build_bubblewrap.py")
     if args.bwrap_notices:
         shutil.copytree(args.bwrap_notices, directory / "share/doc/pdf-form-editor/bubblewrap",
+                        dirs_exist_ok=True)
+    if args.qt_notices:
+        shutil.copytree(args.qt_notices, directory / "share/doc/pdf-form-editor/qt",
                         dirs_exist_ok=True)
     if args.libgcc_runtime:
         if not args.libgcc_notices:
@@ -118,7 +128,8 @@ def stage(args, directory):
                 copied[soname] = source
                 originals.append(source)
     # ldd reports each seed's complete transitive closure, including plugins.
-    originals += [p for name in ("plugins", "qml") for p in (qt / name).rglob("*.so")]
+    originals += [qt / name / p.relative_to(directory / name)
+                  for name in ("plugins", "qml") for p in (directory / name).rglob("*.so")]
     fonts = directory / "share/fonts"
     fonts.mkdir(parents=True)
     for font in args.font_dir.rglob("*.ttf"):
@@ -185,6 +196,7 @@ def main():
     parser.add_argument("--target", choices=("linux", "windows", "macos"), default="linux")
     parser.add_argument("--build-dir", type=Path, default=ROOT / "build-release")
     parser.add_argument("--bwrap-notices", type=Path, help="Notices for a source-built Bubblewrap")
+    parser.add_argument("--qt-notices", type=Path, help="Notices collected from matching Qt module sources")
     parser.add_argument("--libgcc-runtime", type=Path, help="Pinned baseline-compatible libgcc_s.so.1")
     parser.add_argument("--libgcc-notices", type=Path, help="Notices for the overridden libgcc runtime")
     parser.add_argument("--qt-runtime", type=Path, help="Qt directory containing plugins/ and qml/")

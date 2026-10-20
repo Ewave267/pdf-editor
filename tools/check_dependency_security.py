@@ -45,8 +45,8 @@ def main():
     inputs = {
         "PDFium": {"commit": pins["PDFIUM_REVISION"]},
         "V8": {"commit": pins["V8_REVISION"]},
-        "Qt desktop qtbase": {"package": {"name": "https://code.qt.io/qt/qtbase.git", "ecosystem": "GIT"}, "version": "v6.8.3"},
-        "Qt desktop qtdeclarative": {"package": {"name": "https://code.qt.io/qt/qtdeclarative.git", "ecosystem": "GIT"}, "version": "v6.8.3"},
+        "Qt desktop qtbase": {"package": {"name": "https://code.qt.io/qt/qtbase.git", "ecosystem": "GIT"}, "version": "v6.11.2"},
+        "Qt desktop qtdeclarative": {"package": {"name": "https://code.qt.io/qt/qtdeclarative.git", "ecosystem": "GIT"}, "version": "v6.11.2"},
         "Independent reader": {"package": {"name": "pdfjs-dist", "ecosystem": "npm"}, "version": reader["dependencies"]["pdfjs-dist"]},
     }
     manifest = ROOT / ".deps/pdfium-patched/build-info.json"

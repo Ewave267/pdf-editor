@@ -48,3 +48,19 @@ release gate.
 Candidate artifacts remain
 unsigned and must not be labelled production-ready while this gate, signing/
 notarization or clean-desktop validation is outstanding.
+
+## Local reliability candidate — 2026-10-20
+
+See [SECURITY-REVIEW](SECURITY-REVIEW.md), [SOURCE-DISTRIBUTION](SOURCE-DISTRIBUTION.md)
+and [PERFORMANCE](PERFORMANCE.md) for the current evidence and remaining gates.
+Desktop Qt is pinned to 6.11.2, with matching module source archives collected
+locally. The relocated Linux host-validation package requires glibc 2.39; it does
+not replace the RHEL 9 baseline builds. Windows/macOS/ARM native workflows were
+not run because the user requested local commits only.
+
+The AppImage continuous input changed and correctly failed its checksum check.
+Reviewed the single upstream change (temporary-path mapping for reproducible
+builds), matched the successful official build's head revision and release-asset
+digests, and updated both architecture pins. Hash enforcement remains enabled;
+ARM execution remains an external gate. Cryptographic PDF signing/validation is
+excluded from this implementation at the user's request.
