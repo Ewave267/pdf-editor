@@ -2,6 +2,32 @@
 
 Last updated: 2026-10-20
 
+## 2026-10-20 — Prepare local runtime and source artifacts
+
+Local commits only, as requested. Desktop Qt pins and matching source collection
+now use 6.11.2. Vendor advisory review is recorded separately from OSV results;
+production dependency acceptance remains open. Reviewed the AppImage runtime's
+single upstream reproducibility change, matched successful official build/source
+metadata and asset digests, and updated both architecture hashes without
+relaxing checksum enforcement. Linux packaging selects editor plugin categories
+and includes matching Qt notices when supplied.
+
+The relocated Qt 6.11.2 tarball passes all 46 viewer cases and native smoke
+checks. The AppImage passes native smoke checks with the newly reviewed runtime.
+Local artifacts in dist/qt-upgrade-validation require glibc 2.39 and do not replace
+the RHEL 9 baseline candidates. Matching Qt sources/notices were collected.
+
+The source packager produces an archive for commit 4c3719d with 85,616 tracked
+source files from 37 application/PDFium/V8/dependency/build-tool checkouts. Its
+six boundary/determinism tests pass. The archive explicitly excludes complete
+native runtime/SDK source coverage. See docs/SOURCE-DISTRIBUTION.md.
+
+Remaining external gates: Windows/macOS/ARM builds, clean-desktop accessibility,
+physical printing, independently signed/certified interoperability, complete
+platform advisory/corresponding-source acceptance and signing/notarization
+credentials. No push, remote workflow or cryptographic PDF signing/validation.
+
+
 ## 2026-10-20 — Complete local form reliability and operation warnings
 
 Twelve IRS Form 14234-C generations now cover multi-page 20/30-row growth,

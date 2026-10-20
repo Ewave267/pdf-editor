@@ -21,8 +21,12 @@ fail rather than producing an apparently complete source package.
 The archive contains the application, modified PDFium/V8, all checked-out Git
 dependencies, the distributor patches and depot/build scripts. The original
 `tools/build_pdfium.py`, `.gclient`, `.gclient_entries`, DEPS, patches and GN args
-record the pinned rebuild procedure. Git history is omitted; running the normal
-bootstrap in an extracted archive fetches its pinned checkouts/tool binaries.
+record the pinned rebuild procedure. Git history is omitted. For a network rebuild, copy the application tree without
+its archived `.deps` folder to a clean directory, then run the normal bootstrap
+to fetch pinned checkouts/tool binaries and apply the included patches. Keep the
+archived modified dependency files as the reference source snapshot. Running
+Git bootstrap directly inside the populated metadata-free `.deps` snapshot will
+fail because it is not a set of Git repositories.
 This is a source-distribution artifact, not an offline compiler/toolchain bundle.
 Native Windows/macOS SDKs and cross-build sysroots remain platform prerequisites.
 A package created on one host does not attest that another platform was built or
@@ -44,3 +48,12 @@ Qt/distribution/runtime sources are assembled and checked. A source URL, notices
 file or manifest alone is not the corresponding source itself. The local archive
 deliberately states its narrower scope; it must not be advertised as satisfying
 all source obligations for every native artifact.
+
+## Local candidate evidence — 2026-10-20
+
+`dist/sources/pdfium-source.tar.gz` contains 85,616 files from 37 source checkouts
+for application commit `4c3719d`, matching the locally packaged candidate. Its
+SHA-256 sidecar and every file hash in SOURCE-MANIFEST.json were checked. Five
+matching Qt 6.11.2 module source archives and SHA256SUMS are in
+`.deps/release-inputs/qt-sources/`. These local files have not been published.
+The runtime/distribution source rows above remain incomplete.

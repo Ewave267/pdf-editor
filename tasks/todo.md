@@ -11,8 +11,10 @@
 - [x] Signature/certification presence detection and operation warnings with
       cancellation; keep unsafe XFA operations blocked.
 - [x] Large-document opening/render/input timing baselines with bounded tests.
-- [ ] Dependency/security release review and corresponding-source preparation.
-- [ ] Local package validation; cross-platform CI when authorized.
+- [x] Local dependency/advisory review and scoped corresponding-source archive
+      preparation; exact native runtime advisory/source closure remains a gate.
+- [x] Local Qt 6.11.2 relocated tarball and AppImage validation.
+- [ ] Windows/macOS/ARM native execution; no remote workflows requested.
 - [ ] External production acceptance: clean desktops, native accessibility,
       physical printers, platform signing/notarization and source distribution.
 
