@@ -40,6 +40,9 @@ class PdfDocument : public QObject
     Q_PROPERTY(QString error READ error NOTIFY stateChanged)
     Q_PROPERTY(QString fileName READ fileName NOTIFY stateChanged)
     Q_PROPERTY(QString formType READ formType NOTIFY stateChanged)
+    Q_PROPERTY(int signatureCount READ signatureCount NOTIFY stateChanged)
+    Q_PROPERTY(bool certified READ certified NOTIFY stateChanged)
+    Q_PROPERTY(bool canAddContent READ canAddContent NOTIFY stateChanged)
     Q_PROPERTY(QVariantList pages READ pages NOTIFY stateChanged)
     Q_PROPERTY(int pageCount READ pageCount NOTIFY stateChanged)
     Q_PROPERTY(double maxPageWidth READ maxPageWidth NOTIFY stateChanged)
@@ -94,6 +97,10 @@ class PdfDocument : public QObject
     QString error() const { return error_; }
     QString fileName() const { return fileName_; }
     QString formType() const { return formType_; }
+    int signatureCount() const { return signatureCount_; }
+    bool certified() const { return certified_; }
+    bool canAddContent() const { return ready_ && !(formType_ == "XFA" && xfaFull_); }
+    Q_INVOKABLE QString operationWarning(const QString& operation) const;
     QVariantList pages() const { return pages_; }
     int pageCount() const { return pages_.size(); }
     double maxPageWidth() const;
@@ -186,6 +193,8 @@ class PdfDocument : public QObject
     std::unique_ptr<QTemporaryDir> snapshot_;
     quint64 savedRevision_ = 0, saveRevision_ = 0;
     bool saving_ = false, xfaFull_ = false;
+    int signatureCount_ = -1;
+    bool certified_ = false;
     quint64 formRevision_ = 0, savedFormRevision_ = 0, saveFormRevision_ = 0;
     int pendingFormEvents_ = 0, formFieldType_ = -1, formPage_ = 0;
     QString formText_, formError_;

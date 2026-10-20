@@ -113,7 +113,10 @@ string and 16 MiB total text. Complete inspection becoming unavailable fails the
 save rather than downgrading a previously available check.
 
 For XFA packet arrays, the native public API compares saved template and datasets
-bytes against the committed snapshot. Single-stream XFA does not expose these
+bytes against the committed snapshot. FORM packets compare typed value nodes
+and their instance paths, excluding regenerated captions and layout attributes;
+this includes unbound field state. XML inspection is iterative, rejects DTDs and
+is bounded to 256 levels, one million tokens and 16 MiB per packet. Single-stream XFA does not expose these
 packets through that API and reports field preservation as unchecked. XFA page
 counts can change on reopening even when data is preserved; such a layout check
 is explicitly unchecked. Existing unsupported XFA addition/flatten operations

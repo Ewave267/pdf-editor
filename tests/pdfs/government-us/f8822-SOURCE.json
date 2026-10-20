@@ -1,0 +1,46 @@
+{
+  "publisher": "Internal Revenue Service, United States Department of the Treasury",
+  "file": "irs-f8822.pdf",
+  "title": "Form 8822: Change of Address",
+  "version": "Rev. February 2021; PDF metadata dated 2021-01-26",
+  "source_url": "https://www.irs.gov/pub/irs-pdf/f8822.pdf",
+  "retrieved_on": "2026-10-19",
+  "sha256": "200ec0db82a1f8ea0c37f5ffdad562926dfe26c1d537ff701755989ce4197be6",
+  "bytes": 80702,
+  "rights": "Federal-employee IRS content is not subject to copyright and may be freely copied; IRS credit requested. No endorsement is implied.",
+  "rights_url": "https://www.irs.gov/about-irs/use-of-content-from-irsgov",
+  "privacy_review": "Unsubmitted unchanged official blank template. All 25 page-bearing AcroForm widget values independently inspected: text empty, checkboxes Off; no taxpayer responses. Both source pages visually inspected; source staff authorship metadata retained.",
+  "symbols_review": "Official IRS form retained unchanged and separately attributed solely for compatibility testing; no endorsement claimed. No third-party copyright notice observed on either page.",
+  "expected": {
+    "formType": 3,
+    "pages": [
+      {
+        "width": 611.9760131835938,
+        "height": 791.968017578125
+      },
+      {
+        "width": 611.9760131835938,
+        "height": 791.968017578125
+      }
+    ],
+    "widgets": 25,
+    "text_widgets": 22,
+    "unchecked_widgets": 3,
+    "native_geometry_note": "Source page boxes are 611.976 x791.968 points; native float values are pinned exactly and must survive save/reopen."
+  },
+  "round_trip": {
+    "field": "topmostSubform[0].Page1[0].f1_3[0]",
+    "page": 0,
+    "x": 200,
+    "y": 252,
+    "values": [
+      "Test Élodie Montréal",
+      "Test André révision 2"
+    ]
+  },
+  "unchecked_operations": [
+    "pixel or cross-reader layout equivalence",
+    "all static XFA controls and scripts",
+    "cryptographic signatures"
+  ]
+}

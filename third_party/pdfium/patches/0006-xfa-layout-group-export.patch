@@ -1,0 +1,67 @@
+--- a/xfa/fxfa/parser/cxfa_dataexporter.cpp
++++ b/xfa/fxfa/parser/cxfa_dataexporter.cpp
+@@ -8,4 +8,8 @@
+ 
++#include <algorithm>
++#include <set>
++
+ #include "core/fxcrt/check.h"
+ #include "core/fxcrt/fx_codepage.h"
++#include "core/fxcrt/xml/cfx_xmldocument.h"
+ #include "core/fxcrt/xml/cfx_xmlelement.h"
+@@ -15,2 +19,41 @@
+ #include "xfa/fxfa/parser/xfa_utils.h"
++
++namespace {
++
++void CollectLayoutOnlyGroups(CXFA_Node* node,
++                             std::set<CFX_XMLNode*>* excluded) {
++  if (node->GetElementType() == XFA_Element::DataGroup &&
++      !node->GetFirstChild()) {
++    const auto bindings = node->GetBindItemsCopy();
++    if (!bindings.empty() &&
++        std::all_of(bindings.begin(), bindings.end(), [](CXFA_Node* binding) {
++          return binding->IsLayoutGeneratedNode();
++        })) {
++      excluded->insert(node->GetXMLMappingNode());
++    }
++  }
++  for (CXFA_Node* child = node->GetFirstChild(); child;
++       child = child->GetNextSibling()) {
++    CollectLayoutOnlyGroups(child, excluded);
++  }
++}
++
++CFX_XMLNode* CloneFiltered(CFX_XMLNode* original,
++                           CFX_XMLDocument* document,
++                           const std::set<CFX_XMLNode*>& excluded) {
++  CFX_XMLNode* copy = original->Clone(document);
++  // Element Clone copies text children only; rebuild the complete subtree.
++  while (CFX_XMLNode* child = copy->GetFirstChild()) {
++    copy->RemoveChild(child);
++  }
++  for (CFX_XMLNode* child = original->GetFirstChild(); child;
++       child = child->GetNextSibling()) {
++    if (!excluded.contains(child)) {
++      copy->AppendLastChild(CloneFiltered(child, document, excluded));
++    }
++  }
++  return copy;
++}
++
++}  // namespace
+ 
+@@ -47,3 +90,12 @@
+         XFA_DataExporter_DealWithDataGroupNode(pDataNode);
+-        pElement->Save(pStream);
++        // Layout-only empty groups must not become input instances on reopen.
++        std::set<CFX_XMLNode*> excluded;
++        CollectLayoutOnlyGroups(pDataNode, &excluded);
++        if (excluded.empty()) {
++          pElement->Save(pStream);
++        } else {
++          CFX_XMLDocument exported;
++          CFX_XMLNode* copy = CloneFiltered(pElement, &exported, excluded);
++          copy->Save(pStream);
++        }
+         break;

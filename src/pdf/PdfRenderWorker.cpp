@@ -6,6 +6,7 @@
 #include <fpdf_flatten.h>
 #include <fpdf_ppo.h>
 #include <fpdf_save.h>
+#include <fpdf_signature.h>
 #include <fpdf_text.h>
 
 #include <QBuffer>
@@ -21,6 +22,7 @@
 #include <QJsonObject>
 #include <QMap>
 #include <QRegularExpression>
+#include <QXmlStreamReader>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
@@ -266,10 +268,25 @@ class PdfDocument
             pages.append(QJsonObject{{"width", width}, {"height", height}});
         }
         initialFields_ = fields_;
+        const int signatures = FPDF_GetSignatureCount(document_);
+        bool certified = false;
+        int signatureData = 0;
+        for (int index = 0; index < std::min(signatures, 4096); ++index)
+        {
+            const auto signature = FPDF_GetSignatureObject(document_, index);
+            const bool certification = FPDFSignatureObj_GetDocMDPPermission(signature) > 0;
+            certified = certified || certification;
+            // An empty signature widget is a place to sign, not an existing signature.
+            if (certification || FPDFSignatureObj_GetContents(signature, nullptr, 0) ||
+                FPDFSignatureObj_GetByteRange(signature, nullptr, 0))
+                ++signatureData;
+        }
         return {{"pages", pages},
                 {"formType", type_},
                 {"fields", fields_},
                 {"fieldsComplete", fieldsComplete_},
+                {"signatureCount", signatures >= 0 && signatures <= 4096 ? signatureData : -1},
+                {"certified", certified},
                 {"deniedHostRequests", host_.deniedRequests}};
     }
 
@@ -937,7 +954,7 @@ class PdfDocument
                     FPDFPage_CloseAnnot(annot);
                 }
             }
-        bool datasets = false, xfaComplete = true;
+        bool datasets = false, templatePacket = false, xfaComplete = true;
         if (isXfa())
         {
             const int count = FPDF_GetXFAPacketCount(document_);
@@ -951,8 +968,9 @@ class PdfDocument
                     xfaComplete = false;
                     continue;
                 }
-                // Metadata such as timestamps may change on save; form packets must not.
-                if (QByteArray(name) != "datasets" && QByteArray(name) != "template")
+                // Metadata and derived FORM layout attributes can change on reopening.
+                if (QByteArray(name) != "datasets" && QByteArray(name) != "template" &&
+                    QByteArray(name) != "form")
                     continue;
                 unsigned long length = 0;
                 if (!FPDF_GetXFAPacketContent(document_, index, nullptr, 0, &length) ||
@@ -968,16 +986,75 @@ class PdfDocument
                     xfaComplete = false;
                 else
                 {
+                    if (QByteArray(name) == "form")
+                    {
+                        QXmlStreamReader xml(bytes);
+                        QStringList path, tags;
+                        QList<QMap<QString, int>> siblings{QMap<QString, int>{}};
+                        QJsonArray values;
+                        QString valuePath;
+                        QJsonArray value;
+                        int valueDepth = 0, tokens = 0;
+                        while (!xml.atEnd() && ++tokens <= 1000000)
+                        {
+                            const auto token = xml.readNext();
+                            if (token == QXmlStreamReader::DTD || path.size() > 256)
+                                break;
+                            if (token == QXmlStreamReader::StartElement)
+                            {
+                                const QString tag = xml.name().toString();
+                                const QString identity = QString::fromUtf8(QJsonDocument(QJsonArray{
+                                    tag, xml.attributes().value("name").toString()}).toJson(QJsonDocument::Compact));
+                                const int index = siblings.last()[identity]++;
+                                path.append(identity + "[" + QString::number(index) + "]");
+                                siblings.append(QMap<QString, int>{});
+                                if (tag == "value" && valueDepth == 0 && !tags.isEmpty() &&
+                                    (tags.last() == "field" || tags.last() == "exclGroup"))
+                                {
+                                    valueDepth = path.size();
+                                    valuePath = path.join('/');
+                                    value = {};
+                                }
+                                else if (valueDepth)
+                                {
+                                    QJsonObject attributes;
+                                    for (const auto& attr : xml.attributes())
+                                        attributes[attr.qualifiedName().toString()] = attr.value().toString();
+                                    value.append(QJsonArray{"start", xml.namespaceUri().toString(), tag, attributes});
+                                }
+                                tags.append(tag);
+                            }
+                            else if (token == QXmlStreamReader::Characters && valueDepth)
+                                value.append(QJsonArray{"text", xml.text().toString()});
+                            else if (token == QXmlStreamReader::EndElement)
+                            {
+                                if (valueDepth == path.size())
+                                {
+                                    values.append(QJsonObject{{"path", valuePath}, {"value", value}});
+                                    valueDepth = 0;
+                                }
+                                else if (valueDepth)
+                                    value.append(QJsonArray{"end", xml.name().toString()});
+                                path.removeLast();
+                                tags.removeLast();
+                                siblings.removeLast();
+                            }
+                        }
+                        if (!xml.atEnd() || xml.hasError() || !path.isEmpty())
+                            xfaComplete = false;
+                        bytes = QJsonDocument(values).toJson(QJsonDocument::Compact);
+                    }
                     packets.append(QJsonObject{{"name", QString::fromLatin1(name)},
                                                {"sha256", digest(bytes)}});
                     datasets = datasets || QByteArray(name) == "datasets";
+                    templatePacket = templatePacket || QByteArray(name) == "template";
                 }
             }
         }
         return {{"version", 1}, {"formType", type_}, {"pageCount", FPDF_GetPageCount(document_)},
                 {"fieldsComplete", complete}, {"fieldCount", fields.size()},
                 {"fields", digest(QJsonDocument(fields).toJson(QJsonDocument::Compact))},
-                {"xfaComplete", xfaComplete && datasets}, {"xfa", packets}};
+                {"xfaComplete", xfaComplete && datasets && templatePacket}, {"xfa", packets}};
     }
     QByteArray save(const QByteArray& overlayBytes)
     {

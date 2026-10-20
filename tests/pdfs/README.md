@@ -36,8 +36,9 @@ long-to-short multiline explanation saves. The explanation checks record native
 split-field focus/cache limitations and reader pagination differences.
 IRS Form 14234-C additionally checks one-to-three-to-two scripted repeated rows,
 neighboring Unicode values, live row positions and populated last-row removal
-over five saved generations. Both readers retain one heading and one page;
-longer multi-page repeated-row pagination remains unchecked. Broader input/save scenarios and production static XFA coverage remain open. Empty category directories reserve space for future reviewed forms.
+over twelve saved generations, including 20/30-row pagination and shrink cycles.
+Per-page headings and controls remain stable; native/PDF.js layout differences
+are recorded explicitly. Broader input/save scenarios and production static XFA coverage remain open. Empty category directories reserve space for future reviewed forms.
 
 ## Safety corpus
 
@@ -90,3 +91,8 @@ Statistics Canada AcroForms under its Open Licence. Original bytes, source URLs,
 hashes, attribution and privacy review are recorded separately. The existing
 worker regression gate verifies opening, initial field state and every page's
 render output. Production XFA, editing and save/reopen coverage remain open.
+
+`acroform/signature-marker.pdf` and `certification-marker.pdf` are original
+GPL-3.0-only generated test fixtures. Their intentionally invalid signature bytes
+exercise presence/certification warnings and cancellation, not signature validity.
+Regenerate them with `tools/generate_probe_fixtures.py`.

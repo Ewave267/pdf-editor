@@ -367,7 +367,7 @@ void PdfDocument::startSaveWorker(const QByteArray& baseline, bool verifying)
                         return;
                     }
                     else
-                        check("Form fields", "passed", xfa ? "XFA template and datasets preserved; scripts and visual layout are not certified."
+                        check("Form fields", "passed", xfa ? "XFA template, form state and datasets preserved; scripts and visual layout are not certified."
                                                           : "Form fields and values verified after saving.");
                 }
                 // Recheck immediately before commit: a destination can change while the worker

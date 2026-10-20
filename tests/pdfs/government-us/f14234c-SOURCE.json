@@ -78,7 +78,10 @@
           "reader_controls_per_page": [
             26
           ],
-          "reader_row_page": 0
+          "reader_row_page": 0,
+          "reader_headings_per_page": [
+            1
+          ]
         },
         {
           "edits": [
@@ -125,7 +128,10 @@
           "reader_controls_per_page": [
             19
           ],
-          "reader_row_page": 0
+          "reader_row_page": 0,
+          "reader_headings_per_page": [
+            1
+          ]
         },
         {
           "edits": [],
@@ -143,7 +149,10 @@
           "reader_controls_per_page": [
             19
           ],
-          "reader_row_page": 0
+          "reader_row_page": 0,
+          "reader_headings_per_page": [
+            1
+          ]
         },
         {
           "edits": [],
@@ -161,7 +170,10 @@
           "reader_controls_per_page": [
             19
           ],
-          "reader_row_page": 0
+          "reader_row_page": 0,
+          "reader_headings_per_page": [
+            1
+          ]
         },
         {
           "edits": [],
@@ -179,16 +191,425 @@
           "reader_controls_per_page": [
             19
           ],
-          "reader_row_page": 0
+          "reader_row_page": 0,
+          "reader_headings_per_page": [
+            1
+          ]
+        },
+        {
+          "edits": [
+            {
+              "field": "number_of_issues",
+              "page": 0,
+              "x": 680,
+              "y": 185,
+              "value": "20"
+            }
+          ],
+          "count": "20",
+          "values": [
+            "Test André <replace>",
+            "Test Noël & second",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          "read_page": 0,
+          "read_y": [
+            300,
+            318
+          ],
+          "native_page_count": 2,
+          "reader_controls_per_page": [
+            110,
+            35
+          ],
+          "reader_row_page": 0,
+          "reader_headings_per_page": [
+            1,
+            0
+          ],
+          "reader_row_pages": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "live_read_y": [
+            243,
+            262
+          ]
+        },
+        {
+          "edits": [],
+          "count": "20",
+          "values": [
+            "Test André <replace>",
+            "Test Noël & second",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          "read_page": 0,
+          "read_y": [
+            300,
+            318
+          ],
+          "native_page_count": 2,
+          "reader_controls_per_page": [
+            110,
+            35
+          ],
+          "reader_row_page": 0,
+          "reader_headings_per_page": [
+            1,
+            0
+          ],
+          "reader_row_pages": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "live_read_y": [
+            300,
+            318
+          ]
+        },
+        {
+          "edits": [
+            {
+              "field": "number_of_issues",
+              "page": 0,
+              "x": 680,
+              "y": 185,
+              "value": "2"
+            }
+          ],
+          "count": "2",
+          "values": [
+            "Test André <replace>",
+            "Test Noël & second"
+          ],
+          "read_page": 0,
+          "read_y": [
+            243,
+            262
+          ],
+          "native_page_count": 1,
+          "reader_controls_per_page": [
+            19
+          ],
+          "reader_row_page": 0,
+          "reader_headings_per_page": [
+            1
+          ],
+          "live_read_y": [
+            300,
+            318
+          ]
+        },
+        {
+          "edits": [
+            {
+              "field": "number_of_issues",
+              "page": 0,
+              "x": 680,
+              "y": 185,
+              "value": "30"
+            }
+          ],
+          "count": "30",
+          "values": [
+            "Test André <replace>",
+            "Test Noël & second",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          "read_page": 0,
+          "read_y": [
+            480,
+            498
+          ],
+          "native_page_count": 3,
+          "reader_controls_per_page": [
+            110,
+            105
+          ],
+          "reader_row_page": 0,
+          "reader_headings_per_page": [
+            1,
+            0
+          ],
+          "reader_row_pages": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "live_read_y": [
+            243,
+            262
+          ]
+        },
+        {
+          "edits": [],
+          "count": "30",
+          "values": [
+            "Test André <replace>",
+            "Test Noël & second",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          "read_page": 0,
+          "read_y": [
+            480,
+            498
+          ],
+          "native_page_count": 3,
+          "reader_controls_per_page": [
+            110,
+            105
+          ],
+          "reader_row_page": 0,
+          "reader_headings_per_page": [
+            1,
+            0
+          ],
+          "reader_row_pages": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "live_read_y": [
+            480,
+            498
+          ]
+        },
+        {
+          "edits": [
+            {
+              "field": "number_of_issues",
+              "page": 0,
+              "x": 680,
+              "y": 185,
+              "value": "1"
+            }
+          ],
+          "count": "1",
+          "values": [
+            "Test André <replace>"
+          ],
+          "read_page": 0,
+          "read_y": [
+            243
+          ],
+          "native_page_count": 1,
+          "reader_controls_per_page": [
+            12
+          ],
+          "reader_row_page": 0,
+          "reader_headings_per_page": [
+            1
+          ],
+          "live_read_y": [
+            480
+          ]
+        },
+        {
+          "edits": [],
+          "count": "1",
+          "values": [
+            "Test André <replace>"
+          ],
+          "read_page": 0,
+          "read_y": [
+            243
+          ],
+          "native_page_count": 1,
+          "reader_controls_per_page": [
+            12
+          ],
+          "reader_row_page": 0,
+          "reader_headings_per_page": [
+            1
+          ]
         }
       ],
-      "layout_limitation": "One heading and one page preserved for the covered one-to-three-to-two row scenario and five save/reopen generations; longer multi-page row counts remain unchecked."
+      "layout_limitation": "Native and PDF.js pagination differ for larger row counts: 30 rows use three native pages and two PDF.js pages; PDF.js places no repeated heading on its continuation. Per-reader page/control/heading expectations are explicit. Multi-page values are checked independently by PDF.js. Native live focus coordinates after shrinking a multi-page table differ from reopened coordinates; both positions and values are checked separately."
     }
   },
   "unchecked_operations": [
     "custom script validation (this template has no validation scripts)",
     "Unicode/font fidelity",
     "cryptographic signatures",
-    "longer multi-page repeated-row pagination cycles"
+    "matching native and PDF.js multi-page row placement and repeated headings"
   ]
 }

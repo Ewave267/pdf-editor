@@ -1,6 +1,38 @@
 # MVP Progress
 
-Last updated: 2026-10-19
+Last updated: 2026-10-20
+
+## 2026-10-20 — Complete local form reliability and operation warnings
+
+Twelve IRS Form 14234-C generations now cover multi-page 20/30-row growth,
+no-op saves and shrinking. PDFium patches 0006/0007 exclude only decorative
+layout instances during datasets/FORM export, retaining populated/unbound fields.
+Native readback and PDF.js compare values, controls and headings; reader layout
+differences remain explicit. Added unchanged blank IRS Form 8822 static XFA,
+two Unicode rounds, upstream static-password persistence, and Canadian date
+validation/choice scenarios with pinned provenance and negative comparisons.
+
+Save verification now compares XFA FORM value nodes and paths as well as template
+and datasets; regenerated captions/layout attributes are excluded. Static XFA
+Unicode edits and multi-page saves survive the complete staged-save path.
+Signature/certification metadata warnings precede save, additions, export and
+printing; cancellation preserves state. Empty signature widgets do not count as
+existing signatures. Invalid marker fixtures test presence only. Dynamic XFA
+insertion remains disabled and backend restrictions remain enforced.
+
+Image import validates an opened regular file (64 MiB bound), checks magic and
+selects only advertised raster decoders. Renamed SVG and FIFO input are rejected;
+misnamed valid raster files remain usable. Local 1000-page/cache/form/heartbeat
+and memory baselines are recorded in docs/PERFORMANCE.md.
+
+Validation: all six CTest gates passed across the integration run and affected
+worker/UI rerun (50.05/52.40 seconds). The initial UI failure exposed an empty
+signature field being mistaken for signature data; corrected and retested.
+All 69 PDFium XML tests pass. Focused host ASan/UBSan checks pass. A relocated
+Qt 6.11.2 tarball passes all 46 viewer cases and native smoke checks; the AppImage
+passes native smoke checks. Packaging/source preparation follows below. No
+remote workflow, push or cryptographic signing/validation was performed.
+
 
 ## 2026-10-19 — Verify staged saves before destination replacement
 

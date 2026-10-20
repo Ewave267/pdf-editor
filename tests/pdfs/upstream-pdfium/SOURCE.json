@@ -16,7 +16,18 @@
     },
     "static_password_field_rotate.pdf": {
       "source": "testing/resources/pixel/xfa_specific/static_password_field_rotate.pdf",
-      "sha256": "464aa3780a3db1e001ead9fd14be46fd1a470bbfe4daf41f4e51ee6278ee13e3"
+      "sha256": "464aa3780a3db1e001ead9fd14be46fd1a470bbfe4daf41f4e51ee6278ee13e3",
+      "round_trip": {
+        "field": "form1[0].#subform[0].PasswordField1[0]",
+        "page": 0,
+        "x": 170,
+        "y": 202,
+        "values": [
+          "Static test 123",
+          "Révision française 2"
+        ],
+        "coverage_limitation": "BSD upstream rotation/password compatibility fixture; not production-government static XFA coverage."
+      }
     }
   }
 }

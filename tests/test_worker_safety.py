@@ -71,6 +71,62 @@ class WorkerSafetyTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn(b"password", result.stderr)
 
+    def test_upstream_static_xfa_round_trips(self):
+        directory = ROOT / "tests/pdfs/upstream-pdfium"
+        name = "static_password_field_rotate.pdf"
+        record = json.loads((directory / "SOURCE.json").read_text())["files"][name]
+        self.check_static_xfa_round_trips(directory / name, record)
+
+    def test_irs_production_static_xfa_round_trips(self):
+        directory = ROOT / "tests/pdfs/government-us"
+        record = json.loads((directory / "f8822-SOURCE.json").read_text())
+        self.check_static_xfa_round_trips(directory / record["file"], record)
+
+    def check_static_xfa_round_trips(self, original, record):
+        scenario = record["round_trip"]
+        source = original.read_bytes()
+        if "bytes" in record:
+            self.assertEqual(len(source), record["bytes"])
+        self.assertEqual(hashlib.sha256(source).hexdigest(), record["sha256"])
+        fixture = original
+        for generation, value in enumerate(scenario["values"], 1):
+            with self.subTest(generation=generation):
+                commands = [
+                    {"op": "event", "page": scenario["page"], "action": "click",
+                     "x": scenario["x"], "y": scenario["y"]},
+                    {"op": "event", "page": scenario["page"], "action": "selectAll"},
+                    {"op": "event", "page": scenario["page"], "action": "text", "text": value},
+                    {"op": "event", "page": scenario["page"], "action": "blur"},
+                    {"op": "snapshot"},
+                ]
+                responses = self.run_worker(fixture, [dict(command, id=index)
+                                                     for index, command in enumerate(commands, 1)])
+                self.assertEqual(responses[0]["formType"], 3)
+                if "expected" in record:
+                    self.assertEqual(responses[0]["pages"], record["expected"]["pages"])
+                for response in responses[1:]:
+                    self.assertNotIn("error", response)
+                self.assertTrue(responses[1]["handled"])
+                self.assertEqual(responses[3]["text"], value)
+                saved = self.directory / f"static-{generation}.pdf"
+                saved.write_bytes(base64.b64decode(responses[-1]["pdf"]))
+                reopened = self.run_worker(saved, [commands[0] | {"id": 1}] + [
+                    {"id": page + 2, "page": page, "width": 300} for page in range(2)])
+                self.assertEqual(reopened[0]["formType"], 3)
+                self.assertEqual(reopened[0]["pages"], responses[0]["pages"])
+                self.assertEqual(reopened[1]["text"], value)
+                for response in reopened[2:]:
+                    self.assertTrue(base64.b64decode(response["png"]).startswith(b"\x89PNG\r\n\x1a\n"))
+                checked = subprocess.run([
+                    os.environ.get("SAVE_NODE") or "node", str(ROOT / "tools/check_canadian_forms.mjs"),
+                    os.environ.get("SAVE_PDFJS") or str(ROOT / "tests/reader/node_modules/pdfjs-dist"),
+                    str(original), str(saved), scenario["field"], value,
+                    *([json.dumps(record["expected"])] if "expected" in record else []),
+                ], capture_output=True, text=True, timeout=20)
+                self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
+                fixture = saved
+        self.assertEqual(original.read_bytes(), source)
+
     def test_canadian_government_corpus(self):
         directory = ROOT / "tests/pdfs/government-canada"
         manifest = json.loads((directory / "SOURCE.json").read_text())
@@ -149,6 +205,65 @@ class WorkerSafetyTests(unittest.TestCase):
                     fixture = saved
             self.assertEqual(original.read_bytes(), source)
 
+    def test_canadian_government_dates_and_choices(self):
+        directory = ROOT / "tests/pdfs/government-canada"
+        manifest = json.loads((directory / "SOURCE.json").read_text())
+        for name, record in manifest["files"].items():
+            scenario = record["expected"].get("scripted_choices_round_trip")
+            if scenario is None:
+                continue
+            original = directory / name
+            source = original.read_bytes()
+            self.assertEqual(hashlib.sha256(source).hexdigest(), record["sha256"])
+            baseline = self.run_worker(original)[0]
+            fixture = original
+            for generation, state in enumerate(scenario["generations"], 1):
+                with self.subTest(fixture=name, generation=generation):
+                    date = next(field for field in baseline["fields"]
+                                if field["name"] == scenario["date_field"])
+                    self.assertEqual(date["dateFormat"], scenario["date_format"])
+                    changes = {date["name"]: state["date"]}
+                    commands = [{"op": "event", "action": "setFieldText", "page": date["page"],
+                                 "key": date["id"], "text": state["date"]},
+                                {"op": "event", "action": "setFieldText", "page": date["page"],
+                                 "key": date["id"], "text": "not-a-date"}]
+                    for field_name, choice in state["choices"].items():
+                        field = next(field for field in baseline["fields"] if field["name"] == field_name)
+                        commands.append({"op": "event", "action": "chooseOption", "page": field["page"],
+                                         "key": field["id"], "text": str(choice["index"])})
+                        changes[field_name] = choice["value"]
+                    commands.append({"op": "snapshot"})
+                    responses = self.run_worker(fixture, [dict(command, id=index)
+                                                         for index, command in enumerate(commands, 1)])
+                    for response in responses[1:]:
+                        self.assertNotIn("error", response)
+                    self.assertTrue(responses[1]["handled"])
+                    self.assertEqual(responses[1]["validationMessage"], "")
+                    self.assertTrue(responses[2]["validationMessage"])
+                    rejected_date = next(field for field in responses[2]["fields"]
+                                         if field["name"] == date["name"])
+                    self.assertEqual(rejected_date["value"], state["date"])
+                    saved = self.directory / f"scripted-{generation}-{name}"
+                    saved.write_bytes(base64.b64decode(responses[-1]["pdf"]))
+                    reopened = self.run_worker(saved)[0]
+                    self.assertEqual(reopened["pages"], baseline["pages"])
+                    expected_fields = [dict(field, value=changes.get(field["name"], field["value"]))
+                                       for field in baseline["fields"]]
+                    keys = ("name", "page", "annot", "type", "value", "dateFormat")
+                    self.assertEqual([[field[key] for key in keys] for field in reopened["fields"]],
+                                     [[field[key] for key in keys] for field in expected_fields])
+                    for field_name, choice in state["choices"].items():
+                        field = next(field for field in reopened["fields"] if field["name"] == field_name)
+                        self.assertEqual(field["selectedOptions"], [choice["index"]])
+                    command = [os.environ.get("SAVE_NODE") or "node",
+                               str(ROOT / "tools/check_canadian_forms.mjs"),
+                               os.environ.get("SAVE_PDFJS") or str(ROOT / "tests/reader/node_modules/pdfjs-dist"),
+                               str(original), str(saved), "--changes", json.dumps(changes)]
+                    checked = subprocess.run(command, capture_output=True, text=True, timeout=20)
+                    self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
+                    fixture = saved
+            self.assertEqual(original.read_bytes(), source)
+
     def test_irs_production_xfa_corpus(self):
         directory = ROOT / "tests/pdfs/government-us"
         record = json.loads((directory / "SOURCE.json").read_text())
@@ -216,8 +331,9 @@ class WorkerSafetyTests(unittest.TestCase):
                         {"op": "event", "page": edit["page"], "action": "blur"},
                     ])
                 live_start = len(commands) + 1
-                commands.extend({"op": "event", "page": state["read_page"],
-                                 "action": "click", "x": 120, "y": y} for y in state["read_y"])
+                commands.extend({"op": "event", "page": state.get("live_read_page", state["read_page"]),
+                                 "action": "click", "x": 120, "y": y}
+                                for y in state.get("live_read_y", state["read_y"]))
                 commands.append({"op": "snapshot"})
                 responses = self.run_worker(fixture, [dict(command, id=index)
                                                      for index, command in enumerate(commands, 1)])
@@ -253,14 +369,16 @@ class WorkerSafetyTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 incorrect = json.loads(manifest.read_text())
                 incorrect["file"] = str(original)
-                for mismatch in ("value", "lost-row"):
+                for mismatch in ("value", "lost-row", "heading"):
                     bad_state = json.loads(json.dumps(incorrect))
                     bad_generation = bad_state["expected"]["repeated_rows_round_trip"]["generations"][generation - 1]
                     if mismatch == "value":
                         bad_generation["values"][0] = "Deliberately incorrect saved value"
-                    else:
+                    elif mismatch == "lost-row":
                         bad_generation["values"].pop()
                         bad_generation["count"] = str(len(bad_generation["values"]))
+                    else:
+                        bad_generation["reader_headings_per_page"][0] += 1
                     bad_manifest = self.directory / f"incorrect-{mismatch}.json"
                     bad_manifest.write_text(json.dumps(bad_state))
                     rejected = subprocess.run(reader[:-1] + [str(bad_manifest)] + command[-3:],

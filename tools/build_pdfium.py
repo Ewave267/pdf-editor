@@ -166,6 +166,10 @@ def main():
         (source / "resources.rc").write_text(resources)
     apply_patch(ROOT / "third_party/pdfium/patches/0005-xfa-overflow-binding-cleanup.patch",
                 source, environment)
+    apply_patch(ROOT / "third_party/pdfium/patches/0006-xfa-layout-group-export.patch",
+                source, environment)
+    apply_patch(ROOT / "third_party/pdfium/patches/0007-xfa-form-layout-export.patch",
+                source, environment)
     build = source / "out/persistence"
     build.mkdir(parents=True, exist_ok=True)
     (build / "args.gn").write_text("""is_debug = false
@@ -235,6 +239,8 @@ set_target_properties(pdfium PROPERTIES
         "v8_revision": V8_REVISION,
         "depot_tools_revision": DEPOT_REVISION, "distributor_revision": DISTRIBUTOR_REVISION,
         "patch_sha256": hashlib.sha256(PATCH.read_bytes()).hexdigest(),
+        "form_layout_export_patch_sha256": hashlib.sha256((ROOT / "third_party/pdfium/patches/0007-xfa-form-layout-export.patch").read_bytes()).hexdigest(),
+        "layout_group_export_patch_sha256": hashlib.sha256((ROOT / "third_party/pdfium/patches/0006-xfa-layout-group-export.patch").read_bytes()).hexdigest(),
         "overflow_binding_patch_sha256": hashlib.sha256((ROOT / "third_party/pdfium/patches/0005-xfa-overflow-binding-cleanup.patch").read_bytes()).hexdigest(),
         "acroform_action_patch_sha256": hashlib.sha256((ROOT / "third_party/pdfium/patches/0004-acroform-action-result.patch").read_bytes()).hexdigest(),
         "radio_font_patch_sha256": hashlib.sha256((ROOT / "third_party/pdfium/patches/0003-xfa-radio-and-font-fallback.patch").read_bytes()).hexdigest(),

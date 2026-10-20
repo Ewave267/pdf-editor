@@ -201,11 +201,12 @@ if(BUILD_TESTING)
         add_test(NAME worker-safety
             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_worker_safety.py"
                 "$<TARGET_FILE:pdf-render-worker>" "$<TARGET_FILE:sandbox-policy-worker>" "${PDFium_DIR}")
-        set_tests_properties(worker-safety PROPERTIES TIMEOUT 60 LABELS "regression;security"
+        # Twelve production generations and fresh save verifiers add bounded subprocesses.
+        set_tests_properties(worker-safety PROPERTIES TIMEOUT 120 LABELS "regression;security"
             ENVIRONMENT "SAVE_NODE=${NODE_EXECUTABLE};SAVE_PDFJS=${PDF_EDITOR_PDFJS_DIR}")
         add_dependencies(viewer-tests pdf-render-worker)
         add_test(NAME viewer-integration COMMAND viewer-tests)
-        set_tests_properties(viewer-integration PROPERTIES TIMEOUT 90
+        set_tests_properties(viewer-integration PROPERTIES TIMEOUT 180
             ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software" LABELS "viewer;milestone")
     endif()
     if(PDF_EDITOR_BUILD_XFA_PROBE)

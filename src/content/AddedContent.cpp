@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "AddedContent.h"
 #include "pdf/PdfDocument.h"
+#include "pdf/NativeFile.h"
 #include <QBuffer>
 #include <QClipboard>
 #include <QFontDatabase>
@@ -401,7 +402,29 @@ int AddedContent::addImage(int page, double x, double y, const QUrl& file, bool 
         emit changed();
         return -1;
     }
-    QImageReader reader(file.toLocalFile());
+    QFile input;
+    QByteArray format;
+    if (pdf::detail::openRegularInput(input, file.toLocalFile()))
+    {
+        const QByteArray magic = input.peek(16);
+        if (magic.startsWith(QByteArray::fromHex("89504e470d0a1a0a")))
+            format = "png";
+        else if (magic.startsWith(QByteArray::fromHex("ffd8ff")))
+            format = "jpeg";
+        else if (magic.startsWith("BM"))
+            format = "bmp";
+        else if (magic.startsWith("RIFF") && magic.mid(8, 4) == "WEBP")
+            format = "webp";
+    }
+    if (format.isEmpty())
+    {
+        error_ = "Choose a regular PNG, JPEG, WebP or BMP image file of at most 64 MiB.";
+        emit changed();
+        return -1;
+    }
+    // Select only advertised raster decoders; renamed SVG files must not invoke plugins.
+    QImageReader reader(&input, format);
+    reader.setAutoDetectImageFormat(false);
     reader.setAutoTransform(true);
     const QSize size = reader.size();
     if (!size.isValid() || qint64(size.width()) * size.height() > 16000000)

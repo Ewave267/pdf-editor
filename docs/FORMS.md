@@ -160,3 +160,32 @@ leaves these checkboxes read-only; choosing “Spéciales 75 %” clears and loc
 them. These are document script rules, not overrides supplied by the editor.
 Both dependent checkboxes were verified with 70 % selected, including saved
 values and reopening. The reported document is not stored in the repository.
+
+## Existing signatures and operation warnings
+
+The worker reports existing signature dictionaries and DocMDP certification
+permission markers using PDFium's native metadata API. Empty signature widgets
+without signature contents, byte ranges or certification markers do not trigger
+an existing-signature warning. This is presence detection,
+not cryptographic validation, certificate trust or a determination that editing
+is permitted. Drawn/imported signatures remain visual marks.
+
+Before saving, adding content, exporting pages or printing a document with
+signature data, the interface explains that a rewritten copy may invalidate
+signatures. Certification markers add an explicit permission warning. Cancel
+leaves the document and destination unchanged. Form page export and printing
+also explain the loss of interactive fields/scripts. XFA saving warns about
+script/pagination differences and points to the save-check report.
+
+Dynamic XFA insertion tools are disabled because added content cannot be safely
+exported. Native form filling and save-without-additions remain available. The
+backend still rejects unsupported XFA addition export and page flattening;
+acknowledging a warning never bypasses those restrictions.
+
+Original synthetic signature-marker/certification-marker fixtures deliberately
+contain invalid signature bytes. They test detection, warnings and cancellation
+only; no cryptographic signing or validation is implemented.
+
+Signature metadata coverage is limited by the pinned native public API; nested
+signature field structures are not a claim of complete signature discovery.
+Independent signed/certified interoperability review remains a production gate.

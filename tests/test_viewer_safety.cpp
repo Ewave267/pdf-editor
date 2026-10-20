@@ -109,19 +109,43 @@ class ViewerSafetyTests : public QObject
     void largeDocumentMemoryAndClose()
     {
         PdfDocument document;
+        QElapsedTimer elapsed;
+        elapsed.start();
+        qint64 previousHeartbeat = 0;
+        qint64 longestHeartbeatGap = 0;
+        int heartbeats = 0;
+        QTimer heartbeat;
+        connect(&heartbeat, &QTimer::timeout, this, [&] {
+            const auto now = elapsed.elapsed();
+            longestHeartbeatGap = std::max(longestHeartbeatGap, now - previousHeartbeat);
+            previousHeartbeat = now;
+            ++heartbeats;
+        });
+        heartbeat.start(10);
         const auto initialHost = residentBytes(::getpid());
         QVERIFY(initialHost > 0);
         document.open(fixture("safety/many-pages.pdf"));
         QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        const auto openMs = elapsed.elapsed();
+        QVERIFY(openMs < 15000);
         QCOMPARE(document.pageCount(), 1000);
         const auto processes = processTree(document.workerPid());
         QVERIFY(processes.size() >= 2);
         qint64 peakWorker = 0;
+        qint64 coldRenderMs = 0;
+        qint64 cachedRenderMs = 0;
         for (int page = 0; page < 1000; page += 25)
         {
             QSignalSpy image(&document, &PdfDocument::rendered);
+            const auto coldStart = elapsed.elapsed();
             document.requestRender(page, 612);
             QTRY_VERIFY_WITH_TIMEOUT(!image.isEmpty(), 10000);
+            coldRenderMs = std::max(coldRenderMs, elapsed.elapsed() - coldStart);
+            image.clear();
+            const auto cachedStart = elapsed.elapsed();
+            document.requestRender(page, 612);
+            QTRY_VERIFY_WITH_TIMEOUT(!image.isEmpty(), 10000);
+            cachedRenderMs = std::max(cachedRenderMs, elapsed.elapsed() - cachedStart);
             qint64 workerMemory = 0;
             for (const auto pid : processes)
                 workerMemory += std::max<qint64>(0, residentBytes(pid));
@@ -135,6 +159,51 @@ class ViewerSafetyTests : public QObject
         QCOMPARE(document.pageCount(), 0);
         verifyReleased(processes);
         QVERIFY(residentBytes(::getpid()) - initialHost < 80 * 1024 * 1024);
+        QTest::qWait(20);
+        QVERIFY(heartbeats > 0);
+        QVERIFY2(longestHeartbeatGap < 2000, "Large document blocked the host event loop for two seconds");
+        QVERIFY(coldRenderMs < 10000);
+        QVERIFY(cachedRenderMs < 10000);
+        qInfo() << "1000-page open ms:" << openMs << "40 samples, maximum cold/cache render ms:"
+                << coldRenderMs << cachedRenderMs << "maximum host heartbeat gap ms:" << longestHeartbeatGap;
+    }
+    void formInteractionTiming()
+    {
+        PdfDocument document;
+        document.open(fixture("acroform/controls.pdf"));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        QElapsedTimer elapsed;
+        elapsed.start();
+        qint64 previousHeartbeat = 0;
+        qint64 longestHeartbeatGap = 0;
+        int heartbeats = 0;
+        QTimer heartbeat;
+        connect(&heartbeat, &QTimer::timeout, this, [&] {
+            const auto now = elapsed.elapsed();
+            longestHeartbeatGap = std::max(longestHeartbeatGap, now - previousHeartbeat);
+            previousHeartbeat = now;
+            ++heartbeats;
+        });
+        heartbeat.start(10);
+        qint64 longestInteraction = 0;
+        for (int interaction = 0; interaction < 20; ++interaction)
+        {
+            const auto start = elapsed.elapsed();
+            document.formEvent(0, "click", 100, 87);
+            QTRY_VERIFY_WITH_TIMEOUT(!document.formBusy(), 5000);
+            document.formEvent(0, "selectAll");
+            const auto value = QString("Timing edit %1").arg(interaction);
+            document.formEvent(0, "text", 0, 0, 0, value);
+            QTRY_COMPARE_WITH_TIMEOUT(document.formText(), value, 5000);
+            QTRY_VERIFY_WITH_TIMEOUT(!document.formBusy(), 5000);
+            longestInteraction = std::max(longestInteraction, elapsed.elapsed() - start);
+        }
+        QTest::qWait(20);
+        QVERIFY(heartbeats > 0);
+        QVERIFY(longestInteraction < 15000);
+        QVERIFY2(longestHeartbeatGap < 2000, "Form interaction blocked the host event loop for two seconds");
+        qInfo() << "20 form edit sequences, maximum ms:" << longestInteraction
+                << "maximum host heartbeat gap ms:" << longestHeartbeatGap;
     }
     void formQueueIsBounded()
     {

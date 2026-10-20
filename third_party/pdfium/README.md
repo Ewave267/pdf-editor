@@ -39,3 +39,17 @@ form bindings remain, matching instance-removal ownership rules. This prevents
 orphaned headings from multiplying on reopen. Production IRS Form 14234-C checks
 live repeated-row positions, five saved generations and independent PDF.js heading,
 control and value preservation. All platform dependency caches must rebuild.
+
+`patches/0006-xfa-layout-group-export.patch` prevents used overflow headings from
+becoming extra input instances after reopening. Export excludes only empty data
+groups whose remaining bindings all belong to generated layout nodes. It clones
+filtered XML only when necessary, leaving live layout bindings and every populated
+group intact. Twelve IRS Form 14234-C generations cover 20/30-row growth, shrinking,
+live Unicode values and independent per-page controls/headings. PDFium/PDF.js
+pagination differences remain recorded explicitly in the production manifest.
+
+`patches/0007-xfa-form-layout-export.patch` also omits decorative generated
+containers from the saved FORM packet, only when their bound data group is empty
+and the complete subtree contains no Field or ExclGroup. Unbound and populated
+field values remain serialized. Authored headings remain present; generated
+headings are recreated from the template instead of becoming saved instances.

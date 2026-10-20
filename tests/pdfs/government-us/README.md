@@ -105,9 +105,13 @@ expectations fail. Source bytes remain unchanged.
 
 The overflow-binding cleanup patch prevents discarded layout headings from
 leaving data groups behind. Live native row positions and values are checked
-before saving; five save/reopen generations retain one heading and one page in
-both readers. Longer multi-page row-count scenarios remain unchecked; this does
-not establish arbitrary XFA layout compatibility or production readiness.
+before saving; twelve save/reopen generations cover one-to-three-to-two rows,
+20/30-row multi-page growth, no-op saves and shrinking. Native pages remain stable
+within each scenario and PDF.js checks per-page headings and every control/value.
+The 30-row case opens as three native pages versus two PDF.js pages; PDF.js omits
+continuation headings. Live row positions immediately after shrinking can differ
+from reopened positions, so each is pinned and checked separately. These reader
+differences do not establish arbitrary XFA layout compatibility or production readiness.
 Custom validation is not present in this template.
 
 ```sh
@@ -115,3 +119,18 @@ python3 tests/test_worker_safety.py build-viewer/pdf-render-worker \
   build-viewer/sandbox-policy-worker .deps/pdfium-patched \
   WorkerSafetyTests.test_irs_production_xfa_repeated_rows
 ```
+
+## Production static XFA
+
+`irs-f8822.pdf` is the unchanged official IRS Form 8822, revision February 2021,
+downloaded October 19, 2026. [f8822-SOURCE.json](f8822-SOURCE.json) pins the source,
+rights, blank-template/privacy review, byte count and SHA-256. The IRS attribution
+and public-domain policy above apply. Both source pages were visually inspected;
+all 22 text widgets are empty and all three checkboxes are unchecked.
+
+`test_irs_production_static_xfa_round_trips` checks native static-XFA admission,
+two Unicode name replacements through focused input, two saved/reopened generations,
+both rendered pages and unchanged source bytes. Pinned PDF.js independently checks
+the blank source's 25 widgets and every saved widget identity, type, page and value.
+This adds production static-XFA coverage alongside the upstream password/rotation
+fixture; it does not establish pixel equivalence, all-script support or signing.

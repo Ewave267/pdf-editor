@@ -29,6 +29,40 @@
             "Étude à Montréal",
             "Révision française 2"
           ]
+        },
+        "scripted_choices_round_trip": {
+          "date_field": "Date1_af_date",
+          "date_format": "",
+          "generations": [
+            {
+              "date": "10/19/26",
+              "choices": {
+                "Dropdown1": {
+                  "index": 0,
+                  "value": "Academic project"
+                },
+                "Dropdown6": {
+                  "index": 0,
+                  "value": "Student"
+                }
+              }
+            },
+            {
+              "date": "2/29/28",
+              "choices": {
+                "Dropdown1": {
+                  "index": 1,
+                  "value": "Government-funded project"
+                },
+                "Dropdown6": {
+                  "index": 2,
+                  "value": "Full Professor"
+                }
+              }
+            }
+          ],
+          "script_format": "m/d/yy",
+          "native_helper_limitation": "m/d/yy is scripted by the original form but not advertised by the native date helper."
         }
       },
       "coverage": [
@@ -85,6 +119,20 @@
             "Étude à Montréal",
             "Révision française 2"
           ]
+        },
+        "scripted_choices_round_trip": {
+          "date_field": "date",
+          "date_format": "yyyy-mm-dd",
+          "generations": [
+            {
+              "date": "2026-10-19",
+              "choices": {}
+            },
+            {
+              "date": "2028-02-29",
+              "choices": {}
+            }
+          ]
         }
       },
       "coverage": [
@@ -112,6 +160,20 @@
           "values": [
             "Étude à Montréal",
             "Révision française 2"
+          ]
+        },
+        "scripted_choices_round_trip": {
+          "date_field": "date",
+          "date_format": "yyyy-mm-dd",
+          "generations": [
+            {
+              "date": "2026-10-19",
+              "choices": {}
+            },
+            {
+              "date": "2028-02-29",
+              "choices": {}
+            }
           ]
         }
       },

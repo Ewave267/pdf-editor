@@ -38,7 +38,30 @@ ApplicationWindow {
     property bool showThumbnails: true
     readonly property bool canEdit: pdfDocument.ready && !pdfDocument.saving && !pdfDocument.additions.editing
     readonly property bool selectedText: pdfDocument.additions.selectionCount === 1 && root.selectedObject.type === "text"
-    function addText() { textDialog.editing = false; textInput.text = ""; textDialog.loadStyle({}); textDialog.open() }
+    readonly property bool canInsert: root.canEdit && pdfDocument.canAddContent
+    function addText() { confirmOperation("add", function() { textDialog.editing = false; textInput.text = ""; textDialog.loadStyle({}); textDialog.open() }) }
+    function addImage(signature) { confirmOperation("add", function() { imageDialog.signature = signature; imageDialog.open() }) }
+    property var pendingOperation
+    function confirmOperation(operation, action) {
+        if (!root.canEdit || (operation === "add" && !pdfDocument.canAddContent)) return
+        const warning = pdfDocument.operationWarning(operation)
+        if (warning) { pendingOperation = action; operationWarning.message = warning; operationWarning.open() }
+        else action()
+    }
+    Dialog {
+        id: operationWarning
+        objectName: "operationWarningDialog"
+        property string message: ""
+        title: "Review this change"
+        anchors.centerIn: parent
+        width: Math.min(500, root.width - 40)
+        modal: true
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        onOpened: standardButton(Dialog.Ok).text = "Continue"
+        Label { width: parent.width; wrapMode: Text.WordWrap; textFormat: Text.PlainText; text: operationWarning.message }
+        onAccepted: { const action = root.pendingOperation; root.pendingOperation = null; if (root.canEdit && action) action() }
+        onRejected: { root.pendingOperation = null; root.saveBeforeContinuing = false; root.discardAction = null }
+    }
     function editText() { textDialog.editing = true; textInput.text = root.selectedObject.text; textDialog.loadStyle(root.selectedObject); textDialog.open() }
     function applyTextStyle(family, size, bold, italic, underline) {
         if (canEdit && selectedText)
@@ -99,7 +122,7 @@ ApplicationWindow {
             MenuItem { text: "Last save checks…"; enabled: pdfDocument.saveChecks.length > 0; onTriggered: saveReport.open() }
             MenuItem { objectName: "pagesButton"; text: "Organize / export pages…"; enabled: root.canEdit && pdfDocument.formType !== "XFA"; onTriggered: pagesDialog.open() }
             MenuSeparator {}
-            MenuItem { text: "Print…"; enabled: root.canEdit && !pdfDocument.formBusy; onTriggered: pdfDocument.print() }
+            MenuItem { text: "Print…"; enabled: root.canEdit && !pdfDocument.formBusy; onTriggered: root.confirmOperation("print", function() { pdfDocument.print() }) }
             MenuItem { text: "Print to PDF…"; enabled: root.canEdit && !pdfDocument.formBusy; onTriggered: printSaveDialog.open() }
             MenuSeparator {}
             MenuItem { text: "Recover unsaved work…"; enabled: !pdfDocument.ready && !pdfDocument.loading; onTriggered: recoveryDialog.open() }
@@ -112,7 +135,7 @@ ApplicationWindow {
             MenuSeparator {}
             MenuItem { objectName: "cutObjectsButton"; text: "Cut added content"; enabled: root.canEdit && pdfDocument.additions.selectionCount > 0; onTriggered: pdfDocument.additions.cutSelection() }
             MenuItem { objectName: "copyObjectsButton"; text: "Copy added content"; enabled: root.canEdit && pdfDocument.additions.selectionCount > 0; onTriggered: pdfDocument.additions.copySelection() }
-            MenuItem { objectName: "pasteObjectsButton"; text: "Paste"; enabled: root.canEdit; onTriggered: pdfDocument.additions.paste(pdfDocument.currentPage - 1) }
+            MenuItem { objectName: "pasteObjectsButton"; text: "Paste"; enabled: root.canInsert; onTriggered: root.confirmOperation("add", function() { pdfDocument.additions.paste(pdfDocument.currentPage - 1) }) }
             MenuItem { objectName: "selectAllObjectsButton"; text: "Select all added content on this page"; enabled: root.canEdit; onTriggered: pdfDocument.additions.selectAll(pdfDocument.currentPage - 1) }
             MenuSeparator {}
             MenuItem { text: "Find text…"; enabled: root.canEdit; onTriggered: searchDialog.open() }
@@ -127,9 +150,9 @@ ApplicationWindow {
             MenuItem { text: "Full screen"; checkable: true; checked: root.visibility === Window.FullScreen; onTriggered: root.visibility = checked ? Window.FullScreen : Window.Windowed }
         }
         Menu {
-            title: "&Insert"; enabled: root.canEdit
+            title: "&Insert"; enabled: root.canInsert
             MenuItem { text: "Text box…"; onTriggered: root.addText() }
-            MenuItem { text: "Image…"; onTriggered: { imageDialog.signature = false; imageDialog.open() } }
+            MenuItem { text: "Image…"; onTriggered: root.addImage(false) }
             MenuItem { text: "Signature…"; onTriggered: signDialog.open() }
             MenuSeparator {}
             MenuItem { text: "Checkmark…"; onTriggered: root.chooseGraphic("checkmark") }
@@ -208,7 +231,7 @@ ApplicationWindow {
             }
         }
     }
-    Shortcut { sequences: [StandardKey.Print]; enabled: root.canEdit && !root.anyDialogVisible; onActivated: pdfDocument.print() }
+    Shortcut { sequences: [StandardKey.Print]; enabled: root.canEdit && !root.anyDialogVisible; onActivated: root.confirmOperation("print", function() { pdfDocument.print() }) }
     Dialog {
         id: recoveryDialog
         title: "Recover previous session"
@@ -243,12 +266,14 @@ ApplicationWindow {
     property var pendingGraphic: ({})
     property var inkColors: ["#000000", "#c62828", "#225a91", "#237a38", "#ffdf00", "#7638a8"]
     function chooseGraphic(kind) {
+        root.confirmOperation("add", function() {
         graphicDialog.editing = false
         graphicDialog.kind = kind
         inkColor.currentIndex = kind === "highlight" ? 4 : kind === "stamp" ? 1 : 0
         inkWidth.value = kind === "checkmark" ? 3 : 2
         stampText.text = "APPROVED"
         graphicDialog.open()
+        })
     }
     property url pendingImage
     property var selectedObject: ({})
@@ -410,7 +435,7 @@ ApplicationWindow {
         nameFilters: ["Images (*.png *.jpg *.jpeg *.webp *.bmp)"]
         onAccepted: { root.pendingImage = selectedFile; root.placement = signature ? "signature" : "image" }
     }
-    Shortcut { sequence: "Escape"; enabled: !helpDialog.visible && !root.formPopupVisible && !root.workflowPopupVisible && !textDialog.visible && !graphicDialog.visible && !imageDialog.visible && !saveDialog.visible && !discardDialog.visible && !fileDialog.visible && !saveFailure.visible && !(root.activeFocusItem instanceof FormInput); onActivated: { root.placement = ""; pdfDocument.additions.cancelEdit(); pdfDocument.additions.select(-1) } }
+    Shortcut { sequence: "Escape"; enabled: !operationWarning.visible && !saveReport.visible && !helpDialog.visible && !root.formPopupVisible && !root.workflowPopupVisible && !textDialog.visible && !graphicDialog.visible && !imageDialog.visible && !saveDialog.visible && !discardDialog.visible && !fileDialog.visible && !saveFailure.visible && !(root.activeFocusItem instanceof FormInput); onActivated: { root.placement = ""; pdfDocument.additions.cancelEdit(); pdfDocument.additions.select(-1) } }
     Connections {
         target: pdfDocument.additions
         function onChanged() { root.selectedObject = pdfDocument.additions.object(pdfDocument.additions.selected) }
@@ -554,7 +579,7 @@ ApplicationWindow {
             width: parent.width
             Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: "Draw on the page or import a signature image, then resize and place it. This adds visible content; it does not digitally sign a native signature field. Added signatures cannot be saved on dynamic XFA yet." }
             Button { objectName: "drawSignatureButton"; text: "Draw signature"; onClicked: { signDialog.close(); root.chooseGraphic("drawing") } }
-            Button { objectName: "importSignatureButton"; text: "Import signature image"; onClicked: { signDialog.close(); imageDialog.signature = true; imageDialog.open() } }
+            Button { objectName: "importSignatureButton"; text: "Import signature image"; onClicked: { signDialog.close(); root.addImage(true) } }
         }
     }
     FileDialog {
@@ -574,7 +599,7 @@ ApplicationWindow {
         nameFilters: ["PDF documents (*.pdf)"]
         defaultSuffix: "pdf"
         onRejected: { root.saveBeforeContinuing = false; root.discardAction = null }
-        onAccepted: pdfDocument.saveAs(selectedFile)
+        onAccepted: { const destination = selectedFile; root.confirmOperation("save", function() { pdfDocument.saveAs(destination) }) }
     }
     Dialog {
         id: pagesDialog
@@ -612,16 +637,17 @@ ApplicationWindow {
         fileMode: FileDialog.SaveFile
         nameFilters: ["PDF documents (*.pdf)"]
         defaultSuffix: "pdf"
-        onAccepted: pdfDocument.printToPdf(selectedFile)
+        onAccepted: { const destination = selectedFile; root.confirmOperation("print", function() { pdfDocument.printToPdf(destination) }) }
     }
     FileDialog {
         id: pagesSaveDialog
+        objectName: "pagesSaveDialog"
         currentFolder: root.initialFolder
         title: "Export to a new PDF"
         fileMode: FileDialog.SaveFile
         nameFilters: ["PDF documents (*.pdf)"]
         defaultSuffix: "pdf"
-        onAccepted: pdfDocument.exportPages(selectedFile, pageOrder.text, pageRotation.currentIndex * 90, flattenForms.checked, pagesDialog.mergeFiles)
+        onAccepted: { const destination = selectedFile; root.confirmOperation("pages", function() { pdfDocument.exportPages(destination, pageOrder.text, pageRotation.currentIndex * 90, flattenForms.checked, pagesDialog.mergeFiles) }) }
     }
     Dialog {
         id: saveReport
@@ -658,6 +684,7 @@ ApplicationWindow {
     }
     Connections {
         target: pdfDocument
+        function onStateChanged() { if (operationWarning.visible) { root.pendingOperation = null; root.saveBeforeContinuing = false; root.discardAction = null; operationWarning.close() } }
         function onSaveFinished(success) {
             if (root.saveBeforeContinuing) {
                 root.saveBeforeContinuing = false
@@ -676,17 +703,17 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+0"; onActivated: pdfDocument.fitToPage() }
     property bool workflowPopupVisible: helpDialog.visible || pagesDialog.visible || pagesSaveDialog.visible || mergeDialog.visible || printSaveDialog.visible || searchDialog.visible || recoveryDialog.visible
     property bool formPopupVisible: fieldsDialog.visible || validationDialog.visible || resetDialog.visible || choiceDialog.visible || dateDialog.visible || signDialog.visible
-    readonly property bool anyDialogVisible: root.formPopupVisible || root.workflowPopupVisible || textDialog.visible || graphicDialog.visible || imageDialog.visible || fileDialog.visible || saveDialog.visible || discardDialog.visible || saveFailure.visible || saveReport.visible
+    readonly property bool anyDialogVisible: root.formPopupVisible || root.workflowPopupVisible || textDialog.visible || graphicDialog.visible || imageDialog.visible || fileDialog.visible || saveDialog.visible || discardDialog.visible || saveFailure.visible || saveReport.visible || operationWarning.visible
     property bool additionHistoryShortcuts: pdfDocument.ready && !pdfDocument.saving
         && !pdfDocument.additions.editing && !graphicDialog.visible && !helpDialog.visible && !root.formPopupVisible && !root.workflowPopupVisible
-        && !textDialog.visible && !imageDialog.visible && !saveDialog.visible && !discardDialog.visible && !fileDialog.visible && !saveFailure.visible && !saveReport.visible
+        && !textDialog.visible && !imageDialog.visible && !saveDialog.visible && !discardDialog.visible && !fileDialog.visible && !saveFailure.visible && !saveReport.visible && !operationWarning.visible
         && !(root.activeFocusItem instanceof FormInput)
         && !(root.activeFocusItem && typeof root.activeFocusItem.undo === "function")
     Shortcut { sequences: [StandardKey.Undo]; enabled: root.additionHistoryShortcuts && pdfDocument.additions.canUndo; onActivated: pdfDocument.additions.undo() }
     Shortcut { sequences: [StandardKey.Redo]; enabled: root.additionHistoryShortcuts && pdfDocument.additions.canRedo; onActivated: pdfDocument.additions.redo() }
     Shortcut { sequences: [StandardKey.Copy]; enabled: root.additionHistoryShortcuts && pdfDocument.additions.selectionCount > 0; onActivated: pdfDocument.additions.copySelection() }
     Shortcut { sequences: [StandardKey.Cut]; enabled: root.additionHistoryShortcuts && pdfDocument.additions.selectionCount > 0; onActivated: pdfDocument.additions.cutSelection() }
-    Shortcut { sequences: [StandardKey.Paste]; enabled: root.additionHistoryShortcuts; onActivated: pdfDocument.additions.paste(pdfDocument.currentPage - 1) }
+    Shortcut { sequences: [StandardKey.Paste]; enabled: root.additionHistoryShortcuts; onActivated: root.confirmOperation("add", function() { pdfDocument.additions.paste(pdfDocument.currentPage - 1) }) }
     Shortcut { sequences: [StandardKey.SelectAll]; enabled: root.additionHistoryShortcuts; onActivated: pdfDocument.additions.selectAll(pdfDocument.currentPage - 1) }
     Shortcut { sequences: ["Delete", "Backspace"]; enabled: root.additionHistoryShortcuts && pdfDocument.additions.selectionCount > 0; onActivated: pdfDocument.additions.removeSelected() }
     Shortcut { sequence: "Left"; enabled: root.additionHistoryShortcuts && pdfDocument.additions.selectionCount > 0; onActivated: pdfDocument.additions.nudgeSelection(-1, 0) }
@@ -803,11 +830,11 @@ ApplicationWindow {
                 visible: pdfDocument.ready; enabled: root.canEdit
                 EditorButton { objectName: "selectToolButton"; text: "Select"; hint: "Select, move or resize added content"; checked: root.placement === ""; onClicked: root.placement = "" }
                 Rectangle { Layout.preferredWidth: 1; Layout.preferredHeight: 22; color: root.borderColor; Layout.leftMargin: 4; Layout.rightMargin: 4 }
-                EditorButton { objectName: "addTextButton"; text: "Add text"; hint: "Add a new text box to the page"; checked: root.placement === "text"; onClicked: root.addText() }
-                EditorButton { objectName: "addImageButton"; text: "Image"; hint: "Add an image"; checked: root.placement === "image"; onClicked: { imageDialog.signature = false; imageDialog.open() } }
-                EditorButton { objectName: "addSignatureButton"; text: "Sign"; hint: "Draw or import a signature"; checked: root.placement === "signature"; onClicked: signDialog.open() }
+                EditorButton { objectName: "addTextButton"; enabled: root.canInsert; text: "Add text"; hint: "Add a new text box to the page"; checked: root.placement === "text"; onClicked: root.addText() }
+                EditorButton { objectName: "addImageButton"; enabled: root.canInsert; text: "Image"; hint: "Add an image"; checked: root.placement === "image"; onClicked: root.addImage(false) }
+                EditorButton { objectName: "addSignatureButton"; enabled: root.canInsert; text: "Sign"; hint: "Draw or import a signature"; checked: root.placement === "signature"; onClicked: signDialog.open() }
                 EditorButton {
-                    objectName: "drawToolsButton"; text: "Draw ▾"; hint: "Draw, highlight, add shapes or a checkmark"; onClicked: drawMenu.popup()
+                    objectName: "drawToolsButton"; enabled: root.canInsert; text: "Draw ▾"; hint: "Draw, highlight, add shapes or a checkmark"; onClicked: drawMenu.popup()
                         Menu {
                             id: drawMenu
                             MenuItem { objectName: "checkmarkTool"; text: "Checkmark"; onTriggered: root.chooseGraphic("checkmark") }
@@ -828,7 +855,7 @@ ApplicationWindow {
                 anchors.leftMargin: 8; anchors.rightMargin: 8; height: 38; spacing: 4
                 visible: pdfDocument.ready; enabled: root.canEdit
                 EditorButton { objectName: "selectAreaButton"; text: "Select area"; hint: "Drag around added objects to select them together"; visible: !root.placement; checked: root.placement === "selection"; onClicked: root.placement = "selection" }
-                Label { objectName: "toolHint"; textFormat: Text.PlainText; Layout.fillWidth: true; elide: Text.ElideRight; color: root.placement ? root.accentColor : root.mutedColor; font.pixelSize: 12; text: pdfDocument.error || pdfDocument.formError || pdfDocument.additions.error || (root.placement ? (root.placement === "selection" ? "Drag around the objects to select" : root.placement === "text" || root.placement === "image" || root.placement === "signature" || root.placement === "stamp" || root.placement === "checkmark" ? "Click the page to place " + root.placement : "Drag on the page to draw " + root.placement) : pdfDocument.additions.selectionCount > 1 ? pdfDocument.additions.selectionCount + " objects selected" : pdfDocument.additions.selectionCount === 1 ? (root.selectedObject.type === "text" ? "Text box selected" : "Object selected") : pdfDocument.formType !== "PDF" ? "Click a highlighted field to fill in your form" : "Choose a tool above, then click the page") }
+                Label { objectName: "toolHint"; textFormat: Text.PlainText; Layout.fillWidth: true; elide: Text.ElideRight; color: root.placement ? root.accentColor : root.mutedColor; font.pixelSize: 12; text: pdfDocument.error || pdfDocument.formError || pdfDocument.additions.error || (!pdfDocument.canAddContent ? "Dynamic XFA supports form filling; adding content cannot be saved safely." : "") || (root.placement ? (root.placement === "selection" ? "Drag around the objects to select" : root.placement === "text" || root.placement === "image" || root.placement === "signature" || root.placement === "stamp" || root.placement === "checkmark" ? "Click the page to place " + root.placement : "Drag on the page to draw " + root.placement) : pdfDocument.additions.selectionCount > 1 ? pdfDocument.additions.selectionCount + " objects selected" : pdfDocument.additions.selectionCount === 1 ? (root.selectedObject.type === "text" ? "Text box selected" : "Object selected") : pdfDocument.formType !== "PDF" ? "Click a highlighted field to fill in your form" : "Choose a tool above, then click the page") }
                 EditorButton { objectName: "cancelToolButton"; text: "Cancel"; visible: !!root.placement; hint: "Cancel this tool (Esc)"; onClicked: root.placement = "" }
                 ComboBox { objectName: "selectionFontFamily"; visible: root.selectedText && root.width >= 1000 && !root.placement; Layout.preferredWidth: 150; implicitHeight: 32; model: pdfDocument.additions.fontFamilies; currentIndex: Math.max(0, pdfDocument.additions.fontFamilies.indexOf(root.selectedObject.fontFamily || "Sans Serif")); Accessible.name: "Selected text font"; onActivated: root.applyTextStyle(currentText, root.selectedObject.fontSize, root.selectedObject.bold, root.selectedObject.italic, root.selectedObject.underline) }
                 SpinBox { objectName: "selectionFontSize"; visible: root.selectedText && root.width >= 1000 && !root.placement; implicitWidth: 100; implicitHeight: 32; from: 6; to: 144; editable: true; value: root.selectedObject.fontSize || 18; Accessible.name: "Selected text size in points"; onValueModified: root.applyTextStyle(root.selectedObject.fontFamily, value, root.selectedObject.bold, root.selectedObject.italic, root.selectedObject.underline) }
@@ -876,7 +903,7 @@ ApplicationWindow {
                         const date = isNaN(parsed.getTime()) ? new Date() : parsed
                         dateYear.value = date.getFullYear(); dateMonth.value = date.getMonth()+1; dateDay.value = date.getDate(); dateDialog.open()
                     } }
-                    EditorButton { objectName: "signFormButton"; text: "Sign…"; onClicked: signDialog.open() }
+                    EditorButton { objectName: "signFormButton"; enabled: root.canInsert; text: "Sign…"; onClicked: signDialog.open() }
 
                 }
             }

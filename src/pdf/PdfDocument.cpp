@@ -174,6 +174,8 @@ void PdfDocument::close()
     error_.clear();
     fileName_.clear();
     formType_.clear();
+    signatureCount_ = -1;
+    certified_ = false;
     currentPage_ = 1;
     emit stateChanged();
     emit currentPageChanged();
@@ -559,6 +561,8 @@ void PdfDocument::receive()
         const int type = response.value("formType").toInt();
         xfaFull_ = type == 2;
         formType_ = type == 0 ? "PDF" : type == 1 ? "AcroForm" : "XFA";
+        signatureCount_ = response["signatureCount"].toInt(-1);
+        certified_ = response["certified"].toBool();
         formFields_ = response["fields"].toArray().toVariantList();
         fieldsComplete_ = response["fieldsComplete"].toBool();
         emit formsChanged();
@@ -709,6 +713,27 @@ void PdfDocument::receive()
     for (const auto id : listeners)
         emit rendered(id, image);
     nextRequest();
+}
+QString PdfDocument::operationWarning(const QString& operation) const
+{
+    if (!ready_ || !QStringList{"save", "add", "pages", "print"}.contains(operation))
+        return {};
+    QStringList warnings;
+    if (signatureCount_ != 0)
+    {
+        warnings << (signatureCount_ < 0 ? "Existing digital signatures could not be inspected."
+                                        : "This PDF contains existing digital signature data.");
+        warnings << "This operation changes or rewrites content and may invalidate signatures in the saved copy. Signature validity and trust are not checked. Your original PDF is retained.";
+        if (certified_)
+            warnings << "Certification permissions were detected. This editor cannot establish that the change is permitted by the certification.";
+    }
+    if (operation == "pages" && formType_ != "PDF")
+        warnings << "Page export flattens form fields and removes interactive form behavior and document scripts from the exported copy.";
+    if (operation == "print" && formType_ != "PDF")
+        warnings << "Printing produces visible pages; interactive fields, form scripts and digital signatures are not carried into a printed PDF.";
+    if (operation == "save" && formType_ == "XFA")
+        warnings << "XFA scripts and pagination can differ after saving or in another reader. Review the save checks and reopen the copy before sending it.";
+    return warnings.join("\n\n");
 }
 
 quint64 PdfDocument::requestRender(int page, int width)

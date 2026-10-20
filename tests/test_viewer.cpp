@@ -26,6 +26,7 @@
 #include <QtTest>
 #include <cmath>
 #include <csignal>
+#include <sys/stat.h>
 #include <unistd.h>
 
 namespace
@@ -97,12 +98,124 @@ class ViewerTests : public QObject
 #endif
     }
   private slots:
+    void rasterImageBoundary()
+    {
+        PdfDocument document;
+        document.open(fixture("normal/single-page.pdf"));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        QTemporaryDir directory;
+        QFile disguised(directory.filePath("vector.png"));
+        QVERIFY(disguised.open(QIODevice::WriteOnly));
+        disguised.write("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"8\" height=\"8\"><rect width=\"8\" height=\"8\"/></svg>");
+        disguised.close();
+        QCOMPARE(document.additions()->addImage(0, 10, 10, QUrl::fromLocalFile(disguised.fileName())), -1);
+        QVERIFY(!document.dirty());
+        const auto fifo = directory.filePath("image.png");
+        QCOMPARE(::mkfifo(QFile::encodeName(fifo).constData(), 0600), 0);
+        QCOMPARE(document.additions()->addImage(0, 10, 10, QUrl::fromLocalFile(fifo)), -1);
+        QImage image(8, 8, QImage::Format_ARGB32);
+        image.fill(Qt::red);
+        for (const auto& format : {QByteArray("PNG"), QByteArray("JPEG"), QByteArray("BMP")})
+        {
+            const auto path = directory.filePath(QString::fromLatin1(format) + ".svg");
+            QVERIFY(image.save(path, format.constData()));
+            QVERIFY(document.additions()->addImage(0, 10, 10, QUrl::fromLocalFile(path)) > 0);
+        }
+    }
+    void operationWarningsAndCancellation()
+    {
+        QTemporaryDir directory;
+        PdfDocument document;
+        QQmlApplicationEngine engine;
+        engine.rootContext()->setContextProperty("pdfDocument", &document);
+        engine.load(QUrl("qrc:/qml/Main.qml"));
+        QVERIFY(!engine.rootObjects().isEmpty());
+        auto* window = qobject_cast<QQuickWindow*>(engine.rootObjects().first());
+        QVERIFY(window && QTest::qWaitForWindowExposed(window));
+        auto* warning = window->findChild<QObject*>("operationWarningDialog");
+        auto* save = window->findChild<QObject*>("saveDialog");
+        auto* pages = window->findChild<QObject*>("pagesSaveDialog");
+        auto* pageOrder = window->findChild<QObject*>("exportPageOrder");
+        QVERIFY(warning && save && pages && pageOrder);
+        for (const auto& path : {QString("acroform/signature-marker.pdf"),
+                                 QString("acroform/certification-marker.pdf")})
+        {
+            document.open(fixture(path));
+            QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+            QCOMPARE(document.signatureCount(), 1);
+            QCOMPARE(document.certified(), path.contains("certification"));
+            QVERIFY(document.operationWarning("save").contains("may invalidate"));
+            if (document.certified())
+                QVERIFY(document.operationWarning("save").contains("Certification permissions"));
+            const auto revision = document.additions()->revision();
+            QVERIFY(QMetaObject::invokeMethod(window, "addText"));
+            QTRY_VERIFY(warning->property("visible").toBool());
+            if (qEnvironmentVariableIsSet("PDF_WARNING_SCREENSHOT"))
+            {
+                QVERIFY(waitForFrame(window));
+                QVERIFY(window->grabWindow().save(qEnvironmentVariable("PDF_WARNING_SCREENSHOT")));
+            }
+            QVERIFY(QMetaObject::invokeMethod(warning, "reject"));
+            QTRY_VERIFY(!warning->property("visible").toBool());
+            QCOMPARE(document.additions()->revision(), revision);
+            QVERIFY(!document.dirty());
+            const auto destination = directory.filePath(QFileInfo(path).fileName());
+            save->setProperty("selectedFile", QUrl::fromLocalFile(destination));
+            QVERIFY(QMetaObject::invokeMethod(save, "accepted"));
+            QTRY_VERIFY(warning->property("visible").toBool());
+            QVERIFY(QMetaObject::invokeMethod(warning, "reject"));
+            QVERIFY(!document.saving());
+            QVERIFY(!QFileInfo::exists(destination));
+            QVERIFY(pageOrder->setProperty("text", "1"));
+            pages->setProperty("selectedFile", QUrl::fromLocalFile(destination));
+            QVERIFY(QMetaObject::invokeMethod(pages, "accepted"));
+            QTRY_VERIFY(warning->property("visible").toBool());
+            QVERIFY(warning->property("message").toString().contains("flattens"));
+            QVERIFY(QMetaObject::invokeMethod(warning, "reject"));
+            QVERIFY(!QFileInfo::exists(destination));
+            QVERIFY(!document.dirty());
+            QVERIFY(QMetaObject::invokeMethod(window, "addText"));
+            QTRY_VERIFY(warning->property("visible").toBool());
+            QVERIFY(QMetaObject::invokeMethod(warning, "accept"));
+            auto* text = window->findChild<QObject*>("textDialog");
+            QVERIFY(text);
+            QTRY_VERIFY(text->property("visible").toBool());
+            QVERIFY(QMetaObject::invokeMethod(text, "reject"));
+            QVERIFY(QMetaObject::invokeMethod(save, "accepted"));
+            QTRY_VERIFY(warning->property("visible").toBool());
+            QVERIFY(QMetaObject::invokeMethod(warning, "accept"));
+            QTRY_VERIFY_WITH_TIMEOUT(!document.saving(), 30000);
+            QVERIFY2(document.saveError().isEmpty(), qPrintable(document.saveError()));
+            QVERIFY(QFileInfo::exists(destination));
+            auto* checks = window->findChild<QObject*>("saveReportDialog");
+            QVERIFY(checks && QMetaObject::invokeMethod(checks, "open"));
+            QTRY_VERIFY(checks->property("visible").toBool());
+            QVERIFY(QMetaObject::invokeMethod(checks, "close"));
+        }
+        document.open(fixture("normal/single-page.pdf"));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        QCOMPARE(document.signatureCount(), 0);
+        QVERIFY(document.operationWarning("save").isEmpty());
+        document.open(fixture("xfa-dynamic/controls.pdf"));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        QVERIFY(!document.canAddContent());
+        QVERIFY(document.operationWarning("save").contains("XFA"));
+        auto* addText = item(window->contentItem(), "addTextButton");
+        QVERIFY(addText && !addText->isEnabled());
+        QVERIFY(QMetaObject::invokeMethod(window, "addText"));
+        QVERIFY(!warning->property("visible").toBool());
+        QCOMPARE(document.additions()->count(), 0);
+        document.exportPages(QUrl::fromLocalFile(directory.filePath("blocked.pdf")), "1", 0, true);
+        QVERIFY(!document.saveError().isEmpty());
+        QVERIFY(!QFileInfo::exists(directory.filePath("blocked.pdf")));
+    }
     void verifiedSaveReports()
     {
         QTemporaryDir directory;
         for (const auto& path : {QString("normal/single-page.pdf"),
                                  QString("acroform/controls.pdf"), QString("xfa-dynamic/controls.pdf"),
-                                 QString("government-us/irs-f14653.pdf")})
+                                 QString("government-us/irs-f14653.pdf"), QString("government-us/irs-f8822.pdf"),
+                                 QString("upstream-pdfium/static_password_field_rotate.pdf")})
         {
             PdfDocument document;
             document.open(fixture(path));
@@ -117,6 +230,16 @@ class ViewerTests : public QObject
                     }
                 QTRY_VERIFY(!document.formBusy());
             }
+            const bool staticXfa = path.contains("irs-f8822") || path.contains("static_password");
+            const QPointF staticPoint = path.contains("irs-f8822") ? QPointF(200, 252) : QPointF(170, 202);
+            if (staticXfa)
+            {
+                document.formEvent(0, "click", staticPoint.x(), staticPoint.y());
+                document.formEvent(0, "selectAll");
+                document.formEvent(0, "text", 0, 0, 0, QString::fromUtf8("Élodie <保存> & Noël"));
+                document.formEvent(0, "blur");
+                QTRY_VERIFY(!document.formBusy());
+            }
             document.saveAs(QUrl::fromLocalFile(directory.filePath("verified.pdf")));
             QTRY_VERIFY_WITH_TIMEOUT(!document.saving(), 30000);
             QVERIFY2(document.saveError().isEmpty(), qPrintable(document.saveError()));
@@ -125,7 +248,45 @@ class ViewerTests : public QObject
             QCOMPARE(document.saveChecks()[1].toMap()["status"].toString(), "passed");
             QCOMPARE(document.saveChecks()[2].toMap()["status"].toString(),
                      path.startsWith("normal") || path.startsWith("xfa-dynamic") ? "unchecked" : "passed");
+            if (staticXfa)
+            {
+                document.close();
+                document.open(QUrl::fromLocalFile(directory.filePath("verified.pdf")));
+                QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+                document.formEvent(0, "click", staticPoint.x(), staticPoint.y());
+                QTRY_VERIFY(!document.formBusy());
+                QCOMPARE(document.formText(), QString::fromUtf8("Élodie <保存> & Noël"));
+            }
         }
+    }
+    void verifiedMultiPageXfaSave()
+    {
+        PdfDocument document;
+        document.open(fixture("government-us/irs-f14234c.pdf"));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        document.formEvent(0, "click", 120, 243);
+        document.formEvent(0, "selectAll");
+        document.formEvent(0, "text", 0, 0, 0, QString::fromUtf8("Élodie <verified> & Noël"));
+        document.formEvent(0, "blur");
+        QTRY_VERIFY(!document.formBusy());
+        document.formEvent(0, "click", 680, 185);
+        document.formEvent(0, "selectAll");
+        document.formEvent(0, "text", 0, 0, 0, "30");
+        document.formEvent(0, "blur");
+        QTRY_VERIFY(!document.formBusy());
+        QTemporaryDir directory;
+        const auto output = QUrl::fromLocalFile(directory.filePath("multi-page-xfa.pdf"));
+        document.saveAs(output);
+        QTRY_VERIFY_WITH_TIMEOUT(!document.saving(), 30000);
+        QVERIFY2(document.saveError().isEmpty(), qPrintable(document.saveError()));
+        QCOMPARE(document.saveChecks().last().toMap()["status"].toString(), "passed");
+        document.close();
+        document.open(output);
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        QVERIFY(document.pageCount() > 1);
+        document.formEvent(0, "click", 120, 480);
+        QTRY_VERIFY(!document.formBusy());
+        QCOMPARE(document.formText(), QString::fromUtf8("Élodie <verified> & Noël"));
     }
     void verificationFailureRetainsDestination()
     {
@@ -318,6 +479,8 @@ class ViewerTests : public QObject
         PdfDocument document;
         document.open(fixture("acroform/phase3.pdf"));
         QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        QCOMPARE(document.signatureCount(), 0);
+        QVERIFY(document.operationWarning("add").isEmpty());
         const auto output = QUrl::fromLocalFile(directory.filePath("flat.pdf"));
         document.exportPages(output, "1", 0, false);
         QVERIFY(!document.saveError().isEmpty());

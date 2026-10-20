@@ -87,6 +87,22 @@ def xfa_pdf(xml: bytes) -> bytes:
     ])
 
 
+def signature_marker_pdf(certified: bool = False) -> bytes:
+    # Deliberately invalid signature bytes test presence warnings, never validity.
+    reference = (b" /Reference [<< /Type /SigRef /TransformMethod /DocMDP "
+                 b"/TransformParams << /Type /TransformParams /P 1 /V /1.2 >> >>]"
+                 if certified else b"")
+    return pdf([
+        b"<< /Type /Catalog /Pages 2 0 R /AcroForm 4 0 R" +
+        (b" /Perms << /DocMDP 6 0 R >>" if certified else b"") + b" >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << >> /Annots [5 0 R] >>",
+        b"<< /Fields [5 0 R] /SigFlags 3 >>",
+        b"<< /Type /Annot /Subtype /Widget /FT /Sig /T (Invalid test signature) /V 6 0 R /P 3 0 R /Rect [0 0 0 0] /F 2 >>",
+        b"<< /Type /Sig /Filter /Adobe.PPKLite /SubFilter /adbe.pkcs7.detached /ByteRange [0 10 20 30] /Contents <0000>" + reference + b" >>",
+    ])
+
+
 def many_pages_pdf(count: int = 1000, padding: int = 0) -> bytes:
     kids = " ".join(f"{5 + index} 0 R" for index in range(count))
     objects = [b"<< /Type /Catalog /Pages 2 0 R >>",
@@ -188,6 +204,8 @@ def generate(output_root: Path = ROOT) -> None:
         b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << >> >>",
     ]))
     (output_root / "tests/pdfs/acroform/controls.pdf").write_bytes(acroform_controls())
+    (output_root / "tests/pdfs/acroform/signature-marker.pdf").write_bytes(signature_marker_pdf())
+    (output_root / "tests/pdfs/acroform/certification-marker.pdf").write_bytes(signature_marker_pdf(True))
     compatibility = ROOT / "tests/pdfs/xfa-dynamic/empty-calculation.xdp"
     (output_root / "tests/pdfs/xfa-dynamic/empty-calculation.pdf").write_bytes(xfa_pdf(compatibility.read_bytes()))
     font_layout = ROOT / "tests/pdfs/xfa-dynamic/arial-caption.xdp"

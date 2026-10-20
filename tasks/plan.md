@@ -4,7 +4,7 @@ Authorized 2026-10-19: complete remaining planned work; retain deferred ADR 0007
 features. Cryptographic PDF signing and signature trust/validity validation are
 excluded. Detecting existing signature presence and warning about modifications
 remain included. Continue with small verified commits without re-requesting plan
-approval; pushes/native CI depend on the user's pending preference.
+approval; the user requested local commits only: do not push or run remote workflows.
 
 ## Order and acceptance
 

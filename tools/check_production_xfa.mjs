@@ -20,7 +20,6 @@ if (scenarioName) {
   generation = generations[index];
 }
 let baseline;
-let baselineHeadings;
 for (const file of [resolve(dirname(manifestPath), record.file), ...(savedPdf ? [savedPdf] : [])]) {
   const saved = file === savedPdf;
   const multiline = saved && scenarioName === "multiline_round_trip";
@@ -35,7 +34,7 @@ for (const file of [resolve(dirname(manifestPath), record.file), ...(savedPdf ? 
     assert.equal(document.isPureXfa, expected.pure_xfa);
     assert.equal(document.numPages, counts.length);
     const state = [];
-    let headings = 0;
+    const headings = [];
     for (let index = 0; index < document.numPages; index++) {
       const page = await document.getPage(index + 1);
       const viewport = page.getViewport({ scale: 1 });
@@ -43,10 +42,11 @@ for (const file of [resolve(dirname(manifestPath), record.file), ...(savedPdf ? 
       assert.equal(viewport.width, dimensions.width);
       assert.equal(viewport.height, dimensions.height);
       const controls = [], names = [];
+      let pageHeadings = 0;
       function visit(node, name = "") {
         name = node.attributes?.xfaName ?? name;
         if (node.attributes?.xfaName) names.push(node.attributes.xfaName);
-        if (node.attributes?.xfaName === "HeaderRow") headings++;
+        if (node.attributes?.xfaName === "HeaderRow") pageHeadings++;
         if (["input", "textarea", "select"].includes(node.name)) {
           controls.push(node);
           state.push({ page: index, name, type: node.name,
@@ -59,6 +59,7 @@ for (const file of [resolve(dirname(manifestPath), record.file), ...(savedPdf ? 
       assert.ok(tree, `page ${index + 1} must have XFA layout`);
       visit(tree);
       assert.equal(controls.length, counts[index]);
+      headings.push(pageHeadings);
       const values = controls.map(node => node.attributes?.value ?? node.attributes?.textContent ?? node.value ?? "");
       if (!saved) {
         assert.ok(values.every(value => value === "" || value === "0"), "template must have no filled responses");
@@ -68,11 +69,10 @@ for (const file of [resolve(dirname(manifestPath), record.file), ...(savedPdf ? 
         for (const name of expected.sample_fields_per_page[index]) assert.ok(names.includes(name), `missing ${name}`);
       }
     }
-    if (!saved) baselineHeadings = headings;
     if (saved) {
       if (repeated) {
-        assert.ok(baselineHeadings > 0, "baseline must include a table heading");
-        assert.equal(headings, baselineHeadings, "save/reopen must not accumulate table headings");
+        assert.deepEqual(headings, generation.reader_headings_per_page,
+          "save/reopen must preserve the expected headings on every page");
         const scenario = expected.repeated_rows_round_trip;
         const headers = baseline.slice(0, scenario.header_controls).map(control => ({ ...control }));
         const row = baseline.slice(scenario.header_controls);
@@ -80,8 +80,8 @@ for (const file of [resolve(dirname(manifestPath), record.file), ...(savedPdf ? 
         assert.equal(headers.at(-1).name, "number_of_issues");
         headers.at(-1).value = generation.count;
         assert.equal(generation.values.length, Number(generation.count));
-        const rows = generation.values.flatMap(value => row.map(control => ({ ...control,
-          page: generation.reader_row_page,
+        const rows = generation.values.flatMap((value, index) => row.map(control => ({ ...control,
+          page: generation.reader_row_pages?.[index] ?? generation.reader_row_page,
           value: control.name === "identified_issue" ? value : control.value,
         })));
         assert.deepEqual(state, [...headers, ...rows], "saved repeated rows must preserve every control and value");

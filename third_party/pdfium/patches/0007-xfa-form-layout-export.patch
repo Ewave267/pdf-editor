@@ -1,0 +1,34 @@
+diff --git a/xfa/fxfa/parser/xfa_utils.cpp b/xfa/fxfa/parser/xfa_utils.cpp
+--- a/xfa/fxfa/parser/xfa_utils.cpp
++++ b/xfa/fxfa/parser/xfa_utils.cpp
+@@ -302,9 +302,30 @@
+   }
+ }
+ 
++bool HasFormField(CXFA_Node* node) {
++  if (node->GetElementType() == XFA_Element::Field ||
++      node->GetElementType() == XFA_Element::ExclGroup) {
++    return true;
++  }
++  for (CXFA_Node* child = node->GetFirstChild(); child;
++       child = child->GetNextSibling()) {
++    if (HasFormField(child)) {
++      return true;
++    }
++  }
++  return false;
++}
++
+ void RegenerateFormFile_Container(CXFA_Node* pNode,
+                                   const RetainPtr<IFX_SeekableStream>& pStream,
+                                   bool bSaveXML) {
++  CXFA_Node* data = pNode->GetBindData();
++  if (pNode->IsLayoutGeneratedNode() && data &&
++      data->GetElementType() == XFA_Element::DataGroup &&
++      !data->GetFirstChild() && !HasFormField(pNode)) {
++    // Recreate decorative overflow containers from the template on reopen.
++    return;
++  }
+   XFA_Element eType = pNode->GetElementType();
+   if (eType == XFA_Element::Field || eType == XFA_Element::Draw ||
+       !pNode->IsContainerNode()) {
