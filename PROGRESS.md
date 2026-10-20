@@ -2,6 +2,25 @@
 
 Last updated: 2026-10-19
 
+## 2026-10-19 — Verify staged saves before destination replacement
+
+Save a copy reopens staged output in a new isolated worker before QSaveFile
+commit. A bounded committed-state digest covers all AcroForm widgets, Unicode
+values, type/flags, checkbox/radio state and selected choices. XFA packet arrays
+compare template/datasets; unsupported packet inspection and changing XFA
+pagination are explicit unchecked results. Values are never logged. The new
+Save checks report distinguishes passed, failed and unavailable scopes.
+
+Malformed verifier output, changed/lost fields, an inspection downgrade, reopen
+failure and deadline failure retain edits and the previous destination. The
+Windows broker allowlist includes verification mode; XFA addition/flattening
+restrictions remain. Focused normal/AcroForm/production-XFA, Unicode, mismatch,
+malformed/empty-response, timeout/retry, additions and live-relayout checks pass.
+The initial failures exposed a missing timer parent in the test and the existing
+XFA reopen-pagination difference; neither is presented as a successful layout
+verification. Full integration/native checks follow the next implementation slice.
+
+
 ## 2026-10-19 — Stop production XFA table headings accumulating
 
 Reproduced IRS Form 14234-C heading growth from one to four to nine across two

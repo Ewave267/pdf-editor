@@ -24,7 +24,7 @@ content in a separate worker, so additions do not accumulate duplicate copies.
 Form input is paused during saving. Later addition edits during an asynchronous
 save remain marked unsaved. A successful save clears the unsaved marker for
 the saved revision. Closing the document or window during a save is prevented
-in the UI. No autosave or crash recovery is included.
+in the UI. Idle local recovery checkpoints are available; see DESKTOP-EXPERIENCE.
 
 Reopening the new PDF displays additions as ordinary PDF content. They are no
 longer separately selectable app objects. Existing forms remain editable forms; see [FORMS](FORMS.md).
@@ -97,3 +97,31 @@ Page export and printing are described in [DOCUMENT-WORKFLOW](DOCUMENT-WORKFLOW.
 Idle local recovery checkpoints are described in
 [DESKTOP-EXPERIENCE](DESKTOP-EXPERIENCE.md). They do not overwrite the source or
 replace Save a copy.
+
+## Save compatibility checks
+
+Save a copy now reopens the staged result in a fresh isolated worker before
+atomically replacing the destination. File > Last save checks, or the Save checks
+button, shows each passed, failed or unchecked result. Failed reopening, malformed
+inspection, a verification timeout or changed form data retains current edits and
+the previous destination. Retrying performs the checks again.
+
+For inspectable AcroForms the comparison includes every widget (including hidden
+widgets), field identity/type/flags, Unicode values, checkbox/radio state and
+selected choice indices. Inspection is bounded to 4,096 widgets, 128 KiB per
+string and 16 MiB total text. Complete inspection becoming unavailable fails the
+save rather than downgrading a previously available check.
+
+For XFA packet arrays, the native public API compares saved template and datasets
+bytes against the committed snapshot. Single-stream XFA does not expose these
+packets through that API and reports field preservation as unchecked. XFA page
+counts can change on reopening even when data is preserved; such a layout check
+is explicitly unchecked. Existing unsupported XFA addition/flatten operations
+remain blocked. Ordinary save copies preserve form type and page count; page
+export reports form preservation unchecked because flattening/page changes are
+intentional. Printing is a separate rendered output and has no form-preservation
+claim.
+
+Reopening and matching form data do not certify script behavior, visual layout,
+cryptographic signatures or compatibility with every reader. Reports and
+worker diagnostics contain check scope and hashes, never form values.

@@ -10,6 +10,7 @@
 
 #include <QBuffer>
 #include <QCoreApplication>
+#include <QCryptographicHash>
 #include <QDate>
 #include <QElapsedTimer>
 #include <QFile>
@@ -866,7 +867,117 @@ class PdfDocument
     {
         host_.changed = false;
         const auto bytes = save({});
-        return {{"pdf", QString::fromLatin1(bytes.toBase64())}, {"changed", host_.changed}};
+        return {{"pdf", QString::fromLatin1(bytes.toBase64())}, {"changed", host_.changed},
+                {"verification", verification()}};
+    }
+    QJsonObject verification()
+    {
+        QJsonArray fields, packets;
+        bool complete = true;
+        qsizetype total = 0;
+        auto digest = [](const QByteArray& bytes)
+        { return QString::fromLatin1(QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex()); };
+        auto text = [&complete, &total](auto read)
+        {
+            const auto length = read(static_cast<unsigned short*>(nullptr), 0);
+            if (length < 2 || length % 2 || length > 128 * 1024 ||
+                total + length > 16 * 1024 * 1024)
+            {
+                complete = false;
+                return QString();
+            }
+            total += length;
+            QList<unsigned short> value(length / 2);
+            if (read(value.data(), length) != length)
+            {
+                complete = false;
+                return QString();
+            }
+            return QString::fromUtf16(reinterpret_cast<const char16_t*>(value.constData()),
+                                      value.size() - 1);
+        };
+        if (type_ == FORMTYPE_ACRO_FORM)
+            for (int pageIndex = 0; pageIndex < FPDF_GetPageCount(document_); ++pageIndex)
+            {
+                FPDF_PAGE page = FPDF_LoadPage(document_, pageIndex);
+                require(page, "Cannot inspect a form page.");
+                struct PageGuard { FPDF_PAGE page; ~PageGuard() { FPDF_ClosePage(page); } } guard{page};
+                const int count = FPDFPage_GetAnnotCount(page);
+                require(count >= 0 && count <= 4096, "Cannot inspect form annotations within limits.");
+                for (int index = 0; index < count; ++index)
+                {
+                    FPDF_ANNOTATION annot = FPDFPage_GetAnnot(page, index);
+                    require(annot, "Cannot inspect a form annotation.");
+                    if (FPDFAnnot_GetSubtype(annot) == FPDF_ANNOT_WIDGET)
+                    {
+                        if (fields.size() >= 4096)
+                        {
+                            complete = false;
+                            FPDFPage_CloseAnnot(annot);
+                            break;
+                        }
+                        const int type = FPDFAnnot_GetFormFieldType(form_, annot);
+                        const auto name = text([&](auto* buffer, auto size)
+                        { return FPDFAnnot_GetFormFieldName(form_, annot, buffer, size); });
+                        const auto value = text([&](auto* buffer, auto size)
+                        { return FPDFAnnot_GetFormFieldValue(form_, annot, buffer, size); });
+                        QJsonArray selected;
+                        const int options = FPDFAnnot_GetOptionCount(form_, annot);
+                        if (options > 4096)
+                            complete = false;
+                        for (int option = 0; option < std::min(options, 4096); ++option)
+                            if (FPDFAnnot_IsOptionSelected(form_, annot, option))
+                                selected.append(option);
+                        complete = complete && type > 0;
+                        fields.append(QJsonObject{{"page", pageIndex}, {"name", name},
+                            {"type", type}, {"flags", FPDFAnnot_GetFormFieldFlags(form_, annot)},
+                            {"value", value}, {"checked", bool(FPDFAnnot_IsChecked(form_, annot))},
+                            {"selected", selected}});
+                    }
+                    FPDFPage_CloseAnnot(annot);
+                }
+            }
+        bool datasets = false, xfaComplete = true;
+        if (isXfa())
+        {
+            const int count = FPDF_GetXFAPacketCount(document_);
+            xfaComplete = count > 0 && count <= 64;
+            for (int index = 0; index < std::min(count, 64); ++index)
+            {
+                char name[256]{};
+                const auto size = FPDF_GetXFAPacketName(document_, index, name, sizeof(name));
+                if (!size || size > sizeof(name) || name[size - 1] != '\0')
+                {
+                    xfaComplete = false;
+                    continue;
+                }
+                // Metadata such as timestamps may change on save; form packets must not.
+                if (QByteArray(name) != "datasets" && QByteArray(name) != "template")
+                    continue;
+                unsigned long length = 0;
+                if (!FPDF_GetXFAPacketContent(document_, index, nullptr, 0, &length) ||
+                    length > 16 * 1024 * 1024 || !length)
+                {
+                    xfaComplete = false;
+                    continue;
+                }
+                QByteArray bytes(length, Qt::Uninitialized);
+                const auto capacity = length;
+                if (!FPDF_GetXFAPacketContent(document_, index, bytes.data(), capacity, &length) ||
+                    length != capacity)
+                    xfaComplete = false;
+                else
+                {
+                    packets.append(QJsonObject{{"name", QString::fromLatin1(name)},
+                                               {"sha256", digest(bytes)}});
+                    datasets = datasets || QByteArray(name) == "datasets";
+                }
+            }
+        }
+        return {{"version", 1}, {"formType", type_}, {"pageCount", FPDF_GetPageCount(document_)},
+                {"fieldsComplete", complete}, {"fieldCount", fields.size()},
+                {"fields", digest(QJsonDocument(fields).toJson(QJsonDocument::Compact))},
+                {"xfaComplete", xfaComplete && datasets}, {"xfa", packets}};
     }
     QByteArray save(const QByteArray& overlayBytes)
     {
@@ -1091,6 +1202,7 @@ int main(int argc, char** argv)
         const auto arguments = app.arguments();
         QString inputPath = "/input.pdf";
         bool save = false;
+        bool verify = false;
         bool warm = false;
         for (int index = 1; index < arguments.size(); ++index)
         {
@@ -1104,6 +1216,8 @@ int main(int argc, char** argv)
 #endif
             if (argument == "--save")
                 save = true;
+            else if (argument == "--verify")
+                verify = true;
             else if (argument == "--warm")
                 warm = true;
 #if !defined(Q_OS_LINUX)
@@ -1117,7 +1231,7 @@ int main(int argc, char** argv)
 #ifndef Q_OS_MACOS
         pdf::detail::Library library;
 #endif
-        require(!warm || !save, "Warm-up cannot be combined with saving.");
+        require((int(warm) + int(save) + int(verify)) <= 1, "Conflicting worker modes.");
         std::unique_ptr<PdfDocument> document;
         if (warm)
         {
@@ -1142,6 +1256,12 @@ int main(int argc, char** argv)
         {
             stage("opening document snapshot");
             document = std::make_unique<PdfDocument>(inputPath);
+        }
+        if (verify)
+        {
+            document->initialize();
+            reply(document->verification());
+            return 0;
         }
         if (save)
         {

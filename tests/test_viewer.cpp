@@ -97,6 +97,95 @@ class ViewerTests : public QObject
 #endif
     }
   private slots:
+    void verifiedSaveReports()
+    {
+        QTemporaryDir directory;
+        for (const auto& path : {QString("normal/single-page.pdf"),
+                                 QString("acroform/controls.pdf"), QString("xfa-dynamic/controls.pdf"),
+                                 QString("government-us/irs-f14653.pdf")})
+        {
+            PdfDocument document;
+            document.open(fixture(path));
+            QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+            if (document.formType() == "AcroForm")
+            {
+                for (const auto& item : document.formFields())
+                    if (item.toMap()["type"].toInt() == 6)
+                    {
+                        QVERIFY(document.setFormFieldText(item.toMap()["id"].toInt(), QString::fromUtf8("Élodie <保存> & Noël")));
+                        break;
+                    }
+                QTRY_VERIFY(!document.formBusy());
+            }
+            document.saveAs(QUrl::fromLocalFile(directory.filePath("verified.pdf")));
+            QTRY_VERIFY_WITH_TIMEOUT(!document.saving(), 30000);
+            QVERIFY2(document.saveError().isEmpty(), qPrintable(document.saveError()));
+            QCOMPARE(document.saveChecks().size(), 3);
+            QCOMPARE(document.saveChecks()[0].toMap()["status"].toString(), "passed");
+            QCOMPARE(document.saveChecks()[1].toMap()["status"].toString(), "passed");
+            QCOMPARE(document.saveChecks()[2].toMap()["status"].toString(),
+                     path.startsWith("normal") || path.startsWith("xfa-dynamic") ? "unchecked" : "passed");
+        }
+    }
+    void verificationFailureRetainsDestination()
+    {
+        QTemporaryDir directory;
+        PdfDocument document;
+        document.open(fixture("acroform/controls.pdf"));
+        QTRY_VERIFY_WITH_TIMEOUT(document.ready(), 15000);
+        document.additions()->addText(0, 20, 20, "Unsaved");
+        const QString destination = directory.filePath("existing.pdf");
+        QFile output(destination);
+        QVERIFY(output.open(QIODevice::WriteOnly));
+        output.write("previous destination");
+        output.close();
+        const auto bwrap = QStandardPaths::findExecutable("bwrap");
+        QVERIFY(!bwrap.isEmpty());
+        const QByteArray previousPath = qgetenv("PATH");
+        struct RestorePath { QByteArray value; ~RestorePath() { qputenv("PATH", value); } } restore{previousPath};
+        for (const QByteArray& response : {QByteArray("{\"version\":1,\"pageCount\":1,\"formType\":1,\"fieldsComplete\":true,\"fields\":\"wrong\",\"fieldCount\":0}"),
+                                          QByteArray("not JSON"), QByteArray(), QByteArray("timeout")})
+        {
+            QFile wrapper(directory.filePath("bwrap"));
+            QVERIFY(wrapper.open(QIODevice::WriteOnly | QIODevice::Truncate));
+            wrapper.write("#!/bin/sh\nfor arg in \"$@\"; do\nif [ \"$arg\" = --verify ]; then\n" +
+                          (response == "timeout" ? QByteArray("exec /bin/sleep 60\n") : QByteArray()) +
+                          "printf '%s\\n' '" + response +
+                          "'\nexit 0\nfi\ndone\nexec '" + bwrap.toUtf8() + "' \"$@\"\n");
+            wrapper.close();
+            QVERIFY(wrapper.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner));
+            qputenv("PATH", directory.path().toUtf8() + ":" + previousPath);
+            document.saveAs(QUrl::fromLocalFile(destination));
+            if (response == "timeout")
+            {
+                auto verifying = [&document]
+                {
+                    for (auto* process : document.findChildren<QProcess*>())
+                        if (process->arguments().contains("--verify"))
+                            return true;
+                    return false;
+                };
+                QTRY_VERIFY_WITH_TIMEOUT(verifying(), 15000);
+                auto* deadline = document.findChild<QTimer*>("saveDeadline");
+                QVERIFY(deadline && deadline->isActive());
+                deadline->start(50);
+            }
+            QTRY_VERIFY_WITH_TIMEOUT(!document.saving(), 30000);
+            QVERIFY(!document.saveError().isEmpty());
+            QVERIFY(document.dirty());
+            QVERIFY(document.ready());
+            QCOMPARE(document.additions()->count(), 1);
+            QVERIFY(output.open(QIODevice::ReadOnly));
+            QCOMPARE(output.readAll(), QByteArray("previous destination"));
+            output.close();
+            QCOMPARE(document.saveChecks().last().toMap()["status"].toString(), "failed");
+        }
+        qputenv("PATH", previousPath);
+        document.saveAs(QUrl::fromLocalFile(destination));
+        QTRY_VERIFY_WITH_TIMEOUT(!document.saving(), 30000);
+        QVERIFY2(document.saveError().isEmpty(), qPrintable(document.saveError()));
+        QVERIFY(!document.dirty());
+    }
     void printToPdfRetainsEdits()
     {
         QTemporaryDir directory;

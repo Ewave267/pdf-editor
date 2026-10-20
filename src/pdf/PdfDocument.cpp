@@ -33,8 +33,11 @@ PdfDocument::PdfDocument(QObject* parent) : QObject(parent), additions_(new Adde
     savedRevision_ = additions_->revision();
     connect(additions_, &AddedContent::changed, this, &PdfDocument::saveStateChanged);
     saveDeadline_.setSingleShot(true);
+    saveDeadline_.setParent(this);
+    saveDeadline_.setObjectName("saveDeadline");
     connect(&saveDeadline_, &QTimer::timeout, this,
-            [this] { finishSave("Saving took too long. Your changes are retained."); });
+            [this] { finishSave(saveVerifying_ ? "Save verification timed out. Your changes and the previous destination are retained."
+                                              : "Saving took too long. Your changes are retained."); });
     deadline_.setSingleShot(true);
     connect(&deadline_, &QTimer::timeout, this, [this]
             { fail("The document took too long to respond. Close it and try another PDF."); });
@@ -157,6 +160,7 @@ void PdfDocument::close()
     emit formsChanged();
     saveError_.clear();
     savedPath_.clear();
+    saveChecks_.clear();
     searching_ = false;
     searchResults_.clear();
     searchError_.clear();
@@ -612,6 +616,7 @@ void PdfDocument::receive()
                 if (response["changed"].toBool())
                     ++formRevision_;
                 saveFormRevision_ = formRevision_;
+                expectedVerification_ = response["verification"].toObject();
                 startSaveWorker(baseline);
             }
         }

@@ -96,6 +96,7 @@ ApplicationWindow {
             }
             MenuSeparator {}
             MenuItem { text: "Save a copy…"; enabled: root.canEdit; onTriggered: saveDialog.open() }
+            MenuItem { text: "Last save checks…"; enabled: pdfDocument.saveChecks.length > 0; onTriggered: saveReport.open() }
             MenuItem { objectName: "pagesButton"; text: "Organize / export pages…"; enabled: root.canEdit && pdfDocument.formType !== "XFA"; onTriggered: pagesDialog.open() }
             MenuSeparator {}
             MenuItem { text: "Print…"; enabled: root.canEdit && !pdfDocument.formBusy; onTriggered: pdfDocument.print() }
@@ -623,6 +624,29 @@ ApplicationWindow {
         onAccepted: pdfDocument.exportPages(selectedFile, pageOrder.text, pageRotation.currentIndex * 90, flattenForms.checked, pagesDialog.mergeFiles)
     }
     Dialog {
+        id: saveReport
+        objectName: "saveReportDialog"
+        title: "Save compatibility checks"
+        anchors.centerIn: parent
+        modal: true
+        width: Math.min(500, root.width - 40)
+        standardButtons: Dialog.Close
+        ColumnLayout {
+            width: parent.width
+            Repeater {
+                model: pdfDocument.saveChecks
+                Label {
+                    required property var modelData
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    textFormat: Text.PlainText
+                    text: modelData.check + ": " + modelData.status + " — " + modelData.detail
+                }
+            }
+            Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; text: "These checks do not certify script behavior, visual layout, signature validity or compatibility with every PDF reader." }
+        }
+    }
+    Dialog {
         id: saveFailure
         objectName: "saveFailureDialog"
         title: "Couldn't save the PDF"
@@ -652,10 +676,10 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+0"; onActivated: pdfDocument.fitToPage() }
     property bool workflowPopupVisible: helpDialog.visible || pagesDialog.visible || pagesSaveDialog.visible || mergeDialog.visible || printSaveDialog.visible || searchDialog.visible || recoveryDialog.visible
     property bool formPopupVisible: fieldsDialog.visible || validationDialog.visible || resetDialog.visible || choiceDialog.visible || dateDialog.visible || signDialog.visible
-    readonly property bool anyDialogVisible: root.formPopupVisible || root.workflowPopupVisible || textDialog.visible || graphicDialog.visible || imageDialog.visible || fileDialog.visible || saveDialog.visible || discardDialog.visible || saveFailure.visible
+    readonly property bool anyDialogVisible: root.formPopupVisible || root.workflowPopupVisible || textDialog.visible || graphicDialog.visible || imageDialog.visible || fileDialog.visible || saveDialog.visible || discardDialog.visible || saveFailure.visible || saveReport.visible
     property bool additionHistoryShortcuts: pdfDocument.ready && !pdfDocument.saving
         && !pdfDocument.additions.editing && !graphicDialog.visible && !helpDialog.visible && !root.formPopupVisible && !root.workflowPopupVisible
-        && !textDialog.visible && !imageDialog.visible && !saveDialog.visible && !discardDialog.visible && !fileDialog.visible && !saveFailure.visible
+        && !textDialog.visible && !imageDialog.visible && !saveDialog.visible && !discardDialog.visible && !fileDialog.visible && !saveFailure.visible && !saveReport.visible
         && !(root.activeFocusItem instanceof FormInput)
         && !(root.activeFocusItem && typeof root.activeFocusItem.undo === "function")
     Shortcut { sequences: [StandardKey.Undo]; enabled: root.additionHistoryShortcuts && pdfDocument.additions.canUndo; onActivated: pdfDocument.additions.undo() }
@@ -685,6 +709,7 @@ ApplicationWindow {
             EditorButton { objectName: "redoAdditionsButton"; text: "↷"; font.pixelSize: 22; hint: "Redo added content"; enabled: root.canEdit && pdfDocument.additions.canRedo; onClicked: pdfDocument.additions.redo() }
             Label { textFormat: Text.PlainText; text: pdfDocument.ready ? pdfDocument.fileName : "PDF Editor"; color: root.textColor; font.bold: true; elide: Text.ElideMiddle; Layout.fillWidth: true; Layout.leftMargin: 12 }
             Label { objectName: "documentSaveState"; visible: pdfDocument.ready && root.width >= 900; text: pdfDocument.dirty ? "Unsaved changes" : pdfDocument.savedPath ? "Copy saved" : "Original document"; color: pdfDocument.dirty ? root.accentColor : root.mutedColor; font.pixelSize: 12 }
+            EditorButton { objectName: "saveChecksButton"; text: "Save checks"; visible: pdfDocument.saveChecks.length > 0; onClicked: saveReport.open() }
             EditorButton { objectName: "findButton"; text: "Find"; hint: "Find text in the PDF (Ctrl+F)"; enabled: root.canEdit; onClicked: searchDialog.open() }
             EditorButton { objectName: "saveButton"; text: pdfDocument.saving ? "Saving…" : "Save a copy"; hint: "Save your edits to a new PDF (Ctrl+S)"; primary: true; enabled: root.canEdit; onClicked: saveDialog.open() }
             EditorButton { objectName: "closeButton"; text: "×"; font.pixelSize: 20; hint: "Close document"; enabled: !pdfDocument.saving && (pdfDocument.ready || pdfDocument.loading || pdfDocument.error || pdfDocument.dirty); onClicked: root.closeDocument() }

@@ -33,6 +33,7 @@ class PdfDocument : public QObject
     Q_PROPERTY(bool dirty READ dirty NOTIFY saveStateChanged)
     Q_PROPERTY(QString saveError READ saveError NOTIFY saveStateChanged)
     Q_PROPERTY(QString savedPath READ savedPath NOTIFY saveStateChanged)
+    Q_PROPERTY(QVariantList saveChecks READ saveChecks NOTIFY saveStateChanged)
     Q_PROPERTY(AddedContent* additions READ additions CONSTANT)
     Q_PROPERTY(bool ready READ ready NOTIFY stateChanged)
     Q_PROPERTY(bool loading READ loading NOTIFY stateChanged)
@@ -64,6 +65,7 @@ class PdfDocument : public QObject
     }
     QString saveError() const { return saveError_; }
     QString savedPath() const { return savedPath_; }
+    QVariantList saveChecks() const { return saveChecks_; }
     QString formText() const { return formText_; }
     QString formError() const { return formError_; }
     int formFieldType() const { return formFieldType_; }
@@ -165,12 +167,16 @@ class PdfDocument : public QObject
     bool warming_ = false, warmReady_ = false;
     std::unique_ptr<QTemporaryDir> warmRuntime_;
     void updateFit();
-    void startSaveWorker(const QByteArray& baseline);
+    void startSaveWorker(const QByteArray& baseline, bool verifying = false);
     void finishSave(const QString& error);
     AddedContent* additions_;
     QProcess* saveWorker_ = nullptr;
     QTimer saveDeadline_;
     QByteArray saveBytes_, saveOverlay_;
+    QByteArray verificationBytes_;
+    QJsonObject expectedVerification_;
+    QVariantList saveChecks_;
+    bool saveVerifying_ = false;
     QJsonObject exportOptions_;
     QByteArray exportSources_;
     QStringList exportSourcePaths_;

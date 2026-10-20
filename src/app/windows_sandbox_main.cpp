@@ -266,7 +266,8 @@ int wmain(int argc, wchar_t** argv)
         trace("broker entered");
         const bool warm = argc == 3 && std::wstring(argv[1]) == L"--prepare";
         require(warm || ((argc == 3 || argc == 4) && std::wstring(argv[1]) == L"--input" &&
-                         (argc == 3 || std::wstring(argv[3]) == L"--save")),
+                         (argc == 3 || std::wstring(argv[3]) == L"--save" ||
+                          std::wstring(argv[3]) == L"--verify")),
                 "Invalid sandbox launch arguments");
         const fs::path input = fs::absolute(argv[2]);
         require(warm ? fs::is_directory(input)
@@ -383,7 +384,7 @@ int wmain(int argc, wchar_t** argv)
         std::wstring command = warm ? quote(worker.wstring()) + L" --warm"
                                     : quote(worker.wstring()) + L" --input " +
                                           quote((runtime.path / L"input.pdf").wstring()) +
-                                          (argc == 4 ? L" --save" : L"");
+                                          (argc == 4 ? L" " + std::wstring(argv[3]) : L"");
         // Do not inherit Qt/plugin configuration or search paths from the GUI.
         wchar_t systemRoot[32768]{};
         require(GetEnvironmentVariableW(L"SystemRoot", systemRoot, 32768) > 0,

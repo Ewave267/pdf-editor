@@ -138,6 +138,7 @@ void PdfDocument::saveAs(const QUrl& url)
         return;
     }
     saveError_.clear();
+    saveChecks_.clear();
     const QFileInfo target(url.toLocalFile());
     const bool sameFile = pdf::detail::sameFile(sourcePath_, target.absoluteFilePath());
     if (!ready_ || !url.isLocalFile() || url.toLocalFile().isEmpty() || sameFile ||
@@ -221,11 +222,12 @@ void PdfDocument::saveAs(const QUrl& url)
     queue_.append({id, 0, 0, {}, QJsonObject{{"op", "snapshot"}}});
     nextRequest();
 }
-void PdfDocument::startSaveWorker(const QByteArray& baseline)
+void PdfDocument::startSaveWorker(const QByteArray& baseline, bool verifying)
 {
     if (!saving_)
         return;
-    const QString input = snapshot_->filePath("form-state.pdf");
+    saveVerifying_ = verifying;
+    const QString input = snapshot_->filePath(verifying ? "verify-state.pdf" : "form-state.pdf");
     QSaveFile snapshot(input);
     if (!snapshot.open(QIODevice::WriteOnly) || snapshot.write(baseline) != baseline.size() ||
         !snapshot.commit())
@@ -247,7 +249,7 @@ void PdfDocument::startSaveWorker(const QByteArray& baseline)
         return;
     }
     args[inputIndex] = input;
-    args << "--save";
+    args << (verifying ? "--verify" : "--save");
     auto drainDiagnostics = [this]
     {
         if (!saveWorker_)
@@ -280,8 +282,9 @@ void PdfDocument::startSaveWorker(const QByteArray& baseline)
             {
                 if (!saveWorker_)
                     return;
-                saveBytes_ += saveWorker_->readAllStandardOutput();
-                if (saveBytes_.size() > 64 * 1024 * 1024)
+                auto& bytes = saveVerifying_ ? verificationBytes_ : saveBytes_;
+                bytes += saveWorker_->readAllStandardOutput();
+                if (bytes.size() > (saveVerifying_ ? 65536 : 64 * 1024 * 1024))
                     finishSave("The saved PDF exceeds the 64 MiB limit.");
             });
     connect(saveWorker_, &QProcess::errorOccurred, this,
@@ -296,13 +299,76 @@ void PdfDocument::startSaveWorker(const QByteArray& baseline)
                 if (!saveWorker_)
                     return;
                 drainDiagnostics();
-                saveBytes_ += saveWorker_->readAllStandardOutput();
+                auto& bytes = saveVerifying_ ? verificationBytes_ : saveBytes_;
+                bytes += saveWorker_->readAllStandardOutput();
                 if (code != 0 || status != QProcess::NormalExit ||
-                    !saveBytes_.startsWith("%PDF-") || saveBytes_.size() > 64 * 1024 * 1024)
+                    (!saveVerifying_ && !saveBytes_.startsWith("%PDF-")) ||
+                    bytes.size() > (saveVerifying_ ? 65536 : 64 * 1024 * 1024))
                 {
                     reportFailure();
-                    finishSave("The PDF could not be saved. Your changes are retained.");
+                    finishSave(saveVerifying_ ? "The saved PDF could not be reopened for verification. Your changes and the previous destination are retained."
+                                              : "The PDF could not be saved. Your changes are retained.");
                     return;
+                }
+                if (!saveVerifying_)
+                {
+                    disconnect(saveWorker_, nullptr, this, nullptr);
+                    saveWorker_->deleteLater();
+                    saveWorker_ = nullptr;
+                    startSaveWorker(saveBytes_, true);
+                    return;
+                }
+                QJsonParseError parseError;
+                const auto actual = QJsonDocument::fromJson(verificationBytes_, &parseError).object();
+                auto check = [this](const QString& name, const QString& state, const QString& detail)
+                { saveChecks_.append(QVariantMap{{"check", name}, {"status", state}, {"detail", detail}}); };
+                if (parseError.error != QJsonParseError::NoError || actual["version"] != 1 ||
+                    !actual["pageCount"].isDouble() || actual["pageCount"].toInt() < 1 ||
+                    actual["pageCount"].toInt() > 2000 || !actual["formType"].isDouble())
+                {
+                    finishSave("The save verifier returned an invalid result. Your changes and the previous destination are retained.");
+                    return;
+                }
+                check("Reopen", "passed", "Saved PDF reopened in a fresh isolated worker.");
+                if (!exportOptions_.isEmpty())
+                    check("Form preservation", "unchecked", "Page export intentionally changes page structure and may flatten forms.");
+                else
+                {
+                    if (expectedVerification_["version"] != 1 ||
+                        actual["formType"] != expectedVerification_["formType"] ||
+                        (formType_ != "XFA" && actual["pageCount"] != expectedVerification_["pageCount"]))
+                    {
+                        check("Document structure", "failed", "Saved form type or page count changed.");
+                        finishSave("Save verification failed: document structure changed. Your changes and the previous destination are retained.");
+                        return;
+                    }
+                    if (actual["pageCount"] == expectedVerification_["pageCount"])
+                        check("Document structure", "passed", "Form type and page count preserved.");
+                    else
+                        check("Document structure", "unchecked", "XFA pagination changed on reopen; visual layout preservation was not verified.");
+                    const bool xfa = formType_ == "XFA";
+                    const QString complete = xfa ? "xfaComplete" : "fieldsComplete";
+                    const QString value = xfa ? "xfa" : "fields";
+                    if (formType_ == "PDF")
+                        check("Form fields", "unchecked", "No form fields were reported in the source document.");
+                    else if (expectedVerification_[complete].toBool() && !actual[complete].toBool())
+                    {
+                        check("Form fields", "failed", "Previously inspectable form data could not be verified after saving.");
+                        finishSave("Save verification failed: complete form data is no longer available. Your changes and the previous destination are retained.");
+                        return;
+                    }
+                    else if (!expectedVerification_[complete].toBool())
+                        check("Form fields", "unchecked", "Complete native form inspection is unavailable; field preservation was not verified.");
+                    else if (actual[value] != expectedVerification_[value] ||
+                             (!xfa && actual["fieldCount"] != expectedVerification_["fieldCount"]))
+                    {
+                        check("Form fields", "failed", "Saved field identities, types, values or XFA packets changed.");
+                        finishSave("Save verification failed: form fields or values changed. Your changes and the previous destination are retained.");
+                        return;
+                    }
+                    else
+                        check("Form fields", "passed", xfa ? "XFA template and datasets preserved; scripts and visual layout are not certified."
+                                                          : "Form fields and values verified after saving.");
                 }
                 // Recheck immediately before commit: a destination can change while the worker
                 // runs.
@@ -358,7 +424,7 @@ void PdfDocument::startSaveWorker(const QByteArray& baseline)
 #endif
     saveWorker_->start(sandboxProgram_, args);
 #endif
-    if (saveWorker_)
+    if (saveWorker_ && !verifying)
     {
         if (!exportOptions_.isEmpty())
             saveWorker_->write("PDFEDITOR-EXPORT\n" +
@@ -383,6 +449,11 @@ void PdfDocument::finishSave(const QString& error)
         saveWorker_ = nullptr;
     }
     saveBytes_.clear();
+    verificationBytes_.clear();
+    expectedVerification_ = {};
+    if (!error.isEmpty())
+        saveChecks_.append(QVariantMap{{"check", "Save"}, {"status", "failed"}, {"detail", error}});
+    saveVerifying_ = false;
     saveOverlay_.clear();
     exportOptions_ = {};
     exportSources_.clear();
